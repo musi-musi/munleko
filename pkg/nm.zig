@@ -1,0 +1,9 @@
+pub usingnamespace @import("nm/asserts.zig");
+pub usingnamespace @import("nm/axis.zig");
+pub usingnamespace @import("nm/bounds.zig");
+pub usingnamespace @import("nm/cardinal.zig");
+pub usingnamespace @import("nm/matrix.zig");
+pub usingnamespace @import("nm/noise.zig");
+pub usingnamespace @import("nm/scalar.zig");
+pub usingnamespace @import("nm/transform.zig");
+pub usingnamespace @import("nm/vector.zig");
