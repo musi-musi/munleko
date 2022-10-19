@@ -2,11 +2,12 @@ const std = @import("std");
 const window = @import("window");
 const gl = @import("gl");
 const ls = @import("ls");
+const lua = @import("lua");
 
-const musileko = @import("musileko.zig");
+const munleko = @import("munleko.zig");
 
 const Allocator = std.mem.Allocator;
-const Session = musileko.Session;
+const Session = munleko.Session;
 const Window = window.Window;
 
 const TestShader = ls.Shader(.{
@@ -18,6 +19,8 @@ const TestShader = ls.Shader(.{
 
 
 pub fn main() !void {
+    var lua_state: ?lua.State = undefined;
+    lua_state = null;
     // try TestShader.create(.{}, "[insert code here]");
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
@@ -121,7 +124,7 @@ pub const Client = struct {
             }
             gl.clear(.color_depth);
             mesh.drawAssumeBound(3);
-            
+
             const t_ns = timer.read();
             if (t_ns > std.time.ns_per_s) {
                 timer.start_time += std.time.ns_per_s;

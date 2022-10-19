@@ -1,5 +1,5 @@
 const std = @import("std");
 
-const session = @import("musileko/session.zig");
+const session = @import("munleko/session.zig");
 pub usingnamespace session;
 

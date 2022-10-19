@@ -7,12 +7,12 @@
 
 yeah its a working title
 
-musileko is a game/engine for worlds made of voxels. currently still early in development
+munleko is a game/engine for worlds made of voxels. currently still early in development
 
 # clonin n buildin
 use zig 0.9.0, have gpu drivers that can handle opengl 3.3
 
-musileko autogenerates `.zig` files for each source directory.
+munleko autogenerates `.zig` files for each source directory.
 
 these can be manually updated with `zig build imports` following file tree changes
 

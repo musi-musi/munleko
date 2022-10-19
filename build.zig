@@ -12,6 +12,7 @@ pub fn sequence(steps: []const *Step) void {
     while (i < steps.len) : (i += 1) {
         steps[i].dependOn(steps[i - 1]);
     }
+    
 }
 
 pub fn build(b: *std.build.Builder) !void {
@@ -52,6 +53,8 @@ pub fn build(b: *std.build.Builder) !void {
         );
     }
 
+    client.addIncludeDir("pkg/lua/c");
+
 
     const run_cmd = client.run();
 
@@ -65,41 +68,41 @@ pub fn build(b: *std.build.Builder) !void {
         run_cmd.addArgs(args);
     }
 
-    // exe.addLibPath("musileko/c");
+    // exe.addLibPath("munleko/c");
     // exe.linkSystemLibrary("glfw3");
     
-    // const c_flags = .{ "-std=c99", "-I./musileko/c/"};
+    // const c_flags = .{ "-std=c99", "-I./munleko/c/"};
 
-    // exe.addIncludeDir("musileko/c/");
-    // exe.addIncludeDir("musileko/c/glad/include");
-    // exe.addCSourceFile("musileko/c/glad/src/glad.c", &c_flags);
-    // exe.addCSourceFile("musileko/c/stb_image.c", &c_flags);
+    // exe.addIncludeDir("munleko/c/");
+    // exe.addIncludeDir("munleko/c/glad/include");
+    // exe.addCSourceFile("munleko/c/glad/src/glad.c", &c_flags);
+    // exe.addCSourceFile("munleko/c/stb_image.c", &c_flags);
 
 
     // const flags: []const []const u8 = &.{
     //     "-std=c++11",
-    //     "-I./musileko/c",
-    //     "-I./musileko/c/glad/include",
-    //     "-I./musileko/c/cimgui",
-    //     "-I./musileko/c/cimgui/imgui",
-    //     "-I./musileko/c/imgui_impl",
+    //     "-I./munleko/c",
+    //     "-I./munleko/c/glad/include",
+    //     "-I./munleko/c/cimgui",
+    //     "-I./munleko/c/cimgui/imgui",
+    //     "-I./munleko/c/imgui_impl",
     // };
 
 
-    // exe.addCSourceFile("musileko/c/imgui_impl.cpp", flags);
+    // exe.addCSourceFile("munleko/c/imgui_impl.cpp", flags);
 
-    // exe.addIncludeDir("musileko/c/cimgui");
-    // exe.addIncludeDir("musileko/c/cimgui/imgui");
-    // exe.addCSourceFile("musileko/c/cimgui/cimgui.cpp", flags);
-    // exe.addCSourceFile("musileko/c/cimgui/imgui/imgui.cpp", flags);
-    // exe.addCSourceFile("musileko/c/cimgui/imgui/imgui_draw.cpp", flags);
-    // exe.addCSourceFile("musileko/c/cimgui/imgui/imgui_demo.cpp", flags);
-    // exe.addCSourceFile("musileko/c/cimgui/imgui/imgui_tables.cpp", flags);
-    // exe.addCSourceFile("musileko/c/cimgui/imgui/imgui_widgets.cpp", flags);
+    // exe.addIncludeDir("munleko/c/cimgui");
+    // exe.addIncludeDir("munleko/c/cimgui/imgui");
+    // exe.addCSourceFile("munleko/c/cimgui/cimgui.cpp", flags);
+    // exe.addCSourceFile("munleko/c/cimgui/imgui/imgui.cpp", flags);
+    // exe.addCSourceFile("munleko/c/cimgui/imgui/imgui_draw.cpp", flags);
+    // exe.addCSourceFile("munleko/c/cimgui/imgui/imgui_demo.cpp", flags);
+    // exe.addCSourceFile("munleko/c/cimgui/imgui/imgui_tables.cpp", flags);
+    // exe.addCSourceFile("munleko/c/cimgui/imgui/imgui_widgets.cpp", flags);
 
-    // exe.addIncludeDir("musileko/c/imgui_impl");
-    // exe.addCSourceFile("musileko/c/imgui_impl/imgui_impl_glfw.cpp", flags);
-    // exe.addCSourceFile("musileko/c/imgui_impl/imgui_impl_opengl3.cpp", flags);
+    // exe.addIncludeDir("munleko/c/imgui_impl");
+    // exe.addCSourceFile("munleko/c/imgui_impl/imgui_impl_glfw.cpp", flags);
+    // exe.addCSourceFile("munleko/c/imgui_impl/imgui_impl_opengl3.cpp", flags);
 
     // exe.linkLibCpp();
     // exe.linkLibC();
@@ -114,7 +117,7 @@ pub fn build(b: *std.build.Builder) !void {
     // const run_step = b.step("run", "Run the app");
     // run_step.dependOn(&run_cmd.step);
 
-    // const exe_tests = b.addTest("srmusileko/c/main.zig");
+    // const exe_tests = b.addTest("srmunleko/c/main.zig");
     // exe_tests.setBuildMode(mode);
 
     // const test_step = b.step("test", "Run unit tests");
@@ -130,6 +133,7 @@ const pkgs = struct {
 
     const nm = pkg("nm", null);
     const util = pkg("util", null);
+    const lua = pkg("lua", null);
 
     fn pkg(comptime name: []const u8, deps: ?[]const Pkg) Pkg {
         return Pkg {
@@ -144,11 +148,10 @@ const pkgs = struct {
 fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build.LibExeObjStep {
 
 
-    // b.installBinFile("musileko/c/glfw3.dll", "glfw3.dll");
+    // b.installBinFile("munleko/c/glfw3.dll", "glfw3.dll");
 
 
-    const exe = b.addExecutable("musileko", "src/" ++ frontend_id ++ ".zig");
-
+    const exe = b.addExecutable("munleko", "src/" ++ frontend_id ++ ".zig");
 
 
     inline for (std.meta.declarations(pkgs)) |decl| {
