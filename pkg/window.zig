@@ -33,6 +33,11 @@ pub const GlContextOptions = struct {
 
 pub const getGlProcAddress = c.glfwGetProcAddress;
 
+pub const Vsync = enum(c_int) {
+    disabled = 0,
+    enabled = 1,
+};
+
 pub const Window = struct {
 
     allocator: Allocator,
@@ -41,6 +46,7 @@ pub const Window = struct {
     held_buttons: ButtonSet = .{},
     width: u32 = 1280,
     height: u32 = 720,
+    vsync: Vsync = .disabled,
 
     pub const Events = util.Events(union (enum) {
         button_pressed: ButtonCode,
@@ -89,15 +95,22 @@ pub const Window = struct {
         else {
             return error.GlfwCreateWindowFailed;
         }
+
+        self.setVsync(self.vsync);
+    }
+
+    pub fn destroy(self: *Window) void {
+        c.glfwDestroyWindow(self.handle);
+        self.handle = null;
     }
 
     pub fn makeContextCurrent(self: Window) void {
         c.glfwMakeContextCurrent(self.handle);
     }
 
-    pub fn destroy(self: *Window) void {
-        c.glfwDestroyWindow(self.handle);
-        self.handle = null;
+    pub fn setVsync(self: *Window, vsync: Vsync) void {
+        self.vsync = vsync;
+        c.glfwSwapInterval(@enumToInt(vsync));
     }
 
     pub fn nextFrame(self: *Window) bool {
@@ -184,7 +197,7 @@ pub const ButtonState = enum(c_int) {
 };
 
 pub const ButtonCode = enum(c_int) {
-    
+
     const Self = @This();
 
     fn fromButtonCode(key: ButtonCode) Self {

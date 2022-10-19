@@ -55,10 +55,85 @@ pub fn setEnabled(cap: Capability, enabled: Enabled) void {
     }
 }
 
-
 pub const Name = UInt;
 
+pub const IndexType = enum(c_int) {
+    ubyte = c.GL_UNSIGNED_BYTE,
+    ushort = c.GL_UNSIGNED_SHORT,
+    uint = c.GL_UNSIGNED_INT,
 
+    pub fn Type(comptime self: IndexType) type {
+        return switch(self) {
+            .ubyte => u8,
+            .ushort => u16,
+            .uint => u32,
+        };
+    }
+
+};
+
+pub fn clearColor(color: [4]f32) void {
+    c.glClearColor(color[0], color[1], color[2], color[3]);
+}
+
+pub const DepthBits = enum {
+    float,
+    double,
+
+    pub fn Type(comptime self: DepthBits) type {
+        return switch(self) {
+            .float => f32,
+            .double => f64,
+        };
+    }
+
+};
+
+pub fn clearDepth(comptime bits: DepthBits, depth: bits.Type()) void {
+    c.glClearDepth(@floatCast(f64, depth));
+}
+
+pub fn clearStencil(stencil: i32) void {
+    c.glClearStencil(stencil);
+}
+
+pub const ClearFlags = enum(u32) {
+    color = c.GL_COLOR_BUFFER_BIT,
+    depth = c.GL_DEPTH_BUFFER_BIT,
+    stencil = c.GL_STENCIL_BUFFER_BIT,
+    color_depth = c.GL_COLOR_BUFFER_BIT | c.GL_DEPTH_BUFFER_BIT,
+    depth_stencil = c.GL_DEPTH_BUFFER_BIT | c.GL_STENCIL_BUFFER_BIT,
+    color_stencil = c.GL_COLOR_BUFFER_BIT | c.GL_STENCIL_BUFFER_BIT,
+    color_depth_stencil = c.GL_COLOR_BUFFER_BIT | c.GL_DEPTH_BUFFER_BIT | c.GL_STENCIL_BUFFER_BIT,
+};
+
+pub fn clear(flags: ClearFlags) void {
+    c.glClear(@enumToInt(flags));
+}
+
+pub const PrimitiveType = enum(c_uint) {
+    points = c.GL_POINTS,
+    line_strip = c.GL_LINE_STRIP,
+    line_loop = c.GL_LINE_LOOP,
+    lines = c.GL_LINES,
+    triangle_strip = c.GL_TRIANGLE_STRIP,
+    triangle_fan = c.GL_TRIANGLE_FAN,
+    triangles = c.GL_TRIANGLES,
+};
+
+pub fn drawElements(primitive_type: PrimitiveType, index_count: usize, comptime index_type: IndexType) void {
+    c.glDrawElements(@enumToInt(primitive_type), @intCast(c_int, index_count), @enumToInt(index_type), null);
+}
+
+pub fn drawElementsInstanced(primitive_type: PrimitiveType, index_count: usize, comptime index_type: IndexType, instance_count: usize) void {
+    c.glDrawElementsInstanced(
+        @enumToInt(primitive_type),
+        @intCast(c_int, index_count),
+        @enumToInt(index_type),
+        null,
+        @intCast(c_int, instance_count),
+    );
+}
 
 pub const BufferUsage = enum(UInt) {
     stream_draw = c.GL_STREAM_DRAW,
@@ -94,9 +169,8 @@ pub fn Buffer(comptime T: type) type {
             return self;
         }
 
-        pub fn destroy(self: *Self) void {
+        pub fn destroy(self: Self) void {
             c.glDeleteBuffers(1, &self.name);
-            self.name = 0;
         }
 
         pub fn alloc(self: Self, size: usize, usage: BufferUsage) void {
@@ -128,9 +202,8 @@ pub const Array = struct {
         return self;
     }
 
-    pub fn destroy(self: *Array) void {
+    pub fn destroy(self: Array) void {
         c.glDeleteVertexArrays(1, &self.name);
-        self.name = 0;
     }
 
     pub fn setAttributeFormat(self: Array, binding: u32, attr: u32, attr_type: AttrType, stride: usize) void {
@@ -166,37 +239,6 @@ pub const Array = struct {
         );
     }
 
-    pub fn setAttributeFormatFromField(self: Array, binding: u32, attr: u32, comptime T: type, comptime field_name: []const u8) void {
-        const attr_type: AttrType = comptime (
-            for (std.meta.fields(T)) |field| {
-                if (std.mem.eql(u8, field.name, field_name)) {
-                    break AttrType.fromType(field.field_type);
-                }
-            }
-            else {
-                @compileError(@typeName(T) ++ " has no field named " ++ field_name);
-            }
-        );
-        self.setAttributeFormat(binding, attr, attr_type, @offsetOf(T, field_name));
-    }
-
-    pub fn StructAttrIndices(comptime T: type) type {
-        return union(enum) {
-            first: u32,
-            indices: [std.meta.fields(T).len]u32,
-        };
-    }
-
-    pub fn setAttributeFormatsFromStruct(self: Array, binding: u32, comptime T: type, indices: StructAttrIndices(T)) void {
-        inline for (std.meta.fields(T)) |field, i| {
-            const attr: u32 = switch (indices) {
-                .first => |a| a + i,
-                .indices => |a| a[i],
-            };
-            self.setAttributeFormat(binding, attr, comptime AttrType.fromType(field.field_type), @offsetOf(T, field.name));
-        }
-    }
-
     pub fn setBindingDivisor(self: Array, binding: u32, divisor: u32) void {
         c.glVertexArrayBindingDivisor(
             self.name,
@@ -205,7 +247,7 @@ pub const Array = struct {
         );
     }
 
-    pub fn bindVertexBuffer(self: Array, binding: u32, buffer: anytype, offset: u32) void {
+    pub fn setVertexBuffer(self: Array, binding: u32, buffer: anytype, offset: u32) void {
         const B = @TypeOf(buffer);
         comptime assertIsBuffer(B);
         c.glVertexArrayVertexBuffer(
@@ -213,11 +255,11 @@ pub const Array = struct {
             @intCast(UInt, binding),
             buffer.name,
             @intCast(c.GLintptr, offset),
-            @intCast(c_int, buffer.stride),
+            @intCast(c_int, B.stride),
         );
     }
 
-    pub fn bindIndexBuffer(self: Array, buffer: anytype) void {
+    pub fn setIndexBuffer(self: Array, buffer: anytype) void {
         comptime assertIsBuffer(@TypeOf(buffer));
         c.glVertexArrayElementBuffer(self.name, buffer.name);
     }
@@ -313,7 +355,7 @@ pub const StageType = enum(UInt) {
 };
 
 fn assertIsStage(comptime T: type) void {
-    if (!@hasDecl(T, "stage_type") or T != Buffer(T.stage_type)) {
+    if (!@hasDecl(T, "stage_type") or T != Stage(T.stage_type)) {
         @compileError(@typeName(T) ++ " is not a gl.Stage");
     }
 }
@@ -336,7 +378,7 @@ pub fn Stage(comptime stage: StageType) type {
             };
         }
 
-        pub fn destroy(self: *Self) void {
+        pub fn destroy(self: Self) void {
             c.glDeleteShader(self.name);
         }
 
@@ -375,9 +417,8 @@ pub const Program = struct {
         };
     }
 
-    pub fn destroy(self: *Program) void {
+    pub fn destroy(self: Program) void {
         c.glDeleteProgram(self.name);
-        self.name = 0;
     }
 
     pub fn attach(self: Program, stage: anytype) void {
@@ -476,6 +517,17 @@ pub const GlslPrimitive = enum(u8) {
     mat3,
     mat4,
 
+    pub fn fromType(comptime T: type) GlslPrimitive {
+        comptime {
+            for (std.enums.values(GlslPrimitive)) |t| {
+                if (T == t.Type()) {
+                    return t;
+                }
+            }
+            @compileError(@typeName(T) ++ " us not a gl.GlslPrimitive");
+        }
+    } 
+
     /// get the zig type used to represent this glsl type
     pub fn Type(comptime self: GlslPrimitive) type {
         return switch(self) {
@@ -497,12 +549,6 @@ pub const GlslPrimitive = enum(u8) {
             .uivec3 => [3]u32,
             .uivec4 => [4]u32,
         };
-        if (self.count) |count| {
-            return [count]PrimitiveType;
-        }
-        else {
-            return PrimitiveType;
-        }
     }
 
     /// get the zig type used to represent the underlying element

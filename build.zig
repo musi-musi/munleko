@@ -15,9 +15,20 @@ pub fn sequence(steps: []const *Step) void {
 }
 
 pub fn build(b: *std.build.Builder) !void {
-    
+    // Standard target options allows the person running `zig build` to choose
+    // what target to build for. Here we do not override the defaults, which
+    // means any target is allowed, and the default is native. Other options
+    // for restricting supported target set are available.
+    const target = b.standardTargetOptions(.{});
+
+    // Standard release options allow the person running `zig build` to select
+    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
+    const mode = b.standardReleaseOptions();
+
     const client = buildBase(b, "client");
     client.linkLibC();
+    client.setBuildMode(mode);
+    client.setTarget(target);
 
     client.addPackage(pkgs.pkg("window", &.{ pkgs.util }));
 
@@ -34,12 +45,13 @@ pub fn build(b: *std.build.Builder) !void {
     client.addIncludeDir("pkg/gl/c");
     client.addCSourceFile("pkg/gl/c/glad.c", &.{"-std=c99"});
     // client.addSystemIncludeDir("");
+    
+    if (target.getOsTag() == .windows) {
+        client.step.dependOn(
+            &b.addInstallBinFile(.{.path = "pkg/window/c/glfw3.dll"}, "glfw3.dll").step,
+        );
+    }
 
-
-    sequence(&[_]*Step{
-        &b.addInstallBinFile(.{.path = "pkg/window/c/glfw3.dll"}, "glfw3.dll").step,
-        &client.step,
-    });
 
     const run_cmd = client.run();
 
@@ -130,23 +142,14 @@ const pkgs = struct {
 
 
 fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build.LibExeObjStep {
-    // Standard target options allows the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
-    const target = b.standardTargetOptions(.{});
 
-    // Standard release options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
 
     // b.installBinFile("musileko/c/glfw3.dll", "glfw3.dll");
 
 
     const exe = b.addExecutable("musileko", "src/" ++ frontend_id ++ ".zig");
 
-    exe.setTarget(target);
-    exe.setBuildMode(mode);
+
 
     inline for (std.meta.declarations(pkgs)) |decl| {
         const pkg = @field(pkgs, decl.name);
