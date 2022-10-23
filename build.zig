@@ -45,7 +45,6 @@ pub fn build(b: *std.build.Builder) !void {
 
     client.addIncludeDir("pkg/gl/c");
     client.addCSourceFile("pkg/gl/c/glad.c", &.{"-std=c99"});
-    // client.addSystemIncludeDir("");
     
     if (target.getOsTag() == .windows) {
         client.step.dependOn(
@@ -53,8 +52,11 @@ pub fn build(b: *std.build.Builder) !void {
         );
     }
 
-    client.addIncludeDir("pkg/lua/c");
+    client.addIncludeDir("lua/src");
 
+    const lua = try createLuaStep(b);
+
+    client.linkLibrary(lua);
 
     const run_cmd = client.run();
 
@@ -67,61 +69,6 @@ pub fn build(b: *std.build.Builder) !void {
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
-
-    // exe.addLibPath("munleko/c");
-    // exe.linkSystemLibrary("glfw3");
-    
-    // const c_flags = .{ "-std=c99", "-I./munleko/c/"};
-
-    // exe.addIncludeDir("munleko/c/");
-    // exe.addIncludeDir("munleko/c/glad/include");
-    // exe.addCSourceFile("munleko/c/glad/src/glad.c", &c_flags);
-    // exe.addCSourceFile("munleko/c/stb_image.c", &c_flags);
-
-
-    // const flags: []const []const u8 = &.{
-    //     "-std=c++11",
-    //     "-I./munleko/c",
-    //     "-I./munleko/c/glad/include",
-    //     "-I./munleko/c/cimgui",
-    //     "-I./munleko/c/cimgui/imgui",
-    //     "-I./munleko/c/imgui_impl",
-    // };
-
-
-    // exe.addCSourceFile("munleko/c/imgui_impl.cpp", flags);
-
-    // exe.addIncludeDir("munleko/c/cimgui");
-    // exe.addIncludeDir("munleko/c/cimgui/imgui");
-    // exe.addCSourceFile("munleko/c/cimgui/cimgui.cpp", flags);
-    // exe.addCSourceFile("munleko/c/cimgui/imgui/imgui.cpp", flags);
-    // exe.addCSourceFile("munleko/c/cimgui/imgui/imgui_draw.cpp", flags);
-    // exe.addCSourceFile("munleko/c/cimgui/imgui/imgui_demo.cpp", flags);
-    // exe.addCSourceFile("munleko/c/cimgui/imgui/imgui_tables.cpp", flags);
-    // exe.addCSourceFile("munleko/c/cimgui/imgui/imgui_widgets.cpp", flags);
-
-    // exe.addIncludeDir("munleko/c/imgui_impl");
-    // exe.addCSourceFile("munleko/c/imgui_impl/imgui_impl_glfw.cpp", flags);
-    // exe.addCSourceFile("munleko/c/imgui_impl/imgui_impl_opengl3.cpp", flags);
-
-    // exe.linkLibCpp();
-    // exe.linkLibC();
-    // exe.install();
-
-    // const run_cmd = exe.run();
-    // run_cmd.step.dependOn(b.getInstallStep());
-    // if (b.args) |args| {
-    //     run_cmd.addArgs(args);
-    // }
-
-    // const run_step = b.step("run", "Run the app");
-    // run_step.dependOn(&run_cmd.step);
-
-    // const exe_tests = b.addTest("srmunleko/c/main.zig");
-    // exe_tests.setBuildMode(mode);
-
-    // const test_step = b.step("test", "Run unit tests");
-    // test_step.dependOn(&exe_tests.step);
 }
 
 const fs = std.fs;
@@ -148,9 +95,6 @@ const pkgs = struct {
 fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build.LibExeObjStep {
 
 
-    // b.installBinFile("munleko/c/glfw3.dll", "glfw3.dll");
-
-
     const exe = b.addExecutable("munleko", "src/" ++ frontend_id ++ ".zig");
 
 
@@ -162,23 +106,25 @@ fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build
     }
 
 
-    // const build_src =
-    // \\pub const FrontendId = enum {
-    // \\    client,
-    // \\    server,
-    // \\};
-    // \\
-    // \\
-    // ;
-
-    // const build_step = b.addWriteFile("build.zig", build_src ++ "pub const frontend: FrontendId = ." ++ frontend_id ++ ";\n");
-    // exe.step.dependOn(&build_step.step);
-    // const build_pkg = Pkg {
-    //     .name = "build",
-    //     .path = build_step.getFileSource("build.zig").?,
-    // };
-    // exe.addPackage(build_pkg);
-
-
     return exe;
+}
+
+fn createLuaStep(b: *Builder) !*std.build.LibExeObjStep {
+    const lua = b.addStaticLibrary("lua", null);
+    var dir = try std.fs.cwd().openDir("lua/src", .{.iterate = true});
+    defer dir.close();
+
+    lua.linkLibC();
+    var iter = dir.iterate();
+    while (try iter.next()) |entry| {
+        if (std.mem.endsWith(u8, entry.name, ".c")) {
+            const path = try std.fmt.allocPrint(b.allocator, "lua/src/{s}", .{entry.name});
+            // std.log.info("{s}", .{path});
+            lua.addCSourceFile(path, &.{"-std=c99"});
+        }
+    }
+
+    lua.addIncludeDir("lua/src");
+
+    return lua;
 }

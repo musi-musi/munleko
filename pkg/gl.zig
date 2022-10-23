@@ -38,7 +38,9 @@ pub const Capability = enum(UInt) {
     stencil_test = c.GL_STENCIL_TEST,
     framebuffer_srgb = c.GL_FRAMEBUFFER_SRGB,
     multisample = c.GL_MULTISAMPLE,
+    cull_face = c.GL_CULL_FACE,
 };
+
 
 pub fn enable(cap: Capability) void {
     c.glEnable(@enumToInt(cap));
@@ -53,6 +55,21 @@ pub fn setEnabled(cap: Capability, enabled: Enabled) void {
         .enabled => enable(cap),
         .disabled => disable(cap),
     }
+}
+
+pub const DepthFunc = enum(c_uint) {
+    never = c.GL_NEVER,
+    less = c.GL_LESS,
+    equal = c.GL_EQUAL,
+    lequal = c.GL_LEQUAL,
+    greater = c.GL_GREATER,
+    not_equal = c.GL_NOTEQUAL,
+    gequal = c.GL_GEQUAL,
+    always = c.GL_ALWAYS,
+};
+
+pub fn setDepthFunction(func: DepthFunc) void {
+    c.glDepthFunc(@enumToInt(func));
 }
 
 pub const Name = UInt;
@@ -467,7 +484,7 @@ pub const Program = struct {
         comptime uniform_type: GlslPrimitive,
         value: []const uniform_type.Type(),
     ) void {
-        const count = @intCast(c_uint, value.len);
+        const count = @intCast(c_int, value.len);
         const ptr = @ptrCast(*const uniform_type.Element(), value.ptr);
         const transpose = 0;
         switch (uniform_type) {

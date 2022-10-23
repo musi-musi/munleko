@@ -184,7 +184,7 @@ pub fn Shader(comptime shader_defs: ShaderDefs) type {
 
             var locations: defs.UniformLocations() = undefined;
             inline for (defs.uniforms) |uniform, i| {
-                locations[i] = program.getUniformLocation(uniform ++ "");
+                locations[i] = program.getUniformLocation("u_" ++ uniform.name ++ "");
             }
 
             return Self {

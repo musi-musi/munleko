@@ -2,13 +2,18 @@ const std = @import("std");
 const window = @import("window");
 const gl = @import("gl");
 const ls = @import("ls");
-const lua = @import("lua");
+const nm = @import("nm");
+
+const Vec3 = nm.Vec3;
+const vec3 = nm.vec3;
 
 const munleko = @import("munleko.zig");
 
 const Allocator = std.mem.Allocator;
 const Session = munleko.Session;
 const Window = window.Window;
+
+pub const rendering = @import("client/rendering.zig");
 
 const TestShader = ls.Shader(.{
     .vert_inputs = &.{
@@ -19,8 +24,6 @@ const TestShader = ls.Shader(.{
 
 
 pub fn main() !void {
-    var lua_state: ?lua.State = undefined;
-    lua_state = null;
     // try TestShader.create(.{}, "[insert code here]");
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
@@ -57,6 +60,7 @@ pub const Client = struct {
         self.session.deinit();
     }
 
+
     pub fn run(self: *Client) !void {
         try self.window.create(.{});
         defer self.window.destroy();
@@ -64,57 +68,20 @@ pub const Client = struct {
         self.window.setVsync(.disabled);
         try gl.init(window.getGlProcAddress);
         gl.viewport(.{self.window.width, self.window.height});
+        gl.enable(.depth_test);
+        gl.setDepthFunction(.less);
+        gl.enable(.cull_face);
 
-        const Vert = struct {
-            position: [2]f32,
-            color: [3]f32,
-        };
-
-        const Mesh = ls.Mesh(.{
-            .buffers = &.{ ls.defVertexBuffer(Vert)}
-        });
-
-        const VertBuffer = Mesh.Buffer(0);
-
-        const mesh = Mesh.create();
-        defer mesh.destroy();
-
-        const verts = VertBuffer.create();
-        defer verts.destroy();
-        verts.data(&.{
-            .{
-                .position = .{-0.5, -0.5},
-                .color = .{ 1.0, 0.5, 0.5},
-            },
-            .{
-                .position = .{ 0.0,  0.5},
-                .color = .{ 0.5, 1.0, 0.5},
-            },
-            .{
-                .position = .{ 0.5, -0.5},
-                .color = .{ 0.5, 0.5, 1.0},
-            },
-        }, .static_draw);
-
-        const indices = Mesh.IndexBuffer.create();
-        defer indices.destroy();
-        indices.data(&.{ 0, 1, 2 }, .static_draw);
-
-        mesh.setBuffer(0, verts);
-        mesh.setIndexBuffer(indices);
-
-        mesh.bind();
+        const dbg = try rendering.Debug.init();
+        defer dbg.deinit();
+        
+        dbg.setLight(vec3(.{1, 3, 2}).norm());
+        dbg.setView(nm.transform.createLookAt(vec3(.{-2, 1.7, -1.5}), Vec3.zero, Vec3.unit(.y)));
 
         gl.clearColor(.{0, 0, 0, 1});
+        gl.clearDepth(.float, 1);
 
-        const Shader = ls.Shader(.{
-            .vert_inputs = Mesh.vertex_in_defs,
-        });
-
-        const shader = try Shader.create(.{}, @embedFile("test.glsl"));
-        defer shader.destroy();
-
-        shader.use();
+        dbg.start();
 
         var timer = try std.time.Timer.start();
         var frames: u32 = 0;
@@ -123,8 +90,15 @@ pub const Client = struct {
                 gl.viewport(size);
             }
             gl.clear(.color_depth);
-            mesh.drawAssumeBound(3);
-
+            dbg.setProj(
+                nm.transform.createPerspective(
+                    90.0 * std.math.pi / 180.0,
+                    @intToFloat(f32, self.window.width) / @intToFloat(f32, self.window.height),
+                    0.001, 1000,
+                )
+            );
+            dbg.drawCube(Vec3.zero, 1, vec3(.{0.8, 1, 1}));
+            // mesh.drawAssumeBound(3);
             const t_ns = timer.read();
             if (t_ns > std.time.ns_per_s) {
                 timer.start_time += std.time.ns_per_s;
