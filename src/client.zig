@@ -102,7 +102,7 @@ pub const Client = struct {
             const t_ns = timer.read();
             if (t_ns > std.time.ns_per_s) {
                 timer.start_time += std.time.ns_per_s;
-                std.log.info("fps: {d}", .{frames});
+                // std.log.info("fps: {d}", .{frames});
                 frames = 0;
             }
             frames += 1;

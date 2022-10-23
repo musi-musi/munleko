@@ -1,22 +1,10 @@
-# musi leko
-> musi: game, fun, entertainment
+# munleko
 
-> leko: block, square, cube
+voxel game engine in zig and lua
 
-> musi leko: block game, square fun
-
-yeah its a working title
-
-munleko is a game/engine for worlds made of voxels. currently still early in development
 
 # clonin n buildin
-use zig 0.9.0, have gpu drivers that can handle opengl 3.3
-
-munleko autogenerates `.zig` files for each source directory.
-
-these can be manually updated with `zig build imports` following file tree changes
-
-use `zig build clean_imports` to delete them
+use zig 0.9.1, have gpu drivers that can handle opengl 3.3
 
 ## windows
 just `zig build run`, it *should* work
