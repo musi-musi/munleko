@@ -3,6 +3,7 @@ const window = @import("window");
 const gl = @import("gl");
 const ls = @import("ls");
 const nm = @import("nm");
+const util = @import("util");
 
 const Vec3 = nm.Vec3;
 const vec3 = nm.vec3;
@@ -50,7 +51,7 @@ pub const Client = struct {
             allocator,
             Session.Callbacks.init(
                 self,
-                tick,
+                &tick,
             ),
         );
     }
@@ -83,8 +84,8 @@ pub const Client = struct {
 
         dbg.start();
 
-        var timer = try std.time.Timer.start();
-        var frames: u32 = 0;
+        var fps_counter = try util.FpsCounter.start(1);
+
         while (self.window.nextFrame()) {
             for(self.window.events.get(.framebuffer_size)) |size| {
                 gl.viewport(size);
@@ -99,13 +100,9 @@ pub const Client = struct {
             );
             dbg.drawCube(Vec3.zero, 1, vec3(.{0.8, 1, 1}));
             // mesh.drawAssumeBound(3);
-            const t_ns = timer.read();
-            if (t_ns > std.time.ns_per_s) {
-                timer.start_time += std.time.ns_per_s;
-                // std.log.info("fps: {d}", .{frames});
-                frames = 0;
+            if (fps_counter.tick()) |frames| {
+                std.log.info("fps: {d}", .{frames});
             }
-            frames += 1;
         }
     }
 

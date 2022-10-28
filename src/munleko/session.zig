@@ -80,12 +80,12 @@ pub const Session = struct {
         vtable: *const VTable,
 
         pub const VTable = struct {
-            tick: fn(ptr: *anyopaque, session: *Session) anyerror!void,
+            tick: *const fn(ptr: *anyopaque, session: *Session) anyerror!void,
         };
 
         pub fn init(
             pointer: anytype,
-            comptime tickFn: fn(@TypeOf(pointer), *Session) anyerror!void,
+            comptime tickFn: *const fn(@TypeOf(pointer), *Session) anyerror!void,
         ) Callbacks {
             const Ptr = @TypeOf(pointer);
             const alignment = @typeInfo(Ptr).Pointer.alignment;

@@ -13,14 +13,14 @@ pub fn Events(comptime channels_def: type) type {
         pub const ChannelTag = std.meta.Tag(channels_def);
         pub const Channels = blk: {
             const fields = std.meta.fields(channels_def);
-            var channels_fields: [fields.len]std.builtin.TypeInfo.StructField = undefined;
+            var channels_fields: [fields.len]std.builtin.Type.StructField = undefined;
             for (fields) |field, i| {
                 const List = std.ArrayListUnmanaged(field.field_type);
                 const default_value: List = .{};
                 channels_fields[i] = .{
                     .name = field.name,
                     .field_type = List,
-                    .default_value = default_value,
+                    .default_value = &default_value,
                     .is_comptime = false,
                     .alignment = @alignOf(List),
                 };

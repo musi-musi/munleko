@@ -31,7 +31,7 @@ pub const GlContextOptions = struct {
     };
 };
 
-pub const getGlProcAddress = c.glfwGetProcAddress;
+pub const getGlProcAddress = &c.glfwGetProcAddress;
 
 pub const Vsync = enum(c_int) {
     disabled = 0,

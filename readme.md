@@ -4,7 +4,7 @@ voxel game engine in zig and lua
 
 
 # clonin n buildin
-use zig 0.9.1, have gpu drivers that can handle opengl 3.3
+use zig master, have gpu drivers that can handle opengl 3.3
 
 ## windows
 just `zig build run`, it *should* work

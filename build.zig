@@ -33,8 +33,8 @@ pub fn build(b: *std.build.Builder) !void {
 
     client.addPackage(pkgs.pkg("window", &.{ pkgs.util }));
 
-    client.addIncludeDir("pkg/window/c");
-    client.addLibPath("pkg/window/c/");
+    client.addIncludePath("pkg/window/c");
+    client.addLibraryPath("pkg/window/c/");
     client.linkSystemLibrary("glfw3");
 
     const gl = pkgs.pkg("gl", null);
@@ -43,7 +43,7 @@ pub fn build(b: *std.build.Builder) !void {
     const ls = pkgs.pkg("ls", &.{ gl });
     client.addPackage(ls);
 
-    client.addIncludeDir("pkg/gl/c");
+    client.addIncludePath("pkg/gl/c");
     client.addCSourceFile("pkg/gl/c/glad.c", &.{"-std=c99"});
     
     if (target.getOsTag() == .windows) {
@@ -52,7 +52,7 @@ pub fn build(b: *std.build.Builder) !void {
         );
     }
 
-    client.addIncludeDir("lua/src");
+    client.addIncludePath("lua/src");
 
     const lua = try createLuaStep(b);
 
@@ -85,7 +85,7 @@ const pkgs = struct {
     fn pkg(comptime name: []const u8, deps: ?[]const Pkg) Pkg {
         return Pkg {
             .name = name,
-            .path = .{ .path = "pkg/" ++ name ++ ".zig" },
+            .source = .{ .path = "pkg/" ++ name ++ ".zig" },
             .dependencies = deps,
         };
     }
@@ -98,7 +98,7 @@ fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build
     const exe = b.addExecutable("munleko", "src/" ++ frontend_id ++ ".zig");
 
 
-    inline for (std.meta.declarations(pkgs)) |decl| {
+    inline for (comptime std.meta.declarations(pkgs)) |decl| {
         const pkg = @field(pkgs, decl.name);
         if (@TypeOf(pkg) == Pkg) {
             exe.addPackage(pkg);
@@ -111,7 +111,7 @@ fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build
 
 fn createLuaStep(b: *Builder) !*std.build.LibExeObjStep {
     const lua = b.addStaticLibrary("lua", null);
-    var dir = try std.fs.cwd().openDir("lua/src", .{.iterate = true});
+    var dir = try std.fs.cwd().openIterableDir("lua/src", .{});
     defer dir.close();
 
     lua.linkLibC();
@@ -124,7 +124,7 @@ fn createLuaStep(b: *Builder) !*std.build.LibExeObjStep {
         }
     }
 
-    lua.addIncludeDir("lua/src");
+    lua.addIncludePath("lua/src");
 
     return lua;
 }

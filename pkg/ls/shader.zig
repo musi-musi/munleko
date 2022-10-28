@@ -63,7 +63,7 @@ pub const ShaderDefs = struct {
         if (self.uniforms.len == 0) {
             return void;
         }
-        var uniform_tag_fields: [self.uniforms.len]TypeInfo.EnumField = undefined;
+        var uniform_tag_fields: [self.uniforms.len]Type.EnumField = undefined;
         for (self.uniforms) |uniform, i| {
             uniform_tag_fields[i] = .{
                 .name = uniform.name,
@@ -127,7 +127,7 @@ pub const ShaderSourceVersion = struct {
     };
 };
 
-const TypeInfo = std.builtin.TypeInfo;
+const Type = std.builtin.Type;
 pub fn Shader(comptime shader_defs: ShaderDefs) type {
 
     return struct {
