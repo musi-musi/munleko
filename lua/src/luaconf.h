@@ -158,6 +158,9 @@
 #endif				/* } */
 
 
+#define LUA_FLOAT_TYPE LUA_FLOAT_DOUBLE
+#define LUA_INT_TYPE LUA_INT_LONG
+
 /* }================================================================== */
 
 

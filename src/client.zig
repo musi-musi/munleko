@@ -4,6 +4,11 @@ const gl = @import("gl");
 const ls = @import("ls");
 const nm = @import("nm");
 const util = @import("util");
+const lua = @import("lua");
+
+comptime {
+    _ = lua;
+}
 
 const Vec3 = nm.Vec3;
 const vec3 = nm.vec3;
@@ -16,18 +21,14 @@ const Window = window.Window;
 
 pub const rendering = @import("client/rendering.zig");
 
-const TestShader = ls.Shader(.{
-    .vert_inputs = &.{
-        ls.defVertIn(0, "position", .vec3),
-        ls.defVertIn(1, "uv", .vec2),
-    },
-});
-
 
 pub fn main() !void {
-    // try TestShader.create(.{}, "[insert code here]");
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
+    var state = lua.State.init(allocator);
+    try state.create();
+    defer state.destroy();
 
     try window.init();
     defer window.deinit();
