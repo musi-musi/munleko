@@ -69,16 +69,19 @@ pub const Client = struct {
         self.window.makeContextCurrent();
         self.window.setVsync(.disabled);
         try gl.init(window.getGlProcAddress);
-        gl.viewport(.{self.window.width, self.window.height});
+        gl.viewport(self.window.size);
         gl.enable(.depth_test);
         gl.setDepthFunction(.less);
         gl.enable(.cull_face);
+
+        self.window.setMouseMode(.disabled);
+        var cam = @import("client/flycam.zig").FlyCam.init(&self.window);
+
 
         const dbg = try rendering.Debug.init();
         defer dbg.deinit();
         
         dbg.setLight(vec3(.{1, 3, 2}).norm());
-        dbg.setView(nm.transform.createLookAt(vec3(.{-2, 1.7, -1.5}), Vec3.zero, Vec3.unit(.y)));
 
         gl.clearColor(.{0, 0, 0, 1});
         gl.clearDepth(.float, 1);
@@ -91,16 +94,25 @@ pub const Client = struct {
             for(self.window.events.get(.framebuffer_size)) |size| {
                 gl.viewport(size);
             }
+            if (self.window.buttonPressed(.grave)) {
+                switch (self.window.mouse_mode) {
+                    .disabled => self.window.setMouseMode(.visible),
+                    else => self.window.setMouseMode(.disabled),
+                }
+            }
+
+            cam.update();
+            dbg.setView(cam.viewMatrix().mul(nm.transform.createTranslate(vec3(.{0, 0, 3}))));
+
             gl.clear(.color_depth);
             dbg.setProj(
                 nm.transform.createPerspective(
                     90.0 * std.math.pi / 180.0,
-                    @intToFloat(f32, self.window.width) / @intToFloat(f32, self.window.height),
+                    @intToFloat(f32, self.window.size[0]) / @intToFloat(f32, self.window.size[1]),
                     0.001, 1000,
                 )
             );
             dbg.drawCube(Vec3.zero, 1, vec3(.{0.8, 1, 1}));
-            // mesh.drawAssumeBound(3);
             if (fps_counter.tick()) |frames| {
                 std.log.info("fps: {d}", .{frames});
             }

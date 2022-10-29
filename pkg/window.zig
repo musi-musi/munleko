@@ -44,9 +44,9 @@ pub const Window = struct {
     handle: Handle = null,
     events: Events,
     held_buttons: ButtonSet = .{},
-    width: u32 = 1280,
-    height: u32 = 720,
+    size: [2]u32 = .{ 1280, 720 },
     vsync: Vsync = .disabled,
+    mouse_mode: MouseMode = .visible,
 
     pub const Events = util.Events(union (enum) {
         button_pressed: ButtonCode,
@@ -85,7 +85,7 @@ pub const Window = struct {
         );
         c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, debug);
 
-        if (c.glfwCreateWindow(@intCast(c_int, self.width), @intCast(c_int, self.height), "window", null, null)) |handle| {
+        if (c.glfwCreateWindow(@intCast(c_int, self.size[0]), @intCast(c_int, self.size[1]), "window", null, null)) |handle| {
             self.handle = handle;
             c.glfwSetWindowUserPointer(handle, self);
             _ = c.glfwSetKeyCallback(handle, keyCallback);
@@ -142,9 +142,11 @@ pub const Window = struct {
 
     fn framebufferSizeCallback(handle: Handle, width: c_int, height: c_int) callconv(.C) void {
         const self = fromUserPtr(handle);
-        self.width = @intCast(u32, width);
-        self.height = @intCast(u32, height);
-        self.events.post(.framebuffer_size, .{self.width, self.height}) catch |err| {
+        self.size = .{
+            @intCast(u32, width),
+            @intCast(u32, height),
+        };
+        self.events.post(.framebuffer_size, self.size) catch |err| {
             @panic(@errorName(err));
         };
     }
@@ -170,6 +172,7 @@ pub const Window = struct {
                 return true;
             }
         }
+        return false;
     }
 
     pub fn buttonReleased(self: Window, button: ButtonCode) bool {
@@ -178,10 +181,43 @@ pub const Window = struct {
                 return true;
             }
         }
+        return false;
     }
 
     pub fn buttonHeld(self: Window, button: ButtonCode) bool {
         return self.held_buttons.contains(button);
+    }
+
+    pub fn mousePosition(self: Window) [2]f32 {
+        var x: f64 = undefined;
+        var y: f64 = undefined;
+        c.glfwGetCursorPos(self.handle, &x, &y);
+        return [2]f32 {
+            @floatCast(f32, x),
+            @floatCast(f32, y),
+        };
+    }
+
+    pub fn setMousePosition(self: Window, pos: [2]f32) void {
+        c.glfwSetCursorPos(self.handle, @floatCast(f64, pos[0]), @floatCast(f64, pos[1]));
+    }
+
+    pub fn setMouseMode(self: *Window, mode: MouseMode) void {
+        c.glfwSetInputMode(self.handle, c.GLFW_CURSOR, @enumToInt(mode));
+        self.mouse_mode = mode;
+        if (self.isRawMouseSupported()) {
+            switch (mode) {
+                .disabled =>
+                    c.glfwSetInputMode(self.handle, c.GLFW_RAW_MOUSE_MOTION, c.GLFW_TRUE),
+                else =>
+                    c.glfwSetInputMode(self.handle, c.GLFW_RAW_MOUSE_MOTION, c.GLFW_FALSE),
+            }
+        }
+        c.glfwPollEvents();
+    }
+
+    pub fn isRawMouseSupported(_: Window) bool {
+        return c.glfwRawMouseMotionSupported() != c.GLFW_FALSE;
     }
 
 };
@@ -357,3 +393,11 @@ pub const ButtonCode = enum(c_int) {
     mouse_7 = c.GLFW_MOUSE_BUTTON_7 + c.GLFW_KEY_LAST + 1,
     mouse_8 = c.GLFW_MOUSE_BUTTON_8 + c.GLFW_KEY_LAST + 1,
 };
+
+pub const MouseMode = enum(c_int) {
+    visible = c.GLFW_CURSOR_NORMAL,
+    hidden = c.GLFW_CURSOR_HIDDEN,
+    disabled = c.GLFW_CURSOR_DISABLED,
+};
+
+mode: MouseMode

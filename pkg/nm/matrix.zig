@@ -8,7 +8,7 @@ pub fn Matrix(comptime Scalar_: type, comptime rows_: comptime_int, comptime col
     comptime nm.assertValidDimensionCount(rows_);
     comptime nm.assertValidDimensionCount(cols_);
     if (rows_ != cols_) @compileError("TODO: support non-square mats"); // TODO: support non-square mats
-    return struct {
+    return extern struct {
         v: Value,
 
         pub const Value = [rows][cols]Scalar;
