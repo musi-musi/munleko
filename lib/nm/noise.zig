@@ -1,5 +1,5 @@
 const std = @import("std");
-const nm = @import("../nm.zig");
+const nm = @import("lib.zig");
 
 pub const Perlin1 = Perlin(f32, 1);
 pub const Perlin2 = Perlin(f32, 2);

@@ -6,17 +6,20 @@ const nm = @import("nm");
 const util = @import("util");
 const zlua = @import("ziglua");
 
+const Allocator = std.mem.Allocator;
 
 const Vec3 = nm.Vec3;
 const vec3 = nm.vec3;
 
-const munleko = @import("munleko.zig");
+const munleko = @import("munleko");
 
-const Allocator = std.mem.Allocator;
+const Engine = munleko.Engine;
 const Session = munleko.Session;
+
+
 const Window = window.Window;
 
-pub const rendering = @import("client/rendering.zig");
+pub const rendering = @import("rendering.zig");
 
 
 pub fn main() !void {
@@ -24,8 +27,8 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
 
-    var lua = try zlua.Lua.init(allocator);
-    defer lua.deinit();
+    // var lua = try zlua.Lua.init(allocator);
+    // defer lua.deinit();
 
     try window.init();
     defer window.deinit();
@@ -41,22 +44,17 @@ pub fn main() !void {
 pub const Client = struct {
 
     window: Window,
-    session: Session,
+    engine: Engine,
+
 
     pub fn init(self: *Client, allocator: Allocator) !void {
         self.window = Window.init(allocator);
-        try self.session.init(
-            allocator,
-            Session.Callbacks.init(
-                self,
-                &tick,
-            ),
-        );
+        self.engine = try Engine.init(allocator);
     }
 
     pub fn deinit(self: *Client) void {
         self.window.deinit();
-        self.session.deinit();
+        self.engine.deinit();
     }
 
 
@@ -70,9 +68,16 @@ pub const Client = struct {
         gl.enable(.depth_test);
         gl.setDepthFunction(.less);
         gl.enable(.cull_face);
+        var session = try self.engine.createSession(Session.Callbacks.init(
+            self,
+            &tick,
+        ));
+
+        try session.start();
+        defer session.stop();
 
         self.window.setMouseMode(.disabled);
-        var cam = @import("client/flycam.zig").FlyCam.init(&self.window);
+        var cam = @import("FlyCam.zig").init(&self.window);
 
 
         const dbg = try rendering.Debug.init();
@@ -118,9 +123,10 @@ pub const Client = struct {
 
     pub fn tick(self: *Client, session: *Session) !void {
         _ = self;
-        if (session.tick_count % 100 == 0) {
-            std.log.debug("tick {d}", .{ session.tick_count });
-        }
+        _ = session;
+        // if (session.tick_count % 100 == 0) {
+        //     std.log.debug("tick {d}", .{ session.tick_count });
+        // }
     }
 
 };

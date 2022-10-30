@@ -1,7 +1,7 @@
 const std = @import("std");
 const math = std.math;
 
-const nm = @import("../nm.zig");
+const nm = @import("lib.zig");
 
 
 

@@ -1,5 +1,8 @@
 const std = @import("std");
-const c = @import("gl/c.zig");
+
+const c = @cImport({
+    @cInclude("glad/glad.h");
+});
 
 const UInt = c.GLuint;
 

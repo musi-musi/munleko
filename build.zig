@@ -13,7 +13,6 @@ pub fn sequence(steps: []const *Step) void {
     while (i < steps.len) : (i += 1) {
         steps[i].dependOn(steps[i - 1]);
     }
-    
 }
 
 pub fn build(b: *std.build.Builder) !void {
@@ -34,8 +33,8 @@ pub fn build(b: *std.build.Builder) !void {
 
     client.addPackage(pkgs.pkg("window", &.{ pkgs.util }));
 
-    client.addIncludePath("pkg/window/c");
-    client.addLibraryPath("pkg/window/c/");
+    client.addIncludePath("lib/window/c");
+    client.addLibraryPath("lib/window/c/");
     client.linkSystemLibrary("glfw3");
 
     const gl = pkgs.pkg("gl", null);
@@ -44,19 +43,25 @@ pub fn build(b: *std.build.Builder) !void {
     const ls = pkgs.pkg("ls", &.{ gl });
     client.addPackage(ls);
 
-    client.addIncludePath("pkg/gl/c");
-    client.addCSourceFile("pkg/gl/c/glad.c", &.{"-std=c99"});
+    client.addIncludePath("lib/gl/c");
+    client.addCSourceFile("lib/gl/c/glad.c", &.{"-std=c99"});
     
     if (target.getOsTag() == .windows) {
         client.step.dependOn(
-            &b.addInstallBinFile(.{.path = "pkg/window/c/glfw3.dll"}, "glfw3.dll").step,
+            &b.addInstallBinFile(.{.path = "lib/window/c/glfw3.dll"}, "glfw3.dll").step,
         );
     }
 
+    const install_client = &b.addInstallArtifact(client).step;
     const run_cmd = client.run();
 
     sequence(&[_]*Step{
-        &b.addInstallArtifact(client).step,
+        install_client,
+        b.default_step,
+    });
+
+    sequence(&[_]*Step{
+        install_client,
         &run_cmd.step,
         b.step("run", "Run the app"),
     });
@@ -75,11 +80,12 @@ const pkgs = struct {
 
     const nm = pkg("nm", null);
     const util = pkg("util", null);
+    const munleko = pkg("munleko", &.{ nm, util, });
 
     fn pkg(comptime name: []const u8, deps: ?[]const Pkg) Pkg {
         return Pkg {
             .name = name,
-            .source = .{ .path = "pkg/" ++ name ++ ".zig" },
+            .source = .{ .path = "lib/" ++ name ++ "/lib.zig" },
             .dependencies = deps,
         };
     }
@@ -89,7 +95,7 @@ const pkgs = struct {
 fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build.LibExeObjStep {
 
 
-    const exe = b.addExecutable("munleko", "src/" ++ frontend_id ++ ".zig");
+    const exe = b.addExecutable("munleko", frontend_id ++ "/main.zig");
     exe.addPackage(ziglua.linkAndPackage(b, exe, .{}));
 
 

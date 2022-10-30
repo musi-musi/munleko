@@ -3,7 +3,10 @@ const util = @import("util");
 
 const builtin = @import("builtin");
 
-const c = @import("window/c.zig");
+const c = @cImport({
+    @cDefine("GLFW_INCLUDE_NONE", {});
+    @cInclude("glfw3.h");
+});
 
 const Allocator = std.mem.Allocator;
 

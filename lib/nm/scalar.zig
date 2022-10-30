@@ -1,4 +1,4 @@
-const nm = @import("../nm.zig");
+const nm = @import("lib.zig");
 
 
 
