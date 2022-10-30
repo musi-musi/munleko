@@ -365,8 +365,14 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         }
 
         /// normalized
-        pub fn norm(self: Self) Self {
-            return self.divScalar(self.mag());
+        pub fn norm(self: Self) ?Self {
+            const m = self.mag();
+            if (m == 0) {
+                return null;
+            }
+            else {
+                return self.divScalar(self.mag());
+            }
         }
 
         pub fn lerpTo(self: Self, target: Self, t: Scalar) Self {

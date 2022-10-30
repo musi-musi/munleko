@@ -77,13 +77,13 @@ pub const Client = struct {
         defer session.stop();
 
         self.window.setMouseMode(.disabled);
-        var cam = @import("FlyCam.zig").init(&self.window);
+        var cam = @import("FlyCam.zig").init(self.window);
 
 
         const dbg = try rendering.Debug.init();
         defer dbg.deinit();
         
-        dbg.setLight(vec3(.{1, 3, 2}).norm());
+        dbg.setLight(vec3(.{1, 3, 2}).norm() orelse unreachable);
 
         gl.clearColor(.{0, 0, 0, 1});
         gl.clearDepth(.float, 1);
@@ -103,8 +103,8 @@ pub const Client = struct {
                 }
             }
 
-            cam.update();
-            dbg.setView(cam.viewMatrix().mul(nm.transform.createTranslate(vec3(.{0, 0, 3}))));
+            cam.update(self.window);
+            dbg.setView(cam.viewMatrix());
 
             gl.clear(.color_depth);
             dbg.setProj(
