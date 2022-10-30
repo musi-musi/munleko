@@ -1,4 +1,5 @@
 const std = @import("std");
+const ziglua = @import("lib/ziglua/build.zig");
 
 const Pkg = std.build.Pkg;
 const FileSource = std.build.FileSource;
@@ -52,13 +53,6 @@ pub fn build(b: *std.build.Builder) !void {
         );
     }
 
-    client.addIncludePath("lua/src");
-    
-
-    const lua = try createLuaStep(b);
-
-    client.linkLibrary(lua);
-
     const run_cmd = client.run();
 
     sequence(&[_]*Step{
@@ -81,7 +75,6 @@ const pkgs = struct {
 
     const nm = pkg("nm", null);
     const util = pkg("util", null);
-    const lua = pkg("lua", null);
 
     fn pkg(comptime name: []const u8, deps: ?[]const Pkg) Pkg {
         return Pkg {
@@ -97,6 +90,7 @@ fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build
 
 
     const exe = b.addExecutable("munleko", "src/" ++ frontend_id ++ ".zig");
+    exe.addPackage(ziglua.linkAndPackage(b, exe, .{}));
 
 
     inline for (comptime std.meta.declarations(pkgs)) |decl| {
@@ -108,24 +102,4 @@ fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build
 
 
     return exe;
-}
-
-fn createLuaStep(b: *Builder) !*std.build.LibExeObjStep {
-    const lua = b.addStaticLibrary("lua", null);
-    var dir = try std.fs.cwd().openIterableDir("lua/src", .{});
-    defer dir.close();
-
-    lua.linkLibC();
-    var iter = dir.iterate();
-    while (try iter.next()) |entry| {
-        if (std.mem.endsWith(u8, entry.name, ".c")) {
-            const path = try std.fmt.allocPrint(b.allocator, "lua/src/{s}", .{entry.name});
-            // std.log.info("{s}", .{path});
-            lua.addCSourceFile(path, &.{"-std=c99"});
-        }
-    }
-
-    lua.addIncludePath("lua/src");
-
-    return lua;
 }

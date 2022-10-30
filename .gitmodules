@@ -1,0 +1,3 @@
+[submodule "lib/ziglua"]
+	path = lib/ziglua
+	url = git@github.com:musi-musi/ziglua.git

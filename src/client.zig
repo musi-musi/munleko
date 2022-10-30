@@ -4,11 +4,8 @@ const gl = @import("gl");
 const ls = @import("ls");
 const nm = @import("nm");
 const util = @import("util");
-const lua = @import("lua");
+const zlua = @import("ziglua");
 
-comptime {
-    _ = lua;
-}
 
 const Vec3 = nm.Vec3;
 const vec3 = nm.vec3;
@@ -26,9 +23,9 @@ pub fn main() !void {
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
-    var state = lua.State.init(allocator);
-    try state.create();
-    defer state.destroy();
+
+    var lua = try zlua.Lua.init(allocator);
+    defer lua.deinit();
 
     try window.init();
     defer window.deinit();
