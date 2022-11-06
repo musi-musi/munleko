@@ -95,7 +95,7 @@ const pkgs = struct {
 fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build.LibExeObjStep {
 
 
-    const exe = b.addExecutable("munleko", frontend_id ++ "/main.zig");
+    const exe = b.addExecutable("munleko", "src/" ++ frontend_id ++ "/main.zig");
     exe.addPackage(ziglua.linkAndPackage(b, exe, .{}));
 
 

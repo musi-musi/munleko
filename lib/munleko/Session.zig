@@ -1,61 +1,110 @@
 const std = @import("std");
 
 const Allocator = std.mem.Allocator;
-const Thread = std.Thread;
 
 
 const time = std.time;
 const Timer = time.Timer;
-const Self = @This();
+const Session = @This();
 
+const World = @import("World.zig");
+const WorldMan = World.Manager;
+
+const Thread = std.Thread;
+const AtomicBool = std.atomic.Atomic(bool);
 
 allocator: Allocator,
-thread: ?Thread = null,
-is_running: bool = false,
-callbacks: Callbacks,
+
+world: *World,
+world_man: *WorldMan,
+
+thread: Thread = undefined,
+is_running: AtomicBool = AtomicBool.init(false),
 
 timer: Timer = undefined,
 tick_count: u64 = 0,
 
 tick_rate: f32 = 40,
 
-
-pub fn init(allocator: Allocator, callbacks: Callbacks) !Self {
-    return Self {
+pub fn create(allocator: Allocator) !*Session {
+    const self = try allocator.create(Session);
+    const world = try World.create(allocator);
+    const world_man = try WorldMan.create(allocator, world);
+    self.* = .{
         .allocator = allocator,
-        .callbacks = callbacks,
+        .world = world,
+        .world_man = world_man,
     };
+    return self;
 }
 
-pub fn deinit(self: *Self) void {
-    _ = self;
+pub fn destroy(self: *Session) void {
+    self.stop();
+    const allocator = self.allocator;
+    defer allocator.destroy(self);
+    self.world.destroy();
+    self.world_man.destroy();
 }
 
-pub fn start(self: *Self) !void {
-    if (self.thread == null) {
+pub fn start(self: *Session, ctx: anytype, comptime hooks: Hooks(@TypeOf(ctx))) !void {
+    if (!self.isRunning()) {
+        self.is_running.store(true, .Monotonic);
+        const S = struct {
+            fn tMain(s: *Session, c: @TypeOf(ctx)) !void {
+                try s.threadMain(c, hooks);
+            }
+        };
         self.timer = try Timer.start();
         self.tick_count = 0;
-        self.is_running = true;
-        self.thread = try Thread.spawn(.{}, run, .{self});
+        self.thread = try Thread.spawn(.{}, S.tMain, .{self, ctx});
     }
 }
 
-pub fn stop(self: *Self) void {
-    if (self.thread) |thread| {
-        self.is_running = false;
-        thread.join();
+pub fn Hooks(comptime Ctx: type) type {
+    return struct {
+        on_tick: ?HookFunction(Ctx) = null,
+        on_world_update: ?WorldMan.HookFunction(Ctx) = null,
+    };
+}
+
+pub fn HookFunction(comptime Ctx: type) type {
+    return fn(Ctx, *Session) anyerror!void;
+}
+
+
+pub fn stop(self: *Session) void {
+    if (self.isRunning()) {
+        self.is_running.store(false, .Monotonic);
+        self.thread.join();
     }
 }
 
 /// session main loop
-/// this is the session thread main
-pub fn run(self: *Self) !void {
-    while (self.is_running) : (self.nextTick()) {
-        try self.callbacks.tick(self);
+pub fn threadMain(
+    self: *Session,
+    ctx: anytype,
+    comptime hooks: Hooks(@TypeOf(ctx))
+) !void {
+    if (hooks.on_world_update) |on_world_update| {
+        try self.world_man.startWithHook(ctx, on_world_update);
     }
+    else {
+        try self.world_man.start();
+    }
+    while (self.isRunning()) : (self.nextTick()) {
+        self.world_man.tick();
+        if (hooks.on_tick) |on_tick| {
+            try on_tick(ctx, self);
+        }
+    }
+    self.world_man.stop();
 }
 
-fn nextTick(self: *Self) void {
+pub fn isRunning(self: Session) bool {
+    return self.is_running.load(.Monotonic);
+}
+
+fn nextTick(self: *Session) void {
     const elapsed = self.timer.read();
     const quota = self.nsPerTick();
     if (elapsed < quota) {
@@ -71,43 +120,7 @@ fn nextTick(self: *Self) void {
     self.timer.reset();
 }
 
-pub fn nsPerTick(self: Self) u64 {
+pub fn nsPerTick(self: Session) u64 {
     return @floatToInt(u64, 1_000_000_000 / self.tick_rate);
 }
-
-pub const Callbacks = struct {
-    ptr: *anyopaque,
-    vtable: *const VTable,
-
-    pub const VTable = struct {
-        tick: *const fn(ptr: *anyopaque, session: *Self) anyerror!void,
-    };
-
-    pub fn init(
-        pointer: anytype,
-        comptime tickFn: *const fn(@TypeOf(pointer), *Self) anyerror!void,
-    ) Callbacks {
-        const Ptr = @TypeOf(pointer);
-        const alignment = @typeInfo(Ptr).Pointer.alignment;
-
-        return .{
-            .ptr = pointer,
-            .vtable = &(struct {
-                const vtable = VTable {
-                    .tick = tickImpl,
-                };
-
-                fn tickImpl(ptr: *anyopaque, session: *Self) anyerror!void {
-                    const self = @ptrCast(Ptr, @alignCast(alignment, ptr));
-                    try @call(.{ .modifier = .always_inline }, tickFn, .{ self, session });
-                }
-
-            }).vtable,
-        };
-    }
-
-    fn tick(self: Callbacks, session: *Self) !void {
-        try self.vtable.tick(self.ptr, session);
-    }
-};
 

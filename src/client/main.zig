@@ -25,6 +25,8 @@ pub const rendering = @import("rendering.zig");
 pub fn main() !void {
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ =  gpa.deinit();
+    
     const allocator = gpa.allocator();
 
     // var lua = try zlua.Lua.init(allocator);
@@ -41,11 +43,13 @@ pub fn main() !void {
 
 }
 
+const FlyCam = @import("FlyCam.zig");
+
+
 pub const Client = struct {
 
     window: Window,
     engine: Engine,
-
 
     pub fn init(self: *Client, allocator: Allocator) !void {
         self.window = Window.init(allocator);
@@ -59,30 +63,42 @@ pub const Client = struct {
 
 
     pub fn run(self: *Client) !void {
+
         try self.window.create(.{});
         defer self.window.destroy();
         self.window.makeContextCurrent();
         self.window.setVsync(.disabled);
+
         try gl.init(window.getGlProcAddress);
         gl.viewport(self.window.size);
         gl.enable(.depth_test);
         gl.setDepthFunction(.less);
         gl.enable(.cull_face);
-        var session = try self.engine.createSession(Session.Callbacks.init(
-            self,
-            &tick,
-        ));
 
-        try session.start();
-        defer session.stop();
+        var cam = FlyCam.init(self.window);
+        cam.move_speed = 20;
+
+        var session = try self.engine.createSession();
+        var session_context = SessionContext {
+            .client = self,
+            .cam = &cam,
+        };
+
+        try session.start(&session_context, .{
+            .on_tick = SessionContext.onTick,
+            .on_world_update = SessionContext.onWorldUpdate,
+        });
+        defer session.destroy();
+
+        const cam_obs = try session.world_man.addObserver(&cam, FlyCam.getObserverPosition);
+        defer session.world_man.removeObserver(cam_obs) catch {};
 
         self.window.setMouseMode(.disabled);
-        var cam = @import("FlyCam.zig").init(self.window);
 
 
         const dbg = try rendering.Debug.init();
         defer dbg.deinit();
-        
+
         dbg.setLight(vec3(.{1, 3, 2}).norm() orelse unreachable);
 
         gl.clearColor(.{0, 0, 0, 1});
@@ -115,18 +131,31 @@ pub const Client = struct {
                 )
             );
             dbg.drawCube(Vec3.zero, 1, vec3(.{0.8, 1, 1}));
-            if (fps_counter.tick()) |frames| {
-                std.log.info("fps: {d}", .{frames});
+            if (fps_counter.frame()) |frames| {
+                _ = frames;
+                // std.log.info("fps: {d}", .{frames});
             }
         }
     }
 
-    pub fn tick(self: *Client, session: *Session) !void {
-        _ = self;
-        _ = session;
-        // if (session.tick_count % 100 == 0) {
-        //     std.log.debug("tick {d}", .{ session.tick_count });
-        // }
-    }
+
+    const SessionContext = struct {
+        client: *Client,
+        cam: *FlyCam,
+
+        fn onTick(self: *SessionContext, session: *Session) !void {
+            _ = self;
+            _ = session;
+            // if (session.tick_count % 100 == 0) {
+            //     std.log.debug("tick {d}", .{ session.tick_count });
+            // }
+        }
+
+        fn onWorldUpdate(self: *SessionContext, world: *const munleko.World) !void {
+            _ = self;
+            _ = world;
+        }
+    };
+
 
 };

@@ -15,7 +15,7 @@ pub const FpsCounter = struct {
         };
     }
 
-    pub fn tick(self: *FpsCounter) ?f32 {
+    pub fn frame(self: *FpsCounter) ?f32 {
         const read_delay_ns = @floatToInt(u64, self.read_delay * std.time.ns_per_s);
         var time = self.timer.read();
         if (time > read_delay_ns) {

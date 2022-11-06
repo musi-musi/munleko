@@ -19,6 +19,7 @@ prev_cursor: Vec2 = Vec2.zero,
 position: Vec3 = Vec3.zero,
 move_speed: f32 = 5,
 timer: Timer = undefined,
+mutex: std.Thread.Mutex = .{},
 
 pub fn init(window: Window) Self {
     var self = Self{};
@@ -70,4 +71,10 @@ pub fn lookMatrix(self: Self) nm.Mat4 {
 
 pub fn viewMatrix(self: Self) nm.Mat4 {
     return self.positionMatrix().mul(self.lookMatrix());
+}
+
+pub fn getObserverPosition(self: *Self) Vec3 {
+    self.mutex.lock();
+    defer self.mutex.unlock();
+    return self.position;
 }
