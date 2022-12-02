@@ -4,14 +4,14 @@ const Allocator = std.mem.Allocator;
 
 const heap = @import("heap.zig");
 
-pub fn IdPool(comptime T: type) type {
+pub fn IdPool(comptime Id_: type) type {
     return struct {
         const Self = @This();
 
-        pool: IdPoolUnmanaged(T) = .{},
+        pool: IdPoolUnmanaged(Id) = .{},
         allocator: Allocator,
 
-        pub const Id = T;
+        pub const Id = Id_;
 
         pub fn init(allocator: Allocator) Self {
             return .{
@@ -34,14 +34,14 @@ pub fn IdPool(comptime T: type) type {
     };
 }
 
-pub fn IdPoolUnmanaged(comptime T: type) type {
+pub fn IdPoolUnmanaged(comptime Id_: type) type {
     return struct {
         const Self = @This();
 
-        unused: heap.MinHeapUnmanaged(T) = .{},
-        capacity: Id = 0,
+        unused: heap.MinHeapUnmanaged(Id) = .{},
+        capacity: usize = 0,
 
-        pub const Id = T;
+        pub const Id = Id_;
 
         pub fn deinit(self: *Self, allocator: Allocator) void {
             self.unused.deinit(allocator);
@@ -52,7 +52,7 @@ pub fn IdPoolUnmanaged(comptime T: type) type {
                 return id;
             }
             else {
-                const id = self.capacity;
+                const id = @intCast(Id, self.capacity);
                 self.capacity += 1;
                 try self.unused.items.ensureTotalCapacity(allocator, std.math.cast(usize, self.capacity));
                 return id;

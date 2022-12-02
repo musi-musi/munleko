@@ -52,7 +52,7 @@ pub fn destroy(self: *World) void {
 
 
 
-fn enabledChunk(self: *World, position: Vec3i) !*Chunk {
+fn enableChunk(self: *World, position: Vec3i) !*Chunk {
     const id = try self.chunk_id_pool.acquire(self.allocator);
     if (id >= self.chunks.len) {
         std.debug.assert(id == self.chunks.len);
@@ -136,8 +136,6 @@ pub fn ChunkData(comptime T: type) type {
 
 pub const Observer = struct {
     /// position in world coordinates of the observer
-    /// write to this whenever the observer moves, changes will be detected
-    /// during the next tick
     world_position: Vec3,
     /// the last recorded load center, ie the position of the center chunk
     load_center: ?Vec3i = null,

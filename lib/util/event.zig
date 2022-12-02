@@ -4,8 +4,54 @@ const Allocator = std.mem.Allocator;
 
 pub fn Events(comptime channels_def: type) type {
     return struct {
+        const Self = @This();
+
         allocator: Allocator,
-        channels: Channels,
+        channels: Channels = .{},
+
+        const Unmanaged = EventsUnmanaged(channels_def);
+
+        pub const channel_tags = Unmanaged.channel_tags;
+        pub const ChannelTag = Unmanaged.ChannelTag;
+        pub const Channels = Unmanaged.Channels;
+        pub const Event = Unmanaged.Event;
+
+        pub fn init(allocator: Allocator) Self {
+            return .{
+                .allocator = allocator,
+            };
+        }
+
+        pub fn deinit(self: *Self) void {
+            inline for (channel_tags) |tag| {
+                @field(self.channels, @tagName(tag)).deinit(self.allocator);
+            }
+        }
+
+        pub fn clearAll(self: *Self) void {
+            inline for (channel_tags) |tag| {
+                @field(self.channels, @tagName(tag)).clearRetainingCapacity();
+            }
+        }
+
+        pub fn clear(self: *Self, comptime tag: ChannelTag) void {
+            @field(self.channels, @tagName(tag)).clearRetainingCapacity();
+        }
+
+        pub fn post(self: *Self, comptime tag: ChannelTag, event: Event(tag)) !void {
+            try @field(self.channels, @tagName(tag)).append(self.allocator, event);
+        }
+
+        pub fn get(self: Self, comptime tag: ChannelTag) []const Event(tag) {
+            return @field(self.channels, @tagName(tag)).items;
+        }
+ 
+    };
+}
+
+pub fn EventsUnmanaged(comptime channels_def: type) type {
+    return struct {
+        channels: Channels = .{},
 
 
         pub const channel_tags = std.enums.values(ChannelTag);
@@ -47,16 +93,9 @@ pub fn Events(comptime channels_def: type) type {
 
         const Self = @This();
 
-        pub fn init(allocator: Allocator) Self {
-            return Self {
-                .allocator = allocator,
-                .channels = .{},
-            };
-        }
-
-        pub fn deinit(self: *Self) void {
+        pub fn deinit(self: *Self, allocator: Allocator) void {
             inline for (channel_tags) |tag| {
-                @field(self.channels, @tagName(tag)).deinit(self.allocator);
+                @field(self.channels, @tagName(tag)).deinit(allocator);
             }
         }
 
@@ -70,8 +109,8 @@ pub fn Events(comptime channels_def: type) type {
             @field(self.channels, @tagName(tag)).clearRetainingCapacity();
         }
 
-        pub fn post(self: *Self, comptime tag: ChannelTag, event: Event(tag)) !void {
-            try @field(self.channels, @tagName(tag)).append(self.allocator, event);
+        pub fn post(self: *Self, allocator: Allocator, comptime tag: ChannelTag, event: Event(tag)) !void {
+            try @field(self.channels, @tagName(tag)).append(allocator, event);
         }
 
         pub fn get(self: Self, comptime tag: ChannelTag) []const Event(tag) {
