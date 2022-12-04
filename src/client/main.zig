@@ -15,7 +15,9 @@ const munleko = @import("munleko");
 
 const Engine = munleko.Engine;
 const Session = munleko.Session;
+const World = munleko.World;
 
+const Mutex = std.Thread.Mutex;
 
 const Window = window.Window;
 
@@ -75,23 +77,26 @@ pub const Client = struct {
         gl.setDepthFunction(.less);
         gl.enable(.cull_face);
 
+        var session = try self.engine.createSession();
+        defer session.destroy();
+
         var cam = FlyCam.init(self.window);
         cam.move_speed = 20;
 
-        var session = try self.engine.createSession();
+        const cam_obs = try session.world_man.addObserver(cam.position);
+        defer session.world_man.removeObserver(cam_obs) catch {};
+
         var session_context = SessionContext {
             .client = self,
             .cam = &cam,
+            .cam_observer = cam_obs,
         };
 
         try session.start(&session_context, .{
             .on_tick = SessionContext.onTick,
             .on_world_update = SessionContext.onWorldUpdate,
         });
-        defer session.destroy();
 
-        const cam_obs = try session.world_man.addObserver(&cam, FlyCam.getObserverPosition);
-        defer session.world_man.removeObserver(cam_obs) catch {};
 
         self.window.setMouseMode(.disabled);
 
@@ -119,7 +124,11 @@ pub const Client = struct {
                 }
             }
 
-            cam.update(self.window);
+            {
+                session_context.cam_mutex.lock();
+                defer session_context.cam_mutex.unlock();
+                cam.update(self.window);
+            }
             dbg.setView(cam.viewMatrix());
 
             gl.clear(.color_depth);
@@ -142,6 +151,8 @@ pub const Client = struct {
     const SessionContext = struct {
         client: *Client,
         cam: *FlyCam,
+        cam_observer: World.Observer,
+        cam_mutex: Mutex = .{},
 
         fn onTick(self: *SessionContext, session: *Session) !void {
             _ = self;
@@ -151,9 +162,10 @@ pub const Client = struct {
             // }
         }
 
-        fn onWorldUpdate(self: *SessionContext, world: *const munleko.World) !void {
-            _ = self;
-            _ = world;
+        fn onWorldUpdate(self: *SessionContext, world_manager: *munleko.World.Manager) !void {
+            self.cam_mutex.lock();
+            defer self.cam_mutex.unlock();
+            world_manager.setObserverPosition(self.cam_observer, self.cam.position);
         }
     };
 

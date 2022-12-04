@@ -31,7 +31,7 @@ pub fn HeapUnmanaged(comptime T: type, comptime before: fn(T, T) bool) type {
         }
 
         fn swap(self: *Self, a: usize, b: usize) void {
-            std.mem.swap(T, &self.nodes.items[a], &self.nodes.items[b]);
+            std.mem.swap(T, &self.items.items[a], &self.items.items[b]);
         }
 
         fn item(self: Self, i: usize) T {
@@ -53,7 +53,7 @@ pub fn HeapUnmanaged(comptime T: type, comptime before: fn(T, T) bool) type {
         }
 
         fn down(self: *Self, i: usize) void {
-            const len = self.nodes.items.len;
+            const len = self.items.items.len;
             const ca_i = i * 2 + 1;
             if (ca_i < len) {
                 const p = self.item(i);
@@ -77,28 +77,28 @@ pub fn HeapUnmanaged(comptime T: type, comptime before: fn(T, T) bool) type {
         }
 
         pub fn push(self: *Self, allocator: Allocator, new: T) Allocator.Error!void {
-            const len = self.nodes.items.len;
+            const len = self.items.items.len;
             try self.items.append(allocator, new);
             self.up(len);
         }
 
         pub fn pushAssumeCapacity(self: *Self, new: T,) void {
-            const len = self.nodes.items.len;
+            const len = self.items.items.len;
             self.items.appendAssumeCapacity(new);
             self.up(len);
         }
 
         pub fn pop(self: *Self) ?T {
-            const len = self.nodes.items.len;
+            const len = self.items.items.len;
             if (len > 0) {
-                const node = self.nodes.items[0];
+                const node = self.items.items[0];
                 if (len == 1) {
-                    self.nodes.items.len = 0;
+                    self.items.items.len = 0;
                     return node;
                 }
                 else {
                     self.swap(0, len - 1);
-                    self.nodes.items.len -= 1;
+                    self.items.items.len -= 1;
                     self.down(0);
                     return node;
                 }

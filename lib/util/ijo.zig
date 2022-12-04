@@ -60,6 +60,10 @@ pub fn IjoPool(comptime IjoType_: type) type {
         pub fn destroy(self: *Self, ijo: IjoType) void {
             self.id_pool.release(ijo.id);
         }
+
+        pub fn capacity(self: Self) usize {
+            return self.id_pool.capacity;
+        }
     };
 }
 
@@ -75,6 +79,7 @@ pub fn IjoDataStoreValueInit(comptime IjoType: type, comptime Data: type, compti
     });
 }
 
+// completely thread safe as long as capacity is always updated before being written to
 pub fn IjoDataStore(comptime IjoType_: type, comptime Data_: type, comptime Context_: type) type {
     assertIsIjoType(IjoType_);
 
@@ -83,7 +88,7 @@ pub fn IjoDataStore(comptime IjoType_: type, comptime Data_: type, comptime Cont
         allocator: Allocator,
         arena: ArenaAllocator,
         context: Context,
-        segments: std.ArrayListUnmanaged(*Segment) = .{},
+        segments: [segment_count]*Segment = undefined,
         capacity: usize = 0,
 
         pub const IjoType = IjoType_;
@@ -91,8 +96,13 @@ pub fn IjoDataStore(comptime IjoType_: type, comptime Data_: type, comptime Cont
         pub const Segment = [segment_len]Data;
         pub const Context = Context_;
         
-        pub const segment_len_bits = 8;
+        pub const segment_count_bits = 10;
+        pub const segment_count = 1 << segment_count_bits;
+
+        pub const segment_len_bits = 10;
         pub const segment_len = 1 << segment_len_bits;
+
+        pub const max_capacity = segment_count * segment_len;
 
         const Self = @This();
 
@@ -116,7 +126,6 @@ pub fn IjoDataStore(comptime IjoType_: type, comptime Data_: type, comptime Cont
                 }
             }
             self.arena.deinit();
-            self.segments.deinit(self.allocator);
         }
 
         pub fn get(self: Self, ijo: IjoType) Data {
@@ -128,24 +137,24 @@ pub fn IjoDataStore(comptime IjoType_: type, comptime Data_: type, comptime Cont
         }
 
         fn ptrFromIndex(self: Self, index: usize) *Data {
-            return &self.segments.items[@divFloor(index, segment_len)].*[index % segment_len];
+            return &self.segments[@divFloor(index, segment_len)].*[index % segment_len];
         }
 
         pub fn matchCapacity(self: *Self, pool: IjoPool(IjoType)) !void {
-            if (self.capacity < pool.capacity) {
-                const new_segment_count = std.math.divCeil(usize, pool.capacity, segment_len);
-                const old_segment_count = self.segments.items.len;
-                if (old_segment_count > new_segment_count) {
-                    try self.segments.resize(self.allocator, new_segment_count);
-                    for (self.segments.items[old_segment_count..new_segment_count]) |*segment| {
+            const new_capacity = pool.capacity();
+            if (self.capacity < new_capacity) {
+                const new_segment_count = std.math.divCeil(usize, new_capacity, segment_len) catch unreachable;
+                const old_segment_count = std.math.divCeil(usize, self.capacity, segment_len) catch unreachable;
+                if (old_segment_count < new_segment_count) {
+                    for (self.segments[old_segment_count..new_segment_count]) |*segment| {
                         segment.* = try self.arena.allocator().create(Segment);
                     }
                 }
                 var i: usize = self.capacity;
-                while (i < pool.capacity) : (i += 1) {
-                    self.ptrFromIndex(i).* = try self.context.initData(self.arena);
+                while (i < new_capacity) : (i += 1) {
+                    self.ptrFromIndex(i).* = try self.context.initData(&self.arena);
                 }
-                self.capacity = pool.capacity;
+                self.capacity = new_capacity;
             }
         }
     };

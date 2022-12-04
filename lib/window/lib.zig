@@ -402,5 +402,3 @@ pub const MouseMode = enum(c_int) {
     hidden = c.GLFW_CURSOR_HIDDEN,
     disabled = c.GLFW_CURSOR_DISABLED,
 };
-
-mode: MouseMode

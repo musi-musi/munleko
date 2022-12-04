@@ -54,7 +54,7 @@ pub fn IdPoolUnmanaged(comptime Id_: type) type {
             else {
                 const id = @intCast(Id, self.capacity);
                 self.capacity += 1;
-                try self.unused.items.ensureTotalCapacity(allocator, std.math.cast(usize, self.capacity));
+                try self.unused.items.ensureTotalCapacity(allocator, self.capacity);
                 return id;
             }
         }

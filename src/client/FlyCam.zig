@@ -72,9 +72,3 @@ pub fn lookMatrix(self: Self) nm.Mat4 {
 pub fn viewMatrix(self: Self) nm.Mat4 {
     return self.positionMatrix().mul(self.lookMatrix());
 }
-
-pub fn getObserverPosition(self: *Self) Vec3 {
-    self.mutex.lock();
-    defer self.mutex.unlock();
-    return self.position;
-}

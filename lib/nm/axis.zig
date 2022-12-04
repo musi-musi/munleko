@@ -16,7 +16,7 @@ pub fn Axis(comptime dimensions: comptime_int) type {
     comptime nm.assertValidDimensionCount(dimensions);
     return switch (dimensions) {
         1 => enum {
-            x, y,
+            x,
             const Self = @This();
             const mixin = Mixin(Self, dimensions);
             pub usingnamespace mixin;

@@ -63,7 +63,7 @@ pub fn start(self: *Session, ctx: anytype, comptime hooks: Hooks(@TypeOf(ctx))) 
 pub fn Hooks(comptime Ctx: type) type {
     return struct {
         on_tick: ?HookFunction(Ctx) = null,
-        on_world_update: ?WorldMan.HookFunction(Ctx) = null,
+        on_world_update: ?WorldMan.OnWorldUpdateFn(Ctx) = null,
     };
 }
 
@@ -86,13 +86,13 @@ pub fn threadMain(
     comptime hooks: Hooks(@TypeOf(ctx))
 ) !void {
     if (hooks.on_world_update) |on_world_update| {
-        try self.world_man.startWithHook(ctx, on_world_update);
+        try self.world_man.start(ctx, on_world_update);
     }
     else {
         try self.world_man.start();
     }
     while (self.isRunning()) : (self.nextTick()) {
-        self.world_man.tick();
+        try self.world_man.tick();
         if (hooks.on_tick) |on_tick| {
             try on_tick(ctx, self);
         }
