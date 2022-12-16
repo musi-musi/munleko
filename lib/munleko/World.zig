@@ -128,7 +128,7 @@ pub const Chunks = struct {
 };
 
 pub fn chunkPositionToCenterPosition(chunk_position: Vec3i) Vec3i {
-    return chunk_position.mulScalar(chunk_width).addScalar(chunk_width / 2);
+    return chunk_position.mulScalar(chunk_width);
 }
 
 fn createAndAddChunk(self: *World, position: Vec3i) !Chunk {
@@ -202,7 +202,7 @@ pub const ObserverZone = struct {
     mutex: Mutex = .{},
     position: Vec3i = Vec3i.zero,
     center_chunk_position: Vec3i = Vec3i.zero,
-    load_radius: u32 = 4,
+    load_radius: u32 = 6,
 
     fn setPosition(self: *ObserverZone, position: Vec3i) void {
         self.mutex.lock();
@@ -220,7 +220,7 @@ pub const ObserverZone = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
         const old_center_position = self.center_chunk_position;
-        self.center_chunk_position = self.position.divFloorScalar(chunk_width);
+        self.center_chunk_position = self.position.cast(f32).divScalar(chunk_width).round().cast(i32);
         return .{
             .old = old_center_position,
             .new = self.center_chunk_position,
@@ -405,7 +405,7 @@ pub const Observers = struct {
         zone.mutex.lock();
         defer zone.mutex.unlock();
         zone.position = position;
-        const load_center_position = chunkPositionToCenterPosition(zone.center_chunk_position);
+        const load_center_position = zone.center_chunk_position.divFloorScalar(chunk_width);
         if (position.sub(load_center_position).mag2() > chunk_width * chunk_width) {
             self.statuses.getPtr(observer).is_dirty.store(true, .Monotonic);
         }
@@ -523,15 +523,11 @@ pub const Manager = struct {
     fn processPendingChunks(self: *Manager) !void {
         const world = self.world;
         const chunks = &world.chunks;
-        const pending_chunks = &self.pending_chunks.items;
-        var i: usize = 0;
-        while (i < pending_chunks.len) {
-            const chunk = pending_chunks.*[i];
+        var i: isize = @intCast(isize, self.pending_chunks.items.len) - 1;
+        while (i >= 0) : (i -= 1) {
+            const chunk = self.pending_chunks.items[@intCast(usize, i)];
             const status = chunks.statuses.getPtr(chunk);
-            // status.mutex.lock();
-            // defer status.mutex.unlock();
             if (status.user_count != 0) {
-                i += 1;
                 continue;
             }
             switch (status.load_state) {
@@ -556,14 +552,12 @@ pub const Manager = struct {
                     world.graph.removeChunk(chunk);
                     status.load_state = .deleted;
                     status.is_pending = false;
+                    try chunks.load_state_events.post(.deleted, chunk);
                     chunks.pool.delete(chunk);
                 },
             }
-            if (status.is_pending) {
-                i += 1;
-            }
-            else {
-                _ = self.pending_chunks.swapRemove(i);
+            if (!status.is_pending) {
+                _ = self.pending_chunks.swapRemove(@intCast(usize, i));
             }
         }
 
@@ -669,6 +663,9 @@ pub const Manager = struct {
         if (graph.position_map.get(position)) |chunk| {
             const status = chunks.statuses.getPtr(chunk);
             status.observer_count += 1;
+            if (status.observer_count > 1) {
+                std.log.info("count {d}", .{status.observer_count});
+            }
         }
         else {
             const chunk = try world.createAndAddChunk(position);

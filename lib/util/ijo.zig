@@ -13,9 +13,20 @@ pub fn Ijo(comptime ijo_type_name_: []const u8) type {
 
         pub const ijo_type_name = ijo_type_name_;
 
-        pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        const Self = @This();
+
+        pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
             try writer.print("[{s} {d}]", .{ijo_type_name, self.id});
         }
+
+        pub const HashContext = struct {
+            pub fn hash(_: HashContext, x: Self) u64 {
+                return x.id;
+            }
+            pub fn eql(_: HashContext, a: Self, b: Self) bool {
+                return a.id == b.id;
+            }
+        };
     };
 }
 

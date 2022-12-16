@@ -69,19 +69,33 @@ pub fn main() !void {
 const FlyCam = @import("FlyCam.zig");
 
 
+const DrawChunk = struct {
+    position: nm.Vec3i,
+    state: World.ChunkLoadState,
+};
+
+const DrawMap = std.HashMapUnmanaged(World.Chunk, DrawChunk, World.Chunk.HashContext, std.hash_map.default_max_load_percentage);
+
 pub const Client = struct {
 
+    allocator: Allocator,
     window: Window,
     engine: Engine,
+    draw_map: DrawMap = .{},
+    draw_map_mutex: Mutex = .{},
 
     pub fn init(self: *Client, allocator: Allocator) !void {
-        self.window = Window.init(allocator);
-        self.engine = try Engine.init(allocator);
+        self.* = .{
+            .allocator = allocator,
+            .window = Window.init(allocator),
+            .engine = try Engine.init(allocator),
+        };
     }
 
     pub fn deinit(self: *Client) void {
         self.window.deinit();
         self.engine.deinit();
+        self.draw_map.deinit(self.allocator);
     }
 
 
@@ -101,19 +115,16 @@ pub const Client = struct {
         var session = try self.engine.createSession();
         defer session.destroy();
 
+
         var cam = FlyCam.init(self.window);
-        cam.move_speed = 64;
+        cam.move_speed = 256;
 
         const cam_obs = try session.world.observers.create(cam.position.cast(i32));
         defer session.world.observers.delete(cam_obs) catch {};
 
-        var session_context = SessionContext {
-            .client = self,
-        };
-
-        try session.start(&session_context, .{
-            .on_tick = SessionContext.onTick,
-            .on_world_update = SessionContext.onWorldUpdate,
+        try session.start(self, .{
+            .on_tick = onTick,
+            .on_world_update = onWorldUpdate,
         });
 
 
@@ -156,17 +167,7 @@ pub const Client = struct {
                 )
             );
 
-            const grid_size = 8;
-            var pos = Vec3.zero;
-            while (pos.v[0] < grid_size) : ( pos.v[0] += 1) {
-                pos.v[1] = 0;
-                while (pos.v[1] < grid_size) : ( pos.v[1] += 1) {
-                    pos.v[2] = 0;
-                    while (pos.v[2] < grid_size) : ( pos.v[2] += 1) {
-                        dbg.drawCube(pos.mulScalar(World.chunk_width).addScalar(World.chunk_width / 2), 1, vec3(.{0.8, 1, 1}));
-                    }
-                }
-            }
+            self.drawChunks(dbg);
 
             // dbg.drawCube(Vec3.zero, 1, vec3(.{0.8, 1, 1}));
             if (fps_counter.frame()) |frames| {
@@ -177,31 +178,64 @@ pub const Client = struct {
     }
 
 
-    const SessionContext = struct {
-        client: *Client,
+    fn onTick(self: *Client, session: *Session) !void {
+        _ = self;
+        _ = session;
+        // if (session.tick_count % 100 == 0) {
+        //     std.log.debug("tick {d}", .{ session.tick_count });
+        // }
+    }
 
-        fn onTick(self: *SessionContext, session: *Session) !void {
-            _ = self;
-            _ = session;
-            // if (session.tick_count % 100 == 0) {
-            //     std.log.debug("tick {d}", .{ session.tick_count });
-            // }
+    fn onWorldUpdate(self: *Client, world: *World) !void {
+        const chunks = &world.chunks;
+        for (chunks.load_state_events.get(.loading)) |event| {
+            try self.addDrawChunk(world, event.chunk);
         }
+        for (chunks.load_state_events.get(.active)) |chunk| {
+            try self.addDrawChunk(world, chunk);
+        }
+        for (chunks.load_state_events.get(.unloading)) |chunk| {
+            try self.addDrawChunk(world, chunk);
+        }
+        for (chunks.load_state_events.get(.deleted)) |chunk| {
+            self.removeDrawChunk(chunk);
+        }
+        // std.time.sleep(0.5 * std.time.ns_per_s);
+    }
 
-        fn onWorldUpdate(self: *SessionContext, world: *World) !void {
-            _ = self;
-            const chunks = &world.chunks;
-            const graph = &world.graph;
-            for (chunks.load_state_events.get(.active)) |chunk| {
-                const position = graph.positions.get(chunk);
-                std.log.info("loaded {} at {d: >4}", .{chunk, position});
-            }
-            for (chunks.load_state_events.get(.unloading)) |chunk| {
-                const position = graph.positions.get(chunk);
-                std.log.info("unloaded {} at {d: >4}", .{chunk, position});
-            }
+
+    fn addDrawChunk(self: *Client, world: *World, chunk: World.Chunk) !void {
+        std.time.sleep(100000);
+        const draw_chunk = DrawChunk {
+            .position = world.graph.positions.get(chunk),
+            .state = world.chunks.statuses.get(chunk).load_state,
+        };
+        self.draw_map_mutex.lock();
+        defer self.draw_map_mutex.unlock();
+        try self.draw_map.put(self.allocator, chunk, draw_chunk);
+    }
+
+    fn removeDrawChunk(self: *Client, chunk: World.Chunk) void {
+        std.time.sleep(100000);
+        self.draw_map_mutex.lock();
+        defer self.draw_map_mutex.unlock();
+        _ = self.draw_map.remove(chunk);
+    }
+
+    fn drawChunks(self: *Client, dbg: rendering.Debug) void {
+        self.draw_map_mutex.lock();
+        defer self.draw_map_mutex.unlock();
+        var iter = self.draw_map.valueIterator();
+        while (iter.next()) |draw_chunk| {
+            const color = switch (draw_chunk.state) {
+                .loading => vec3(.{0.5, 0.5, 0.5}),
+                .active => vec3(.{1, 1, 1}),
+                .unloading => vec3(.{1, 0.5, 0.5}),
+                else => unreachable,
+            };
+            dbg.drawCube(draw_chunk.position.cast(f32).addScalar(0.5).mulScalar(World.chunk_width), 1, color);
         }
-    };
+    }
 
 
 };
