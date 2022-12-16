@@ -12,6 +12,10 @@ pub fn Ijo(comptime ijo_type_name_: []const u8) type {
         id: IjoId,
 
         pub const ijo_type_name = ijo_type_name_;
+
+        pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+            try writer.print("[{s} {d}]", .{ijo_type_name, self.id});
+        }
     };
 }
 
@@ -57,7 +61,7 @@ pub fn IjoPool(comptime IjoType_: type) type {
             };
         }
 
-        pub fn destroy(self: *Self, ijo: IjoType) void {
+        pub fn delete(self: *Self, ijo: IjoType) void {
             self.id_pool.release(ijo.id);
         }
 

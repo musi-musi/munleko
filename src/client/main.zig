@@ -83,13 +83,11 @@ pub const Client = struct {
         var cam = FlyCam.init(self.window);
         cam.move_speed = 20;
 
-        const cam_obs = try session.world_man.addObserver(cam.position);
-        defer session.world_man.removeObserver(cam_obs) catch {};
+        const cam_obs = try session.world.observers.create(cam.position.cast(i32));
+        defer session.world.observers.delete(cam_obs) catch {};
 
         var session_context = SessionContext {
             .client = self,
-            .cam = &cam,
-            .cam_observer = cam_obs,
         };
 
         try session.start(&session_context, .{
@@ -124,11 +122,8 @@ pub const Client = struct {
                 }
             }
 
-            {
-                session_context.cam_mutex.lock();
-                defer session_context.cam_mutex.unlock();
-                cam.update(self.window);
-            }
+            cam.update(self.window);
+            session.world.observers.setPosition(cam_obs, cam.position.cast(i32));
             dbg.setView(cam.viewMatrix());
 
             gl.clear(.color_depth);
@@ -139,7 +134,20 @@ pub const Client = struct {
                     0.001, 1000,
                 )
             );
-            dbg.drawCube(Vec3.zero, 1, vec3(.{0.8, 1, 1}));
+
+            const grid_size = 8;
+            var pos = Vec3.zero;
+            while (pos.v[0] < grid_size) : ( pos.v[0] += 1) {
+                pos.v[1] = 0;
+                while (pos.v[1] < grid_size) : ( pos.v[1] += 1) {
+                    pos.v[2] = 0;
+                    while (pos.v[2] < grid_size) : ( pos.v[2] += 1) {
+                        dbg.drawCube(pos.mulScalar(World.chunk_width).addScalar(World.chunk_width / 2), 1, vec3(.{0.8, 1, 1}));
+                    }
+                }
+            }
+
+            // dbg.drawCube(Vec3.zero, 1, vec3(.{0.8, 1, 1}));
             if (fps_counter.frame()) |frames| {
                 _ = frames;
                 // std.log.info("fps: {d}", .{frames});
@@ -150,9 +158,6 @@ pub const Client = struct {
 
     const SessionContext = struct {
         client: *Client,
-        cam: *FlyCam,
-        cam_observer: World.Observer,
-        cam_mutex: Mutex = .{},
 
         fn onTick(self: *SessionContext, session: *Session) !void {
             _ = self;
@@ -162,10 +167,9 @@ pub const Client = struct {
             // }
         }
 
-        fn onWorldUpdate(self: *SessionContext, world_manager: *munleko.World.Manager) !void {
-            self.cam_mutex.lock();
-            defer self.cam_mutex.unlock();
-            world_manager.setObserverPosition(self.cam_observer, self.cam.position);
+        fn onWorldUpdate(self: *SessionContext, world: *World) !void {
+            _ = self;
+            _ = world;
         }
     };
 

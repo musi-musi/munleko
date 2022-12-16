@@ -19,7 +19,7 @@ pub fn JobQueueUnmanaged(comptime T: type) type {
 
         /// push a new item to the queue
         /// if any threads are blocking on a call to `pop`, one will be woken up to recieve the item
-        pub fn push(self: *Self, allocator: Allocator, item: T, priority: f32) Allocator.Error!void {
+        pub fn push(self: *Self, allocator: Allocator, item: T, priority: u32) Allocator.Error!void {
             self.mutex.lock();
             defer self.mutex.unlock();
             try self.queue.push(allocator, item, priority);
@@ -56,7 +56,7 @@ pub fn PriorityQueueUnmanaged(comptime T: type) type {
         nodes: Nodes = .{},
 
         pub const Node = struct {
-            priority: f32,
+            priority: u32,
             item: T,
         };
 
@@ -68,7 +68,7 @@ pub fn PriorityQueueUnmanaged(comptime T: type) type {
             std.mem.swap(Node, &self.nodes.items[a], &self.nodes.items[b]);
         }
 
-        fn priority(self: Self, i: usize) f32 {
+        fn priority(self: Self, i: usize) u32 {
             return self.nodes.items[i].priority;
         }
 
@@ -110,7 +110,7 @@ pub fn PriorityQueueUnmanaged(comptime T: type) type {
             }
         }
 
-        pub fn push(self: *Self, allocator: Allocator, item: T, p: f32) Allocator.Error!void {
+        pub fn push(self: *Self, allocator: Allocator, item: T, p: u32) Allocator.Error!void {
             const len = self.nodes.items.len;
             try self.nodes.append(allocator, .{
                 .priority = p,
