@@ -78,6 +78,28 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         pub const axes = Axis.values;
         pub const indices = ([4]u32{0, 1, 2, 3})[0..dimensions];
 
+        pub const Comp = switch (dimensions) {
+            1 => extern struct { 
+                x: Scalar,
+            },
+            2 => extern struct { 
+                x: Scalar, 
+                y: Scalar,
+            },
+            3 => extern struct { 
+                x: Scalar, 
+                y: Scalar, 
+                z: Scalar,
+            },
+            4 => extern struct { 
+                x: Scalar, 
+                y: Scalar, 
+                z: Scalar, 
+                w: Scalar,
+            },
+            else => unreachable,
+        };
+
         const Self = @This();
 
         pub const zero = fill(0);
@@ -396,13 +418,13 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         }
 
 
-        pub fn format(self: Self, comptime fmt: []const u8, _: std.fmt.FormatOptions, w: anytype) !void {
+        pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, w: anytype) !void {
             try w.writeAll("(");
             inline for (indices) |i| {
                 if (i != 0) {
                     try w.writeAll(", ");
                 }
-                try w.print("{" ++ fmt ++ "}", .{ self.v[i] });
+                try std.fmt.formatType(self.v[i], fmt, options, w, 1);
             }
             try w.writeAll(")");
         }

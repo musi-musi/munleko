@@ -24,18 +24,39 @@ const Window = window.Window;
 pub const rendering = @import("rendering.zig");
 
 
+fn printSubZones(a: [3]i32, b: [3]i32, r: u32) void {
+    var ranges: [3]nm.Range3i = undefined;
+    const a_vec = nm.vec3i(a);
+    const b_vec = nm.vec3i(b);
+    std.log.info("subtract zone {d: >2} from {d: >2} (radius {d: >2}):", .{b_vec, a_vec, r});
+    for (World.ObserverZone.subtractZones(a_vec, b_vec, r, &ranges)) |range| {
+        std.log.info("range from {d: >2} to {d: >2}", .{range.min, range.max});
+    }
+}
+
 pub fn main() !void {
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ =  gpa.deinit();
-    
-    const allocator = gpa.allocator();
 
-    // var lua = try zlua.Lua.init(allocator);
-    // defer lua.deinit();
+
+    const allocator = gpa.allocator();
+    // printSubZones(.{0, 0, 0}, .{0, 0, 0}, 4);
+    // printSubZones(.{0, 0, 0}, .{2, 0, 0}, 4);
+    // printSubZones(.{0, 0, 0}, .{-2, 0, 0}, 4);
+    // printSubZones(.{0, 0, 0}, .{0, 2, 0}, 4);
+    // printSubZones(.{0, 0, 0}, .{0, -2, 0}, 4);
+    // printSubZones(.{0, 0, 0}, .{0, 0, 2}, 4);
+    // printSubZones(.{0, 0, 0}, .{0, 0, -2}, 4);
+    // printSubZones(.{0, 0, 0}, .{0, 1, 2}, 4);
+    // printSubZones(.{0, 0, 0}, .{0, 1, -2}, 4);
+    // printSubZones(.{0, 0, 0}, .{0, -1, 2}, 4);
+    // printSubZones(.{0, 0, 0}, .{0, -1, -2}, 4);
+    // printSubZones(.{0, 0, 0}, .{8, 8, 8}, 4);
 
     try window.init();
     defer window.deinit();
+
 
     var client: Client = undefined;
     try client.init(allocator);
@@ -81,7 +102,7 @@ pub const Client = struct {
         defer session.destroy();
 
         var cam = FlyCam.init(self.window);
-        cam.move_speed = 20;
+        cam.move_speed = 64;
 
         const cam_obs = try session.world.observers.create(cam.position.cast(i32));
         defer session.world.observers.delete(cam_obs) catch {};
@@ -169,7 +190,16 @@ pub const Client = struct {
 
         fn onWorldUpdate(self: *SessionContext, world: *World) !void {
             _ = self;
-            _ = world;
+            const chunks = &world.chunks;
+            const graph = &world.graph;
+            for (chunks.load_state_events.get(.active)) |chunk| {
+                const position = graph.positions.get(chunk);
+                std.log.info("loaded {} at {d: >4}", .{chunk, position});
+            }
+            for (chunks.load_state_events.get(.unloading)) |chunk| {
+                const position = graph.positions.get(chunk);
+                std.log.info("unloaded {} at {d: >4}", .{chunk, position});
+            }
         }
     };
 

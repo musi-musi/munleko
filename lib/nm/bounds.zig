@@ -58,7 +58,7 @@ pub fn Range(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
     comptime nm.assertFloatOrInt(Scalar_);
     comptime nm.assertValidDimensionCount(dimensions_);
 
-    return struct {
+    return extern struct {
 
         min: Vector,
         max: Vector,
@@ -67,6 +67,11 @@ pub fn Range(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         pub const dimensions = dimensions_;
         pub const Vector = nm.Vector(Scalar, dimensions);
         pub const Axis = nm.Axis(dimensions);
+
+        pub const Comp = extern struct {
+            min: Vector.Comp,
+            max: Vector.Comp,
+        };
 
         const Self = @This();
 
@@ -95,6 +100,47 @@ pub fn Range(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             }
             return true;
         }
+        pub usingnamespace if (std.meta.trait.isIntegral(Scalar)) struct {
+
+            pub fn iterate(self: Self) Iterator {
+                return Iterator.init(self);
+            }
+
+            pub const Iterator = struct {
+                range: Self,
+                i: ?Vector,
+
+                pub fn init(range: Self) Iterator {
+                    return .{
+                        .range = range,
+                        .i = range.min,
+                    };
+                }
+
+                pub fn next(self: *Iterator) ?Vector {
+                    if (self.i) |i| {
+                        defer self.i = nextRecr(self.range, i, dimensions - 1);
+                        return i;
+                    }
+                    return null;
+                }
+
+                fn nextRecr(range: Self, index: Vector, comptime a: usize) ?Vector {
+                    var i = index;
+                    i.v[a] += 1;
+                    if (i.v[a] == range.max.v[a]) {
+                        if (a == 0) {
+                            return null;
+                        }
+                        i.v[a] = range.min.v[a];
+                        return nextRecr(range, i, a - 1);
+                    }
+                    return i;
+                }
+            };
+
+        }
+        else struct {};
 
     };  
 }
