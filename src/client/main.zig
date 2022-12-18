@@ -153,6 +153,12 @@ pub const Client = struct {
                     else => self.window.setMouseMode(.disabled),
                 }
             }
+            if (self.window.buttonPressed(.f_10)) {
+                self.window.setVsync(switch (self.window.vsync) {
+                    .enabled => .disabled,
+                    .disabled => .enabled,
+                });
+            }
 
             cam.update(self.window);
             session.world.observers.setPosition(cam_obs, cam.position.cast(i32));
@@ -169,7 +175,6 @@ pub const Client = struct {
 
             self.drawChunks(dbg);
 
-            // dbg.drawCube(Vec3.zero, 1, vec3(.{0.8, 1, 1}));
             if (fps_counter.frame()) |frames| {
                 _ = frames;
                 // std.log.info("fps: {d}", .{frames});
@@ -205,7 +210,6 @@ pub const Client = struct {
 
 
     fn addDrawChunk(self: *Client, world: *World, chunk: World.Chunk) !void {
-        std.time.sleep(100000);
         const draw_chunk = DrawChunk {
             .position = world.graph.positions.get(chunk),
             .state = world.chunks.statuses.get(chunk).load_state,
@@ -216,7 +220,6 @@ pub const Client = struct {
     }
 
     fn removeDrawChunk(self: *Client, chunk: World.Chunk) void {
-        std.time.sleep(100000);
         self.draw_map_mutex.lock();
         defer self.draw_map_mutex.unlock();
         _ = self.draw_map.remove(chunk);

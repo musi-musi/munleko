@@ -202,7 +202,7 @@ pub const ObserverZone = struct {
     mutex: Mutex = .{},
     position: Vec3i = Vec3i.zero,
     center_chunk_position: Vec3i = Vec3i.zero,
-    load_radius: u32 = 6,
+    load_radius: u32 = 4,
 
     fn setPosition(self: *ObserverZone, position: Vec3i) void {
         self.mutex.lock();
@@ -523,11 +523,12 @@ pub const Manager = struct {
     fn processPendingChunks(self: *Manager) !void {
         const world = self.world;
         const chunks = &world.chunks;
-        var i: isize = @intCast(isize, self.pending_chunks.items.len) - 1;
-        while (i >= 0) : (i -= 1) {
-            const chunk = self.pending_chunks.items[@intCast(usize, i)];
+        var i: usize = 0;
+        while (i < self.pending_chunks.items.len) {
+            const chunk = self.pending_chunks.items[i];
             const status = chunks.statuses.getPtr(chunk);
             if (status.user_count != 0) {
+                i += 1;
                 continue;
             }
             switch (status.load_state) {
@@ -556,8 +557,11 @@ pub const Manager = struct {
                     chunks.pool.delete(chunk);
                 },
             }
-            if (!status.is_pending) {
-                _ = self.pending_chunks.swapRemove(@intCast(usize, i));
+            if (status.is_pending) {
+                i += 1;
+            }
+            else {
+                _ = self.pending_chunks.swapRemove(i);
             }
         }
 

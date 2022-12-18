@@ -23,4 +23,5 @@ you're on your own
 standard wasd and mouse stuff, space goes up, lshift goes down
 - \[`\] to unlock mouse
 - \[f4\] to toggle fullscreen
+- \[f10\] to toggle vsync
 - \[z\] to toggle noclip
