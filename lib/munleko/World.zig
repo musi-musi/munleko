@@ -523,9 +523,9 @@ pub const Manager = struct {
 
             self.range_load_events.clearAll();
 
-            // self.checkChunks();
 
             try self.processPendingChunks();
+            // self.checkChunks();
             try self.processDirtyObservers();
             try self.processRangeLoadEvents();
 
@@ -579,7 +579,7 @@ pub const Manager = struct {
             }
             const pending_state = status.pending_load_state.?;
             status.load_state = pending_state;
-            switch (pending_state) {
+            switch (status.load_state) {
                 // chunks only become .loading from startChunkLoad, which handles load state events in that case
                 .loading => unreachable,
                 inline else => |state| {
@@ -589,16 +589,11 @@ pub const Manager = struct {
             if (status.load_state == .active) {
                 status.pending_load_state = null;
             }
-            else {
-                // the graph only holds chunks that are active or loading
-                // chunks cannot become loading from the pending list, so we dont need to check 
-                // for .loading
-                world.graph.removeChunk(chunk);
-            }
             switch (status.load_state) {
                 .unloading => {
                     // chunks that are now unloading are immediately queued for deletion
                     status.pending_load_state = .deleted;
+                    world.graph.removeChunk(chunk);
                 },
                 .deleted => {
                     // chunks that are now deleted must be. well. deleted
@@ -608,7 +603,7 @@ pub const Manager = struct {
                 else => {},
             }
             if (status.pending_load_state != null) {
-                // if the chunk does not have a pending state after processing, we dont need to remove it
+                // if the chunk does still has a pending state after processing, we dont need to remove it
                 i += 1;
                 continue;
             }

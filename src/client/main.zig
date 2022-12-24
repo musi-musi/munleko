@@ -176,8 +176,8 @@ pub const Client = struct {
             self.drawChunks(dbg);
 
             if (fps_counter.frame()) |frames| {
-                // _ = frames;
-                std.log.info("fps: {d}", .{frames});
+                _ = frames;
+                // std.log.info("fps: {d}", .{frames});
             }
         }
     }
@@ -206,7 +206,7 @@ pub const Client = struct {
         for (chunks.load_state_events.get(.deleted)) |chunk| {
             self.removeDrawChunk(chunk);
         }
-        std.time.sleep(0.5 * std.time.ns_per_s);
+        // std.time.sleep(0.5 * std.time.ns_per_s);
     }
 
 
