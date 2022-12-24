@@ -37,23 +37,22 @@ graph: Graph = undefined,
 pub const ChunkLoadState = enum {
     deleted,
     loading,
-    cancelled,
     active,
     unloading,
 };
 
 pub const ChunkStatus = struct {
     load_state: ChunkLoadState = .deleted,
-    is_pending: bool = false,
+    pending_load_state: ?ChunkLoadState = null,
     user_count: u32 = 0,
     observer_count: u32 = 0,
-    mutex: Mutex = .{}
+    mutex: Mutex = .{},
+    index: usize = 0,
 };
 
 pub const ChunkLoadStateEvents = util.Events(union(ChunkLoadState) {
     deleted: Chunk,
     loading: PriorityChunk,
-    cancelled: Chunk,
     active: Chunk,
     unloading: Chunk,
 });
@@ -93,6 +92,7 @@ pub const Chunks = struct {
     pool: ChunkPool,
     statuses: ChunkStatusStore,
     load_state_events: ChunkLoadStateEvents,
+    chunk_list: List(Chunk) = .{},
 
     fn init(self: *Chunks, allocator: Allocator) !void {
         self.* = .{
@@ -107,6 +107,7 @@ pub const Chunks = struct {
         self.pool.deinit();
         self.statuses.deinit();
         self.load_state_events.deinit();
+        self.chunk_list.deinit(self.allocator);
     }
 
     pub fn startUsing(self: *Chunks, chunk: Chunk) void {
@@ -122,7 +123,17 @@ pub const Chunks = struct {
     fn create(self: *Chunks) !Chunk {
         const chunk = try self.pool.create();
         try self.statuses.matchCapacity(self.pool);
+        self.statuses.getPtr(chunk).index = self.chunk_list.items.len;
+        try self.chunk_list.append(self.allocator, chunk);
         return chunk;
+    }
+
+    fn delete(self: *Chunks, chunk: Chunk) void {
+        const index = self.statuses.get(chunk).index;
+        _ = self.chunk_list.swapRemove(index);
+        if (index != self.chunk_list.items.len) {
+            self.statuses.getPtr(self.chunk_list.items[index]).index = index;
+        }
     }
 
 };
@@ -233,7 +244,7 @@ pub const ObserverZone = struct {
     pub fn subtractZones(center_a: Vec3i, center_b: Vec3i, load_radius: u32, ranges: *[3]Range3i) []Range3i {
         var count: u32 = 0;
         var range = @ptrCast([*]Range3i.Comp, ranges);
-        const d = @bitCast(Vec3i.Comp, center_a.sub(center_b));
+        const d = @bitCast(Vec3i.Comp, center_b.sub(center_a));
         const b = @bitCast(Vec3i.Comp, center_b);
         const a = @bitCast(Vec3i.Comp, center_a);
         const r = @intCast(i32, load_radius);
@@ -245,7 +256,7 @@ pub const ObserverZone = struct {
             return ranges[0..1];
         }
         if (d.x != 0) {
-            if (d.x > 0) {
+            if (d.x < 0) {
                 range[0].min.x = b.x + r;
                 range[0].max.x = a.x + r;
             }
@@ -261,7 +272,7 @@ pub const ObserverZone = struct {
             count += 1;
         }
         if (d.y != 0) {
-            if (d.x > 0) {
+            if (d.x < 0) {
                 range[0].min.x = a.x - r;
                 range[0].max.x = b.x + r;
             }
@@ -269,7 +280,7 @@ pub const ObserverZone = struct {
                 range[0].min.x = b.x - r;
                 range[0].max.x = a.x + r;
             }
-            if (d.y > 0) {
+            if (d.y < 0) {
                 range[0].min.y = b.y + r;
                 range[0].max.y = a.y + r;
             }
@@ -283,7 +294,7 @@ pub const ObserverZone = struct {
             count += 1;
         }
         if (d.z != 0) {
-            if (d.x > 0) {
+            if (d.x < 0) {
                 range[0].min.x = a.x - r;
                 range[0].max.x = b.x + r;
             }
@@ -291,7 +302,7 @@ pub const ObserverZone = struct {
                 range[0].min.x = b.x - r;
                 range[0].max.x = a.x + r;
             }
-            if (d.y > 0) {
+            if (d.y < 0) {
                 range[0].min.y = a.y - r;
                 range[0].max.y = b.y + r;
             }
@@ -299,7 +310,7 @@ pub const ObserverZone = struct {
                 range[0].min.y = b.y - r;
                 range[0].max.y = a.y + r;
             }
-            if (d.z > 0) {
+            if (d.z < 0) {
                 range[0].min.z = b.z + r;
                 range[0].max.z = a.z + r;
             }
@@ -405,10 +416,10 @@ pub const Observers = struct {
         zone.mutex.lock();
         defer zone.mutex.unlock();
         zone.position = position;
-        const load_center_position = zone.center_chunk_position.divFloorScalar(chunk_width);
-        if (position.sub(load_center_position).mag2() > chunk_width * chunk_width) {
-            self.statuses.getPtr(observer).is_dirty.store(true, .Monotonic);
-        }
+        self.statuses.getPtr(observer).is_dirty.store(true, .Monotonic);
+        // const load_center_position = zone.center_chunk_position.divFloorScalar(chunk_width);
+        // if (position.sub(load_center_position).mag2() > chunk_width * chunk_width) {
+        // }
     }
 
     pub fn getPosition(self: *Observers, observer: Observer) Vec3i {
@@ -510,6 +521,10 @@ pub const Manager = struct {
         on_world_update_thread = true;
         while (self.thread_is_running.load(.Monotonic)) {
 
+            self.range_load_events.clearAll();
+
+            // self.checkChunks();
+
             try self.processPendingChunks();
             try self.processDirtyObservers();
             try self.processRangeLoadEvents();
@@ -517,6 +532,36 @@ pub const Manager = struct {
             try on_update_fn(context, self.world);
 
             self.world.chunks.load_state_events.clearAll();
+        }
+    }
+
+    fn checkChunks(self: Manager) void {
+        if (std.debug.runtime_safety) {
+            const world = self.world;
+            const chunks = &world.chunks;
+            const graph = &world.graph;
+            for (chunks.chunk_list.items) |chunk| {
+                const status = chunks.statuses.get(chunk);
+                // const count = std.mem.count(Chunk, self.pending_chunks.items, &[1]Chunk{chunk});
+                // if (status.pending_load_state) |_| {
+                //     std.debug.assert(count == 1);
+                // }
+                // else {
+                //     std.debug.assert(count == 0);
+                // }
+                const position = graph.positions.get(chunk);
+                const load_state = status.load_state;
+                if (load_state == .loading) {
+                    const mapped_chunk = graph.position_map.get(position);
+                    std.debug.assert(mapped_chunk != null);
+                    std.debug.assert(mapped_chunk == chunk);
+                }
+                if (load_state == .active) {
+                    const mapped_chunk = graph.position_map.get(position);
+                    std.debug.assert(mapped_chunk != null);
+                    std.debug.assert(mapped_chunk == chunk);
+                }
+            }
         }
     }
 
@@ -528,41 +573,46 @@ pub const Manager = struct {
             const chunk = self.pending_chunks.items[i];
             const status = chunks.statuses.getPtr(chunk);
             if (status.user_count != 0) {
+                // dont process chunks that are still being used by external systems
                 i += 1;
                 continue;
             }
-            switch (status.load_state) {
-                .deleted => {
-                    @panic("deleted chunk marked as pending");
-                },
-                .loading => {
-                    status.load_state = .active;
-                    status.is_pending = false;
-                    try chunks.load_state_events.post(.active, chunk);
-                },
-                .cancelled => {
-                    status.load_state = .unloading;
-                    try chunks.load_state_events.post(.unloading, chunk);
-                },
-                .active => {
-                    world.graph.removeChunk(chunk);
-                    status.load_state = .unloading;
-                    try chunks.load_state_events.post(.unloading, chunk);
-                },
-                .unloading => {
-                    world.graph.removeChunk(chunk);
-                    status.load_state = .deleted;
-                    status.is_pending = false;
-                    try chunks.load_state_events.post(.deleted, chunk);
-                    chunks.pool.delete(chunk);
-                },
+            const pending_state = status.pending_load_state.?;
+            status.load_state = pending_state;
+            switch (pending_state) {
+                // chunks only become .loading from startChunkLoad, which handles load state events in that case
+                .loading => unreachable,
+                inline else => |state| {
+                    try chunks.load_state_events.post(state, chunk);
+                }
             }
-            if (status.is_pending) {
-                i += 1;
+            if (status.load_state == .active) {
+                status.pending_load_state = null;
             }
             else {
-                _ = self.pending_chunks.swapRemove(i);
+                // the graph only holds chunks that are active or loading
+                // chunks cannot become loading from the pending list, so we dont need to check 
+                // for .loading
+                world.graph.removeChunk(chunk);
             }
+            switch (status.load_state) {
+                .unloading => {
+                    // chunks that are now unloading are immediately queued for deletion
+                    status.pending_load_state = .deleted;
+                },
+                .deleted => {
+                    // chunks that are now deleted must be. well. deleted
+                    status.pending_load_state = null;
+                    chunks.delete(chunk);
+                },
+                else => {},
+            }
+            if (status.pending_load_state != null) {
+                // if the chunk does not have a pending state after processing, we dont need to remove it
+                i += 1;
+                continue;
+            }
+            _ = self.pending_chunks.swapRemove(i);
         }
 
     }
@@ -638,7 +688,6 @@ pub const Manager = struct {
     fn processRangeLoadEvents(self: *Manager) !void {
         const world = self.world;
         const observers = &world.observers;
-        defer self.range_load_events.clearAll();
         for (self.range_load_events.get(.load)) |event| {
             var iter = event.range.iterate();
             while (iter.next()) |position| {
@@ -666,6 +715,7 @@ pub const Manager = struct {
         const observers = &world.observers;
         if (graph.position_map.get(position)) |chunk| {
             const status = chunks.statuses.getPtr(chunk);
+            std.debug.assert(status.load_state == .active or status.load_state == .loading);
             status.observer_count += 1;
             if (status.observer_count > 1) {
                 std.log.info("count {d}", .{status.observer_count});
@@ -675,8 +725,8 @@ pub const Manager = struct {
             const chunk = try world.createAndAddChunk(position);
             const status = chunks.statuses.getPtr(chunk);
             status.observer_count = 1;
-            status.is_pending = true;
             status.load_state = .loading;
+            status.pending_load_state = .active;
             status.user_count = 0;
             try chunks.load_state_events.post(.loading, .{
                 .chunk = chunk,
@@ -703,15 +753,11 @@ pub const Manager = struct {
         if (status.observer_count != 0) {
             return;
         }
-        if (status.load_state == .loading) {
-            status.load_state = .cancelled;
-            try chunks.load_state_events.post(.cancelled, chunk);
-            graph.removeChunk(chunk);
-        }
-        if (!status.is_pending) {
+        if (status.pending_load_state == null) {
+            // if the chunks isnt already pending, it needs to be added to the list of pending chunks
             try self.pending_chunks.append(self.allocator, chunk);
-            status.is_pending = true;
         }
+        status.pending_load_state = .unloading;
     }
 
     pub fn tick(self: *Manager) !void {

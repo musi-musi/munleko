@@ -176,8 +176,8 @@ pub const Client = struct {
             self.drawChunks(dbg);
 
             if (fps_counter.frame()) |frames| {
-                _ = frames;
-                // std.log.info("fps: {d}", .{frames});
+                // _ = frames;
+                std.log.info("fps: {d}", .{frames});
             }
         }
     }
@@ -201,11 +201,12 @@ pub const Client = struct {
         }
         for (chunks.load_state_events.get(.unloading)) |chunk| {
             try self.addDrawChunk(world, chunk);
+            // self.removeDrawChunk(chunk);
         }
         for (chunks.load_state_events.get(.deleted)) |chunk| {
             self.removeDrawChunk(chunk);
         }
-        // std.time.sleep(0.5 * std.time.ns_per_s);
+        std.time.sleep(0.5 * std.time.ns_per_s);
     }
 
 
@@ -228,6 +229,7 @@ pub const Client = struct {
     fn drawChunks(self: *Client, dbg: rendering.Debug) void {
         self.draw_map_mutex.lock();
         defer self.draw_map_mutex.unlock();
+        dbg.bindCube();
         var iter = self.draw_map.valueIterator();
         while (iter.next()) |draw_chunk| {
             const color = switch (draw_chunk.state) {
@@ -236,7 +238,7 @@ pub const Client = struct {
                 .unloading => vec3(.{1, 0.5, 0.5}),
                 else => unreachable,
             };
-            dbg.drawCube(draw_chunk.position.cast(f32).addScalar(0.5).mulScalar(World.chunk_width), 1, color);
+            dbg.drawCubeAssumeBound(draw_chunk.position.cast(f32).addScalar(0.5).mulScalar(World.chunk_width), 1, color);
         }
     }
 

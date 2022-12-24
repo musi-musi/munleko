@@ -55,12 +55,20 @@ pub const Debug = struct {
         self.mesh.bind();
     }
 
-    pub fn drawCube(self: Debug, position: Vec3, radius: f32, color: Vec3) void {
+    pub fn bindCube(self: Debug) void {
+        self.mesh.setBuffer(0, self.cube_buffers.verts);
+        self.mesh.setIndexBuffer(self.cube_buffers.indices);
+    }
+
+    pub fn bindAndDrawCube(self: Debug, position: Vec3, radius: f32, color: Vec3) void {
+        self.bindCube();
+        self.drawCubeAssumeBound(position, radius, color);
+    }
+
+    pub fn drawCubeAssumeBound(self: Debug, position: Vec3, radius: f32, color: Vec3) void {
         self.shader.setUniform(.position, position.v);
         self.shader.setUniform(.radius, radius);
         self.shader.setUniform(.color, color.v);
-        self.mesh.setBuffer(0, self.cube_buffers.verts);
-        self.mesh.setIndexBuffer(self.cube_buffers.indices);
         self.mesh.drawAssumeBound(36);
     }
 

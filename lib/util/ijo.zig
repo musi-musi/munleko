@@ -8,23 +8,22 @@ pub const IjoId = u32;
 pub const IjoIdPool = idpool.IdPoolUnmanaged(IjoId);
 
 pub fn Ijo(comptime ijo_type_name_: []const u8) type {
-    return struct {
-        id: IjoId,
-
+    return enum(IjoId) {
+        _,
         pub const ijo_type_name = ijo_type_name_;
 
         const Self = @This();
 
         pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-            try writer.print("[{s} {d}]", .{ijo_type_name, self.id});
+            try writer.print("[{s} {d}]", .{ijo_type_name, @enumToInt(self)});
         }
 
         pub const HashContext = struct {
             pub fn hash(_: HashContext, x: Self) u64 {
-                return x.id;
+                return @enumToInt(x);
             }
             pub fn eql(_: HashContext, a: Self, b: Self) bool {
-                return a.id == b.id;
+                return a == b;
             }
         };
     };
@@ -67,13 +66,11 @@ pub fn IjoPool(comptime IjoType_: type) type {
 
         pub fn create(self: *Self) !IjoType {
             const id = try self.id_pool.acquire(self.allocator);
-            return .{
-                .id = id,
-            };
+            return @intToEnum(IjoType, id);
         }
 
         pub fn delete(self: *Self, ijo: IjoType) void {
-            self.id_pool.release(ijo.id);
+            self.id_pool.release(@enumToInt(ijo));
         }
 
         pub fn capacity(self: Self) usize {
@@ -144,11 +141,11 @@ pub fn IjoDataStore(comptime IjoType_: type, comptime Data_: type, comptime Cont
         }
 
         pub fn get(self: Self, ijo: IjoType) Data {
-            return self.ptrFromIndex(ijo.id).*;
+            return self.ptrFromIndex(@enumToInt(ijo)).*;
         }
 
         pub fn getPtr(self: *Self, ijo: IjoType) *Data {
-            return self.ptrFromIndex(ijo.id);
+            return self.ptrFromIndex(@enumToInt(ijo));
         }
 
         fn ptrFromIndex(self: Self, index: usize) *Data {

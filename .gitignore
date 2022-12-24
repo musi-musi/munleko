@@ -6,3 +6,4 @@
 /build/
 /build-*/
 /docgen_tmp/
+*.blend1
