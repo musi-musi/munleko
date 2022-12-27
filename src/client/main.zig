@@ -23,6 +23,7 @@ const Window = window.Window;
 
 pub const rendering = @import("rendering.zig");
 
+pub const log_level = std.log.Level.info;
 
 fn printSubZones(a: [3]i32, b: [3]i32, r: u32) void {
     var ranges: [3]nm.Range3i = undefined;
@@ -83,6 +84,7 @@ pub const Client = struct {
     engine: Engine,
     draw_map: DrawMap = .{},
     draw_map_mutex: Mutex = .{},
+    observer: World.Observer = undefined,
 
     pub fn init(self: *Client, allocator: Allocator) !void {
         self.* = .{
@@ -121,6 +123,7 @@ pub const Client = struct {
 
         const cam_obs = try session.world.observers.create(cam.position.cast(i32));
         defer session.world.observers.delete(cam_obs) catch {};
+        self.observer = cam_obs;
 
         try session.start(self, .{
             .on_tick = onTick,
@@ -176,8 +179,8 @@ pub const Client = struct {
             self.drawChunks(dbg);
 
             if (fps_counter.frame()) |frames| {
-                _ = frames;
-                // std.log.info("fps: {d}", .{frames});
+                // _ = frames;
+                std.log.info("fps: {d}", .{frames});
             }
         }
     }
@@ -192,20 +195,27 @@ pub const Client = struct {
     }
 
     fn onWorldUpdate(self: *Client, world: *World) !void {
-        const chunks = &world.chunks;
-        for (chunks.load_state_events.get(.loading)) |event| {
-            try self.addDrawChunk(world, event.chunk);
-        }
-        for (chunks.load_state_events.get(.active)) |chunk| {
+        const events = &world.observers.statuses.getPtr(self.observer).chunk_events;
+        for (events.get(.enter)) |chunk| {
             try self.addDrawChunk(world, chunk);
         }
-        for (chunks.load_state_events.get(.unloading)) |chunk| {
-            try self.addDrawChunk(world, chunk);
-            // self.removeDrawChunk(chunk);
-        }
-        for (chunks.load_state_events.get(.deleted)) |chunk| {
+        for (events.get(.exit)) |chunk| {
             self.removeDrawChunk(chunk);
         }
+        // const chunks = &world.chunks;
+        // for (chunks.load_state_events.get(.loading)) |event| {
+        //     try self.addDrawChunk(world, event.chunk);
+        // }
+        // for (chunks.load_state_events.get(.active)) |chunk| {
+        //     try self.addDrawChunk(world, chunk);
+        // }
+        // for (chunks.load_state_events.get(.unloading)) |chunk| {
+        //     try self.addDrawChunk(world, chunk);
+        //     // self.removeDrawChunk(chunk);
+        // }
+        // for (chunks.load_state_events.get(.deleted)) |chunk| {
+        //     self.removeDrawChunk(chunk);
+        // }
         // std.time.sleep(0.5 * std.time.ns_per_s);
     }
 
@@ -218,6 +228,10 @@ pub const Client = struct {
         self.draw_map_mutex.lock();
         defer self.draw_map_mutex.unlock();
         try self.draw_map.put(self.allocator, chunk, draw_chunk);
+        // const existing = try self.draw_map.fetchPut(self.allocator, chunk, draw_chunk);
+        // if (existing) |_| {
+        //     std.log.info("duplicate {}", .{chunk});
+        // }
     }
 
     fn removeDrawChunk(self: *Client, chunk: World.Chunk) void {

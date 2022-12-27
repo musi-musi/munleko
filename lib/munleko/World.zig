@@ -4,6 +4,7 @@ const nm = @import("nm");
 
 const Engine = @import("Engine.zig");
 const Session = @import("Session.zig");
+const leko = @import("leko.zig");
 
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
@@ -33,6 +34,7 @@ allocator: Allocator,
 chunks: Chunks = undefined,
 observers: Observers = undefined,
 graph: Graph = undefined,
+leko: leko.LekoData = undefined,
 
 pub const ChunkLoadState = enum {
     deleted,
@@ -44,7 +46,7 @@ pub const ChunkLoadState = enum {
 pub const ChunkStatus = struct {
     load_state: ChunkLoadState = .deleted,
     pending_load_state: ?ChunkLoadState = null,
-    user_count: u32 = 0,
+    user_count: Atomic(u32) = .{ .value = 0, },
     observer_count: u32 = 0,
     mutex: Mutex = .{},
     index: usize = 0,
@@ -72,6 +74,7 @@ pub fn create(allocator: Allocator) !*World {
     try self.observers.init(allocator);
     try self.chunks.init(allocator);
     try self.graph.init(allocator);
+    try self.leko.init(allocator);
     return self;
 
 }
@@ -83,6 +86,7 @@ pub fn destroy(self: *World) void {
     self.chunks.deinit();
     self.observers.deinit();
     self.graph.deinit();
+    self.leko.deinit();
 
 }
 
@@ -112,12 +116,11 @@ pub const Chunks = struct {
 
     pub fn startUsing(self: *Chunks, chunk: Chunk) void {
         assertOnWorldUpdateThread();
-        self.statuses.getPtr(chunk).user_count += 1;
+        _ = self.statuses.getPtr(chunk).user_count.fetchAdd(1, .Monotonic);
     }
 
     pub fn stopUsing(self: *Chunks, chunk: Chunk) void {
-        assertOnWorldUpdateThread();
-        self.statuses.getPtr(chunk).user_count -= 1;
+        _ = self.statuses.getPtr(chunk).user_count.fetchSub(1, .Monotonic);
     }
 
     fn create(self: *Chunks) !Chunk {
@@ -134,6 +137,7 @@ pub const Chunks = struct {
         if (index != self.chunk_list.items.len) {
             self.statuses.getPtr(self.chunk_list.items[index]).index = index;
         }
+        self.pool.delete(chunk);
     }
 
 };
@@ -236,6 +240,17 @@ pub const ObserverZone = struct {
             .old = old_center_position,
             .new = self.center_chunk_position,
         };
+    }
+
+    fn rangeForZone(center: Vec3i, load_radius: u32) Range3i {
+        return Range3i.init(
+            center.subScalar(@intCast(i32, load_radius)).v,
+            center.addScalar(@intCast(i32, load_radius)).v,
+        );
+    }
+
+    pub fn observerdRange(self: ObserverZone) Range3i {
+        return rangeForZone(self.center_chunk_position, self.load_radius);
     }
 
 
@@ -346,11 +361,30 @@ const ObserverStatus = struct {
     state: Atomic(ObserverState) = .{ .value = .deleted },
     is_dirty: Atomic(bool) = .{ .value = false },
     index: Atomic(usize) = .{ .value = 0 },
+    chunk_events: ObserverChunkEvents,
+    waiting_chunks: std.ArrayList(Chunk),
 };
 
+const ObserverChunkEvents = util.Events(union(enum) {
+    enter: Chunk,
+    exit: Chunk,
+});
 
 const ObserverZoneStore = util.IjoDataStoreDefaultInit(Observer, ObserverZone);
-const ObserverStatusStore = util.IjoDataStoreDefaultInit(Observer, ObserverStatus);
+const ObserverStatusStore = util.IjoDataStore(Observer, ObserverStatus, struct {
+    pub fn initData(_: @This(), arena: *std.heap.ArenaAllocator) !ObserverStatus {
+        return ObserverStatus {
+            .chunk_events = ObserverChunkEvents.init(arena.child_allocator),
+            .waiting_chunks = std.ArrayList(Chunk).init(arena.child_allocator),
+        };
+    }
+    pub fn deinitData(_: @This(), status: *ObserverStatus) void {
+        status.chunk_events.deinit();
+        status.waiting_chunks.deinit();
+    }
+});
+const ObserverEventsStore = util.IjoEventsStore(Observer, );
+const ObserverPendingListStore = util.IjoDataListStore(Observer, Chunk);
 
 pub const Observers = struct {
 
@@ -375,10 +409,13 @@ pub const Observers = struct {
 
     fn deinit(self: *Observers) void {
         const allocator = self.allocator;
+
+        self.observer_list.deinit(allocator);
+
         self.pool.deinit();
         self.zones.deinit();
         self.statuses.deinit();
-        self.observer_list.deinit(allocator);
+
     }
 
     fn matchDataCapacity(self: *Observers) !void {
@@ -466,6 +503,8 @@ pub const Manager = struct {
     pending_chunks: List(Chunk) = .{},
     range_load_events: RangeLoadEvents,
 
+    leko_load_system: *leko.LekoLoadSystem,
+
     const RangeLoadEvents = util.Events(union(enum) {
         load: RangeLoadEvent,
         unload: RangeLoadEvent,
@@ -486,6 +525,7 @@ pub const Manager = struct {
             .allocator = allocator,
             .world = world,
             .range_load_events = RangeLoadEvents.init(allocator),
+            .leko_load_system = try leko.LekoLoadSystem.create(allocator),
         };
         return self;
     }
@@ -496,6 +536,7 @@ pub const Manager = struct {
         self.stop();
         self.pending_chunks.deinit(allocator);
         self.range_load_events.deinit();
+        self.leko_load_system.destroy();
     }
 
     pub fn start(self: *Manager, context: anytype, comptime on_update_fn: OnWorldUpdateFn(@TypeOf(context))) !void {
@@ -508,10 +549,12 @@ pub const Manager = struct {
                 try s.threadMain(c, on_update_fn);
             }
         }).f, .{self, context});
+        try self.leko_load_system.start(self.world);
     }
 
     pub fn stop(self: *Manager) void {
         if (self.thread_is_running.load(.Monotonic)) {
+            self.leko_load_system.stop();
             self.thread_is_running.store(false, .Monotonic);
             self.update_thread.join();
         }
@@ -529,7 +572,10 @@ pub const Manager = struct {
             try self.processDirtyObservers();
             try self.processRangeLoadEvents();
 
+            try self.leko_load_system.onWorldUpdate(self.world);
+
             try on_update_fn(context, self.world);
+
 
             self.world.chunks.load_state_events.clearAll();
         }
@@ -572,7 +618,7 @@ pub const Manager = struct {
         while (i < self.pending_chunks.items.len) {
             const chunk = self.pending_chunks.items[i];
             const status = chunks.statuses.getPtr(chunk);
-            if (status.user_count != 0) {
+            if (status.user_count.load(.Monotonic) != 0) {
                 // dont process chunks that are still being used by external systems
                 i += 1;
                 continue;
@@ -663,6 +709,7 @@ pub const Manager = struct {
                             .range = range,
                         });
                     }
+                    try self.processObserverWaitingChunks(observer);
                 },
                 .deleting => {
                     const center_position = zone.center_chunk_position;
@@ -674,7 +721,42 @@ pub const Manager = struct {
                         }
                     });
                     status.state.store(.deleted, .Monotonic);
+                    status.chunk_events.clearAll();
+                    status.waiting_chunks.clearRetainingCapacity();
                     observers.swapRemove(i);
+                },
+            }
+        }
+    }
+
+    fn processObserverWaitingChunks(self: *Manager, observer: Observer) !void {
+        const world = self.world;
+        const chunks = &world.chunks;
+        const graph = &world.graph;
+        const status = world.observers.statuses.getPtr(observer);
+        const zone = world.observers.zones.getPtr(observer);
+        const range = zone.observerdRange();
+        status.chunk_events.clearAll();
+        var i: usize = 0;
+        while (i < status.waiting_chunks.items.len) {
+            const chunk = status.waiting_chunks.items[i];
+            const chunk_position = graph.positions.get(chunk);
+            const chunk_status = chunks.statuses.get(chunk);
+            if (!range.contains(chunk_position)) {
+                _ = status.waiting_chunks.swapRemove(i);
+                continue;
+            }
+            switch (chunk_status.load_state) {
+                .deleted => unreachable,
+                .loading => {
+                    i += 1;
+                },
+                .active => {
+                    try status.chunk_events.post(.enter, chunk);
+                    _ = status.waiting_chunks.swapRemove(i);
+                },
+                .unloading => {
+                    _ = status.waiting_chunks.swapRemove(i);
                 },
             }
         }
@@ -708,12 +790,20 @@ pub const Manager = struct {
         const chunks = &world.chunks;
         const graph = &world.graph;
         const observers = &world.observers;
+        const observer_status = observers.statuses.getPtr(observer);
         if (graph.position_map.get(position)) |chunk| {
             const status = chunks.statuses.getPtr(chunk);
-            std.debug.assert(status.load_state == .active or status.load_state == .loading);
             status.observer_count += 1;
             if (status.observer_count > 1) {
                 std.log.info("count {d}", .{status.observer_count});
+            }
+            switch (status.load_state) {
+                .active => try observer_status.chunk_events.post(.enter, chunk),
+                .loading => try observer_status.waiting_chunks.append(chunk),
+                else => unreachable,
+            }
+            if (status.pending_load_state != null and status.load_state == .loading) {
+                status.pending_load_state = .active;
             }
         }
         else {
@@ -722,7 +812,7 @@ pub const Manager = struct {
             status.observer_count = 1;
             status.load_state = .loading;
             status.pending_load_state = .active;
-            status.user_count = 0;
+            status.user_count.store(0, .Monotonic);
             try chunks.load_state_events.post(.loading, .{
                 .chunk = chunk,
                 .priority = (
@@ -732,19 +822,24 @@ pub const Manager = struct {
                 ),
             });
             try self.pending_chunks.append(self.allocator, chunk);
+            try observer_status.waiting_chunks.append(chunk);
         }
     }
 
     fn startChunkUnload(self: *Manager, position: Vec3i, observer: Observer) !void {
-        _ = observer;
         const world = self.world;
         const chunks = &world.chunks;
         const graph = &world.graph;
+        const observers = &world.observers;
         const chunk = graph.position_map.get(position) orelse {
             return;
         };
         const status = chunks.statuses.getPtr(chunk);
         status.observer_count -= 1;
+        const observer_status = observers.statuses.getPtr(observer);
+        if (observer_status.state.load(.Monotonic) == .active) {
+            try observer_status.chunk_events.post(.exit, chunk);
+        }
         if (status.observer_count != 0) {
             return;
         }
@@ -752,6 +847,9 @@ pub const Manager = struct {
             // if the chunks isnt already pending, it needs to be added to the list of pending chunks
             try self.pending_chunks.append(self.allocator, chunk);
         }
+        // if (status.load_state == .loading) {
+        //     graph.removeChunk(chunk);
+        // }
         status.pending_load_state = .unloading;
     }
 

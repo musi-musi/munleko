@@ -1,6 +1,8 @@
 const std = @import("std");
 const idpool = @import("idpool.zig");
 
+const Events = @import("event.zig").Events;
+
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
 
@@ -29,27 +31,27 @@ pub fn Ijo(comptime ijo_type_name_: []const u8) type {
     };
 }
 
-pub fn isIjoType(comptime T: type) bool {
+pub fn isIjo(comptime T: type) bool {
     comptime {
         return @hasDecl(T, "ijo_type_name") and T == Ijo(T.ijo_type_name);
     }
 }
 
-pub fn assertIsIjoType(comptime T: type) void {
+pub fn assertIsIjo(comptime T: type) void {
     comptime {
-        if (!isIjoType(T)) {
+        if (!isIjo(T)) {
             @compileError(@typeName(T) ++ " is not an Ijo type");
         }
     }
 }
 
-pub fn IjoPool(comptime IjoType_: type) type {
-    assertIsIjoType(IjoType_);
+pub fn IjoPool(comptime IjoT_: type) type {
+    assertIsIjo(IjoT_);
     return struct {
         allocator: Allocator,
         id_pool: IjoIdPool,
 
-        pub const IjoType = IjoType_;
+        pub const IjoT = IjoT_;
 
         const Self = @This();
 
@@ -64,12 +66,12 @@ pub fn IjoPool(comptime IjoType_: type) type {
             self.id_pool.deinit(self.allocator);
         }
 
-        pub fn create(self: *Self) !IjoType {
+        pub fn create(self: *Self) !IjoT {
             const id = try self.id_pool.acquire(self.allocator);
-            return @intToEnum(IjoType, id);
+            return @intToEnum(IjoT, id);
         }
 
-        pub fn delete(self: *Self, ijo: IjoType) void {
+        pub fn delete(self: *Self, ijo: IjoT) void {
             self.id_pool.release(@enumToInt(ijo));
         }
 
@@ -79,21 +81,58 @@ pub fn IjoPool(comptime IjoType_: type) type {
     };
 }
 
-pub fn IjoDataStoreDefaultInit(comptime IjoType: type, comptime Data: type) type {
-    return IjoDataStoreValueInit(IjoType, Data, Data{});
+pub fn IjoDataStoreDefaultInit(comptime IjoT: type, comptime Data: type) type {
+    return IjoDataStoreValueInit(IjoT, Data, Data{});
 }
 
-pub fn IjoDataStoreValueInit(comptime IjoType: type, comptime Data: type, comptime init_value: Data) type {
-    return IjoDataStore(IjoType, Data, struct {
+pub fn IjoDataStoreValueInit(comptime IjoT: type, comptime Data: type, comptime init_value: Data) type {
+    return IjoDataStore(IjoT, Data, struct {
         fn initData(_: @This(), _: *ArenaAllocator) !Data {
             return init_value;
         }
     });
 }
 
+pub fn IjoDataStoreArenaInit(comptime IjoT: type, comptime Data: type) type {
+    return IjoDataStore(IjoT, *Data, struct {
+        fn initData(_: @This(), arena: *ArenaAllocator) !*Data {
+            return arena.allocator().create(Data);
+        }
+    });
+}
+
+pub fn IjoEventsStore(comptime IjoT: type, comptime channels_def: type) type {
+    const EventsT = Events(channels_def);
+    return IjoDataStore(IjoT, *EventsT, struct {
+        fn initData(_: @This(), arena: *ArenaAllocator) !*EventsT {
+            const events = try arena.allocator().create(EventsT);
+            events.* = EventsT.init(arena.child_allocator);
+            return events;
+        }
+        fn deinitData(_: @This(), events: **EventsT) void {
+            events.*.deinit();
+        }
+    });
+}
+
+pub fn IjoDataListStore(comptime IjoT: type, comptime T: type) type {
+    const ListT = std.ArrayList(T);
+    return IjoDataStore(IjoT, *ListT, struct {
+        fn initData(_: @This(), arena: *ArenaAllocator) !*ListT {
+            const list = try arena.allocator().create(ListT);
+            list.* = ListT.init(arena.child_allocator);
+            return list;
+        }
+
+        fn deinitData(_: @This(), list: **ListT) void {
+            list.*.deinit();
+        }
+    });
+}
+
 // completely thread safe as long as capacity is always updated before being written to
-pub fn IjoDataStore(comptime IjoType_: type, comptime Data_: type, comptime Context_: type) type {
-    assertIsIjoType(IjoType_);
+pub fn IjoDataStore(comptime IjoT_: type, comptime Data_: type, comptime Context_: type) type {
+    assertIsIjo(IjoT_);
 
     return struct {
 
@@ -103,7 +142,7 @@ pub fn IjoDataStore(comptime IjoType_: type, comptime Data_: type, comptime Cont
         segments: [segment_count]*Segment = undefined,
         capacity: usize = 0,
 
-        pub const IjoType = IjoType_;
+        pub const IjoT = IjoT_;
         pub const Data = Data_;
         pub const Segment = [segment_len]Data;
         pub const Context = Context_;
@@ -131,20 +170,20 @@ pub fn IjoDataStore(comptime IjoType_: type, comptime Data_: type, comptime Cont
         }
 
         pub fn deinit(self: *Self) void {
-            if (@hasDecl(Context, "deinitValue")) {
+            if (@hasDecl(Context, "deinitData")) {
                 var i: usize = 0;
                 while (i < self.capacity) : (i += 1) {
-                    self.context.deinitValue(self.ptrFromIndex(i));
+                    self.context.deinitData(self.ptrFromIndex(i));
                 }
             }
             self.arena.deinit();
         }
 
-        pub fn get(self: Self, ijo: IjoType) Data {
+        pub fn get(self: Self, ijo: IjoT) Data {
             return self.ptrFromIndex(@enumToInt(ijo)).*;
         }
 
-        pub fn getPtr(self: *Self, ijo: IjoType) *Data {
+        pub fn getPtr(self: *Self, ijo: IjoT) *Data {
             return self.ptrFromIndex(@enumToInt(ijo));
         }
 
@@ -152,7 +191,7 @@ pub fn IjoDataStore(comptime IjoType_: type, comptime Data_: type, comptime Cont
             return &self.segments[@divFloor(index, segment_len)].*[index % segment_len];
         }
 
-        pub fn matchCapacity(self: *Self, pool: IjoPool(IjoType)) !void {
+        pub fn matchCapacity(self: *Self, pool: IjoPool(IjoT)) !void {
             const new_capacity = pool.capacity();
             if (self.capacity < new_capacity) {
                 const new_segment_count = std.math.divCeil(usize, new_capacity, segment_len) catch unreachable;
