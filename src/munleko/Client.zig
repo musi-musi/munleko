@@ -110,7 +110,7 @@ pub fn run(self: *Client) !void {
     var fps_counter = try util.FpsCounter.start(1);
 
     session_renderer.scene.setDirectionalLight(nm.vec3(.{ 1, 3, 2 }).norm() orelse unreachable);
-    
+
     while (self.window.nextFrame()) {
         for (self.window.events.get(.framebuffer_size)) |size| {
             gl.viewport(size);
@@ -147,8 +147,8 @@ pub fn run(self: *Client) !void {
         session_renderer.draw();
 
         if (fps_counter.frame()) |frames| {
-            _ = frames;
-            // std.log.info("fps: {d}", .{frames});
+            // _ = frames;
+            std.log.info("fps: {d}", .{frames});
         }
     }
 }

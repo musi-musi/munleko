@@ -79,33 +79,34 @@ pub fn stop(self: *WorldRenderer) void {
 
 pub fn onWorldUpdate(self: *WorldRenderer, world: *World) !void {
     try self.world_model_manager.onWorldUpdate(world);
+    const world_model = self.world_model;
+    self.back_draw_list.clearRetainingCapacity();
+    var iter = world_model.chunk_models.map.iterator();
+    while (iter.next()) |kv| {
+        const chunk = kv.key_ptr.*;
+        const chunk_model = kv.value_ptr.*;
+        const position = self.world.graph.positions.get(chunk);
+        const draw_chunk = DrawChunk{
+            .chunk = chunk,
+            .chunk_model = chunk_model,
+            .position = position,
+        };
+        try self.back_draw_list.append(self.allocator, draw_chunk);
+    }
+    self.draw_list_mutex.lock();
+    defer self.draw_list_mutex.unlock();
+    std.mem.swap(DrawList, &self.draw_list, &self.back_draw_list);
 }
 
 pub fn update(self: *WorldRenderer) !void {
-    const world_model = self.world_model;
-    self.back_draw_list.clearRetainingCapacity();
-    {
-        world_model.chunk_models.map_mutex.lock();
-        defer world_model.chunk_models.map_mutex.unlock();
-        var iter = world_model.chunk_models.map.iterator();
-        while (iter.next()) |kv| {
-            const chunk = kv.key_ptr.*;
-            const chunk_model = kv.value_ptr.*;
-            const position = self.world.graph.positions.get(chunk);
-            const draw_chunk = DrawChunk{
-                .chunk = chunk,
-                .chunk_model = chunk_model,
-                .position = position,
-            };
-            try self.back_draw_list.append(self.allocator, draw_chunk);
-        }
-        std.mem.swap(DrawList, &self.draw_list, &self.back_draw_list);
-    }
+    _ = self;
 }
 
 pub fn draw(self: *WorldRenderer, scene: *Scene) void {
     scene.debug.start();
     scene.debug.bindCube();
+    self.draw_list_mutex.lock();
+    defer self.draw_list_mutex.unlock();
     for (self.draw_list.items) |draw_chunk| {
         const position = draw_chunk.position.cast(f32).addScalar(0.5).mulScalar(World.chunk_width);
         scene.debug.drawCubeAssumeBound(position, 1, vec3(.{ 1, 1, 1 }));
