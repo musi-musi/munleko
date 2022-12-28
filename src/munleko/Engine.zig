@@ -1,8 +1,10 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
+pub const Session = @import("engine/Session.zig");
+pub const World = @import("engine/World.zig");
+pub const leko = @import("engine/leko.zig");
 
-const Session = @import("Session.zig");
+const Allocator = std.mem.Allocator;
 
 allocator: Allocator,
 

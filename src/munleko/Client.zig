@@ -11,11 +11,10 @@ const Allocator = std.mem.Allocator;
 const Vec3 = nm.Vec3;
 const vec3 = nm.vec3;
 
-const munleko = @import("munleko");
 
-const Engine = munleko.Engine;
-const Session = munleko.Session;
-const World = munleko.World;
+const Engine = @import("Engine.zig");
+const Session = Engine.Session;
+const World = Engine.World;
 
 const Mutex = std.Thread.Mutex;
 
@@ -23,52 +22,30 @@ const Window = window.Window;
 
 pub const rendering = @import("rendering.zig");
 
-pub const log_level = std.log.Level.info;
 
-fn printSubZones(a: [3]i32, b: [3]i32, r: u32) void {
-    var ranges: [3]nm.Range3i = undefined;
-    const a_vec = nm.vec3i(a);
-    const b_vec = nm.vec3i(b);
-    std.log.info("subtract zone {d: >2} from {d: >2} (radius {d: >2}):", .{b_vec, a_vec, r});
-    for (World.ObserverZone.subtractZones(a_vec, b_vec, r, &ranges)) |range| {
-        std.log.info("range from {d: >2} to {d: >2}", .{range.min, range.max});
+pub const main_decls = struct {
+
+    pub const log_level = std.log.Level.info;
+
+    pub fn main() !void {
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        defer _ = gpa.deinit();
+
+        const allocator = gpa.allocator();
+
+        try window.init();
+        defer window.deinit();
+
+        var client: Client = undefined;
+        try client.init(allocator);
+        defer client.deinit();
+
+        try client.run();
     }
-}
-
-pub fn main() !void {
-
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ =  gpa.deinit();
+};
 
 
-    const allocator = gpa.allocator();
-    // printSubZones(.{0, 0, 0}, .{0, 0, 0}, 4);
-    // printSubZones(.{0, 0, 0}, .{2, 0, 0}, 4);
-    // printSubZones(.{0, 0, 0}, .{-2, 0, 0}, 4);
-    // printSubZones(.{0, 0, 0}, .{0, 2, 0}, 4);
-    // printSubZones(.{0, 0, 0}, .{0, -2, 0}, 4);
-    // printSubZones(.{0, 0, 0}, .{0, 0, 2}, 4);
-    // printSubZones(.{0, 0, 0}, .{0, 0, -2}, 4);
-    // printSubZones(.{0, 0, 0}, .{0, 1, 2}, 4);
-    // printSubZones(.{0, 0, 0}, .{0, 1, -2}, 4);
-    // printSubZones(.{0, 0, 0}, .{0, -1, 2}, 4);
-    // printSubZones(.{0, 0, 0}, .{0, -1, -2}, 4);
-    // printSubZones(.{0, 0, 0}, .{8, 8, 8}, 4);
-
-    try window.init();
-    defer window.deinit();
-
-
-    var client: Client = undefined;
-    try client.init(allocator);
-    defer client.deinit();
-
-    try client.run();
-
-}
-
-const FlyCam = @import("FlyCam.zig");
-
+const FlyCam = @import("client/FlyCam.zig");
 
 const DrawChunk = struct {
     position: nm.Vec3i,
@@ -78,7 +55,6 @@ const DrawChunk = struct {
 const DrawMap = std.HashMapUnmanaged(World.Chunk, DrawChunk, World.Chunk.HashContext, std.hash_map.default_max_load_percentage);
 
 pub const Client = struct {
-
     allocator: Allocator,
     window: Window,
     engine: Engine,
@@ -100,9 +76,7 @@ pub const Client = struct {
         self.draw_map.deinit(self.allocator);
     }
 
-
     pub fn run(self: *Client) !void {
-
         try self.window.create(.{});
         defer self.window.destroy();
         self.window.makeContextCurrent();
@@ -117,7 +91,6 @@ pub const Client = struct {
         var session = try self.engine.createSession();
         defer session.destroy();
 
-
         var cam = FlyCam.init(self.window);
         cam.move_speed = 256;
 
@@ -130,16 +103,14 @@ pub const Client = struct {
             .on_world_update = onWorldUpdate,
         });
 
-
         self.window.setMouseMode(.disabled);
-
 
         const dbg = try rendering.Debug.init();
         defer dbg.deinit();
 
-        dbg.setLight(vec3(.{1, 3, 2}).norm() orelse unreachable);
+        dbg.setLight(vec3(.{ 1, 3, 2 }).norm() orelse unreachable);
 
-        gl.clearColor(.{0, 0, 0, 1});
+        gl.clearColor(.{ 0, 0, 0, 1 });
         gl.clearDepth(.float, 1);
 
         dbg.start();
@@ -147,7 +118,7 @@ pub const Client = struct {
         var fps_counter = try util.FpsCounter.start(1);
 
         while (self.window.nextFrame()) {
-            for(self.window.events.get(.framebuffer_size)) |size| {
+            for (self.window.events.get(.framebuffer_size)) |size| {
                 gl.viewport(size);
             }
             if (self.window.buttonPressed(.grave)) {
@@ -168,23 +139,21 @@ pub const Client = struct {
             dbg.setView(cam.viewMatrix());
 
             gl.clear(.color_depth);
-            dbg.setProj(
-                nm.transform.createPerspective(
-                    90.0 * std.math.pi / 180.0,
-                    @intToFloat(f32, self.window.size[0]) / @intToFloat(f32, self.window.size[1]),
-                    0.001, 1000,
-                )
-            );
+            dbg.setProj(nm.transform.createPerspective(
+                90.0 * std.math.pi / 180.0,
+                @intToFloat(f32, self.window.size[0]) / @intToFloat(f32, self.window.size[1]),
+                0.001,
+                1000,
+            ));
 
             self.drawChunks(dbg);
 
             if (fps_counter.frame()) |frames| {
-                // _ = frames;
-                std.log.info("fps: {d}", .{frames});
+                _ = frames;
+                // std.log.info("fps: {d}", .{frames});
             }
         }
     }
-
 
     fn onTick(self: *Client, session: *Session) !void {
         _ = self;
@@ -219,9 +188,8 @@ pub const Client = struct {
         // std.time.sleep(0.5 * std.time.ns_per_s);
     }
 
-
     fn addDrawChunk(self: *Client, world: *World, chunk: World.Chunk) !void {
-        const draw_chunk = DrawChunk {
+        const draw_chunk = DrawChunk{
             .position = world.graph.positions.get(chunk),
             .state = world.chunks.statuses.get(chunk).load_state,
         };
@@ -247,14 +215,12 @@ pub const Client = struct {
         var iter = self.draw_map.valueIterator();
         while (iter.next()) |draw_chunk| {
             const color = switch (draw_chunk.state) {
-                .loading => vec3(.{0.5, 0.5, 0.5}),
-                .active => vec3(.{1, 1, 1}),
-                .unloading => vec3(.{1, 0.5, 0.5}),
+                .loading => vec3(.{ 0.5, 0.5, 0.5 }),
+                .active => vec3(.{ 1, 1, 1 }),
+                .unloading => vec3(.{ 1, 0.5, 0.5 }),
                 else => unreachable,
             };
             dbg.drawCubeAssumeBound(draw_chunk.position.cast(f32).addScalar(0.5).mulScalar(World.chunk_width), 1, color);
         }
     }
-
-
 };

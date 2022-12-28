@@ -2,7 +2,7 @@ const std = @import("std");
 const util = @import("util");
 const nm = @import("nm");
 
-const Engine = @import("Engine.zig");
+const Engine = @import("../Engine.zig");
 const Session = @import("Session.zig");
 const leko = @import("leko.zig");
 

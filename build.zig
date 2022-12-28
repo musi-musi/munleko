@@ -39,7 +39,6 @@ pub fn build(b: *std.build.Builder) !void {
 
     const gl = pkgs.pkg("gl", null);
     client.addPackage(gl);
-
     const ls = pkgs.pkg("ls", &.{ gl });
     client.addPackage(ls);
 
@@ -80,7 +79,6 @@ const pkgs = struct {
 
     const nm = pkg("nm", null);
     const util = pkg("util", null);
-    const munleko = pkg("munleko", &.{ nm, util, });
 
     fn pkg(comptime name: []const u8, deps: ?[]const Pkg) Pkg {
         return Pkg {
@@ -95,7 +93,7 @@ const pkgs = struct {
 fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build.LibExeObjStep {
 
 
-    const exe = b.addExecutable("munleko", "src/" ++ frontend_id ++ "/main.zig");
+    const exe = b.addExecutable("munleko", "src/" ++ frontend_id ++ "_main.zig");
     exe.addPackage(ziglua.linkAndPackage(b, exe, .{}));
 
 
