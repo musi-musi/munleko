@@ -498,7 +498,7 @@ pub const Manager = struct {
     world: *World,
 
     update_thread: Thread = undefined,
-    thread_is_running: Atomic(bool) = Atomic(bool).init(false),
+    is_running: Atomic(bool) = Atomic(bool).init(false),
 
     pending_chunks: List(Chunk) = .{},
     range_load_events: RangeLoadEvents,
@@ -540,10 +540,10 @@ pub const Manager = struct {
     }
 
     pub fn start(self: *Manager, context: anytype, comptime on_update_fn: OnWorldUpdateFn(@TypeOf(context))) !void {
-        if (self.thread_is_running.load(.Monotonic)) {
-            @panic("world manager update thread already running");
+        if (self.is_running.load(.Monotonic)) {
+            @panic("world manager is already running");
         }
-        self.thread_is_running.store(true, .Monotonic);
+        self.is_running.store(true, .Monotonic);
         self.update_thread = try Thread.spawn(.{}, (struct {
             fn f(s: *Manager, c: @TypeOf(context)) !void {
                 try s.threadMain(c, on_update_fn);
@@ -553,16 +553,16 @@ pub const Manager = struct {
     }
 
     pub fn stop(self: *Manager) void {
-        if (self.thread_is_running.load(.Monotonic)) {
+        if (self.is_running.load(.Monotonic)) {
             self.leko_load_system.stop();
-            self.thread_is_running.store(false, .Monotonic);
+            self.is_running.store(false, .Monotonic);
             self.update_thread.join();
         }
     }
 
     fn threadMain(self: *Manager, context: anytype, comptime on_update_fn: OnWorldUpdateFn(@TypeOf(context))) !void {
         on_world_update_thread = true;
-        while (self.thread_is_running.load(.Monotonic)) {
+        while (self.is_running.load(.Monotonic)) {
 
             self.range_load_events.clearAll();
 
