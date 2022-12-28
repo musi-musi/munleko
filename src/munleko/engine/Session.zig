@@ -1,4 +1,5 @@
 const std = @import("std");
+const util = @import("util");
 
 const Allocator = std.mem.Allocator;
 
@@ -11,7 +12,7 @@ const World = @import("World.zig");
 const WorldMan = World.Manager;
 
 const Thread = std.Thread;
-const AtomicBool = std.atomic.Atomic(bool);
+const AtomicFlag = util.AtomicFlag;
 
 allocator: Allocator,
 
@@ -19,7 +20,7 @@ world: *World,
 world_man: *WorldMan,
 
 thread: Thread = undefined,
-is_running: AtomicBool = AtomicBool.init(false),
+is_running: AtomicFlag = .{},
 
 timer: Timer = undefined,
 tick_count: u64 = 0,
@@ -48,7 +49,7 @@ pub fn destroy(self: *Session) void {
 
 pub fn start(self: *Session, ctx: anytype, comptime hooks: Hooks(@TypeOf(ctx))) !void {
     if (!self.isRunning()) {
-        self.is_running.store(true, .Monotonic);
+        self.is_running.set(true);
         const S = struct {
             fn tMain(s: *Session, c: @TypeOf(ctx)) !void {
                 try s.threadMain(c, hooks);
@@ -74,7 +75,7 @@ pub fn HookFunction(comptime Ctx: type) type {
 
 pub fn stop(self: *Session) void {
     if (self.isRunning()) {
-        self.is_running.store(false, .Monotonic);
+        self.is_running.set(false);
         self.thread.join();
     }
 }
@@ -101,7 +102,7 @@ pub fn threadMain(
 }
 
 pub fn isRunning(self: Session) bool {
-    return self.is_running.load(.Monotonic);
+    return self.is_running.get();
 }
 
 fn nextTick(self: *Session) void {

@@ -13,6 +13,7 @@ const List = std.ArrayListUnmanaged;
 const Thread = std.Thread;
 const Mutex = Thread.Mutex;
 const Atomic = std.atomic.Atomic;
+const AtomicFlag = util.AtomicFlag;
 
 const World = @This();
 
@@ -359,7 +360,7 @@ pub const ObserverState = enum(u8) {
 
 const ObserverStatus = struct {
     state: Atomic(ObserverState) = .{ .value = .deleted },
-    is_dirty: Atomic(bool) = .{ .value = false },
+    is_dirty: AtomicFlag = .{},
     index: Atomic(usize) = .{ .value = 0 },
     chunk_events: ObserverChunkEvents,
     waiting_chunks: std.ArrayList(Chunk),
@@ -433,7 +434,7 @@ pub const Observers = struct {
         const status = self.statuses.getPtr(observer);
         status.state.store(.creating, .Monotonic);
         status.index.store(self.observer_list.items.len, .Monotonic);
-        status.is_dirty.store(true, .Monotonic);
+        status.is_dirty.set(true);
 
         const zone = self.zones.getPtr(observer);
         zone.setPosition(initial_position);
@@ -445,7 +446,7 @@ pub const Observers = struct {
     pub fn delete(self: *Observers, observer: Observer) !void {
         const status = self.statuses.getPtr(observer);
         status.state.store(.deleting, .Monotonic);
-        status.is_dirty.store(true, .Monotonic);
+        status.is_dirty.set(true);
     }
 
     pub fn setPosition(self: *Observers, observer: Observer, position: Vec3i) void {
@@ -453,7 +454,7 @@ pub const Observers = struct {
         zone.mutex.lock();
         defer zone.mutex.unlock();
         zone.position = position;
-        self.statuses.getPtr(observer).is_dirty.store(true, .Monotonic);
+        self.statuses.getPtr(observer).is_dirty.set(true);
         // const load_center_position = zone.center_chunk_position.divFloorScalar(chunk_width);
         // if (position.sub(load_center_position).mag2() > chunk_width * chunk_width) {
         // }
@@ -498,7 +499,7 @@ pub const Manager = struct {
     world: *World,
 
     update_thread: Thread = undefined,
-    is_running: Atomic(bool) = Atomic(bool).init(false),
+    is_running: AtomicFlag = .{},
 
     pending_chunks: List(Chunk) = .{},
     range_load_events: RangeLoadEvents,
@@ -540,10 +541,10 @@ pub const Manager = struct {
     }
 
     pub fn start(self: *Manager, context: anytype, comptime on_update_fn: OnWorldUpdateFn(@TypeOf(context))) !void {
-        if (self.is_running.load(.Monotonic)) {
+        if (self.is_running.get()) {
             @panic("world manager is already running");
         }
-        self.is_running.store(true, .Monotonic);
+        self.is_running.set(true);
         self.update_thread = try Thread.spawn(.{}, (struct {
             fn f(s: *Manager, c: @TypeOf(context)) !void {
                 try s.threadMain(c, on_update_fn);
@@ -553,16 +554,16 @@ pub const Manager = struct {
     }
 
     pub fn stop(self: *Manager) void {
-        if (self.is_running.load(.Monotonic)) {
+        if (self.is_running.get()) {
             self.leko_load_system.stop();
-            self.is_running.store(false, .Monotonic);
+            self.is_running.set(false);
             self.update_thread.join();
         }
     }
 
     fn threadMain(self: *Manager, context: anytype, comptime on_update_fn: OnWorldUpdateFn(@TypeOf(context))) !void {
         on_world_update_thread = true;
-        while (self.is_running.load(.Monotonic)) {
+        while (self.is_running.get()) {
 
             self.range_load_events.clearAll();
 
@@ -666,12 +667,12 @@ pub const Manager = struct {
             const observer = observers.get(i);
             const status = observers.statuses.getPtr(observer);
 
-            if (!status.is_dirty.load(.Monotonic)) {
+            if (!status.is_dirty.get()) {
                 i += 1;
                 continue;
             }
 
-            status.is_dirty.store(false, .Monotonic);
+            status.is_dirty.set(false);
 
             const state = status.state.load(.Monotonic);
             const zone = observers.zones.getPtr(observer);

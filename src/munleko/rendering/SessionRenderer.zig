@@ -1,4 +1,6 @@
 const std = @import("std");
+const util = @import("util");
+const nm = @import("nm");
 
 const WorldRenderer = @import("WorldRenderer.zig");
 const Client = @import("../Client.zig");
@@ -41,6 +43,18 @@ pub fn stop(self: *SessionRenderer) void {
     self.world_renderer.stop();
 }
 
+pub fn setCameraMatrices(self: *SessionRenderer, view: nm.Mat4, proj: nm.Mat4) void {
+    self.world_renderer.setCameraMatrices(view, proj);
+}
+
 pub fn onWorldUpdate(self: *SessionRenderer, world: *World) !void {
     try self.world_renderer.onWorldUpdate(world);
+}
+
+pub fn update(self: *SessionRenderer) !void {
+    try self.world_renderer.update();
+}
+
+pub fn draw(self: *SessionRenderer) void {
+    self.world_renderer.draw();
 }

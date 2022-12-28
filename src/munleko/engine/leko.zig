@@ -10,6 +10,7 @@ const Chunk = World.Chunk;
 const Thread = std.Thread;
 const ThreadGroup = util.ThreadGroup;
 const Atomic = std.atomic.Atomic;
+const AtomicFlag = util.AtomicFlag;
 
 const JobQueue = util.JobQueueUnmanaged;
 const List = std.ArrayListUnmanaged;
@@ -47,7 +48,7 @@ pub const LekoData = struct {
 pub const LekoLoadSystem = struct {
     allocator: Allocator,
     load_group: util.ThreadGroup = undefined,
-    is_runninf: Atomic(bool) = Atomic(bool).init(false),
+    is_running: AtomicFlag = .{},
 
     chunk_job_queue: ChunkJobQueue = .{},
 
@@ -68,17 +69,17 @@ pub const LekoLoadSystem = struct {
     }
 
     pub fn start(self: *LekoLoadSystem, world: *World) !void {
-        if (self.is_runninf.load(.Monotonic)) {
+        if (self.is_running.get()) {
             @panic("leko load system is already running");
         }
-        self.is_runninf.store(true, .Monotonic);
+        self.is_running.set(true);
         self.load_group = try ThreadGroup.spawnCpuCount(self.allocator, 0.5, .{}, loadGroupMain, .{ self, world });
     }
 
     pub fn stop(self: *LekoLoadSystem) void {
-        if (self.is_runninf.load(.Monotonic)) {
+        if (self.is_running.get()) {
             self.chunk_job_queue.flush(self.allocator);
-            self.is_runninf.store(false, .Monotonic);
+            self.is_running.set(false);
             self.load_group.join();
         }
     }
@@ -95,7 +96,7 @@ pub const LekoLoadSystem = struct {
     fn loadGroupMain(self: *LekoLoadSystem, world: *World) !void {
         var rng = std.rand.DefaultPrng.init(0xBABE);
         const r = rng.random();
-        while (self.is_runninf.load(.Monotonic)) {
+        while (self.is_running.get()) {
             if (self.chunk_job_queue.pop()) |node| {
                 const chunk = node.item;
                 const status = world.chunks.statuses.get(chunk);
