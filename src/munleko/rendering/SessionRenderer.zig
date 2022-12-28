@@ -2,6 +2,7 @@ const std = @import("std");
 const util = @import("util");
 const nm = @import("nm");
 
+const Scene = @import("Scene.zig");
 const WorldRenderer = @import("WorldRenderer.zig");
 const Client = @import("../Client.zig");
 const Engine = @import("../Engine.zig");
@@ -15,6 +16,7 @@ const Allocator = std.mem.Allocator;
 const SessionRenderer = @This();
 
 allocator: Allocator,
+scene: Scene,
 session: *Session,
 world_renderer: *WorldRenderer,
 
@@ -22,9 +24,11 @@ pub fn create(allocator: Allocator, session: *Session) !*SessionRenderer {
     const self = try allocator.create(SessionRenderer);
     self.* = SessionRenderer{
         .allocator = allocator,
+        .scene = undefined,
         .session = session,
         .world_renderer = try WorldRenderer.create(allocator, session.world),
     };
+    try self.scene.init();
     return self;
 }
 
@@ -33,6 +37,7 @@ pub fn destroy(self: *SessionRenderer) void {
     defer allocator.destroy(self);
     self.stop();
     self.world_renderer.destroy();
+    self.scene.deinit();
 }
 
 pub fn start(self: *SessionRenderer, observer: Observer) !void {
@@ -41,10 +46,6 @@ pub fn start(self: *SessionRenderer, observer: Observer) !void {
 
 pub fn stop(self: *SessionRenderer) void {
     self.world_renderer.stop();
-}
-
-pub fn setCameraMatrices(self: *SessionRenderer, view: nm.Mat4, proj: nm.Mat4) void {
-    self.world_renderer.setCameraMatrices(view, proj);
 }
 
 pub fn onWorldUpdate(self: *SessionRenderer, world: *World) !void {
@@ -56,5 +57,5 @@ pub fn update(self: *SessionRenderer) !void {
 }
 
 pub fn draw(self: *SessionRenderer) void {
-    self.world_renderer.draw();
+    self.world_renderer.draw(&self.scene);
 }

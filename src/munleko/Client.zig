@@ -109,6 +109,8 @@ pub fn run(self: *Client) !void {
 
     var fps_counter = try util.FpsCounter.start(1);
 
+    session_renderer.scene.setDirectionalLight(nm.vec3(.{ 1, 3, 2 }).norm() orelse unreachable);
+    
     while (self.window.nextFrame()) {
         for (self.window.events.get(.framebuffer_size)) |size| {
             gl.viewport(size);
@@ -129,7 +131,7 @@ pub fn run(self: *Client) !void {
         cam.update(self.window);
         session.world.observers.setPosition(cam_obs, cam.position.cast(i32));
 
-        session_renderer.setCameraMatrices(
+        session_renderer.scene.setCameraMatrices(
             cam.viewMatrix(),
             nm.transform.createPerspective(
                 90.0 * std.math.pi / 180.0,

@@ -20,6 +20,7 @@ const World = Engine.World;
 const Chunk = World.Chunk;
 const Observer = World.Observer;
 
+const Scene = @import("Scene.zig");
 const WorldModel = @import("WorldModel.zig");
 const ChunkModel = WorldModel.ChunkModel;
 
@@ -39,7 +40,6 @@ world: *World,
 world_model: *WorldModel,
 world_model_manager: *WorldModel.Manager,
 observer: Observer = undefined,
-debug: Debug,
 
 draw_list: DrawList = .{},
 back_draw_list: DrawList = .{},
@@ -54,9 +54,7 @@ pub fn create(allocator: Allocator, world: *World) !*WorldRenderer {
         .world = world,
         .world_model = world_model,
         .world_model_manager = world_model_manager,
-        .debug = try Debug.init(),
     };
-    self.debug.setLight(vec3(.{ 1, 3, 2 }).norm() orelse unreachable);
     return self;
 }
 
@@ -68,7 +66,6 @@ pub fn destroy(self: *WorldRenderer) void {
     self.world_model_manager.destroy();
     self.draw_list.deinit(allocator);
     self.back_draw_list.deinit(allocator);
-    self.debug.deinit();
 }
 
 pub fn start(self: *WorldRenderer, observer: Observer) !void {
@@ -78,11 +75,6 @@ pub fn start(self: *WorldRenderer, observer: Observer) !void {
 
 pub fn stop(self: *WorldRenderer) void {
     self.world_model_manager.stop();
-}
-
-pub fn setCameraMatrices(self: *WorldRenderer, view: nm.Mat4, proj: nm.Mat4) void {
-    self.debug.setView(view);
-    self.debug.setProj(proj);
 }
 
 pub fn onWorldUpdate(self: *WorldRenderer, world: *World) !void {
@@ -111,11 +103,11 @@ pub fn update(self: *WorldRenderer) !void {
     }
 }
 
-pub fn draw(self: *WorldRenderer) void {
-    self.debug.start();
-    self.debug.bindCube();
+pub fn draw(self: *WorldRenderer, scene: *Scene) void {
+    scene.debug.start();
+    scene.debug.bindCube();
     for (self.draw_list.items) |draw_chunk| {
         const position = draw_chunk.position.cast(f32).addScalar(0.5).mulScalar(World.chunk_width);
-        self.debug.drawCubeAssumeBound(position, 1, vec3(.{ 1, 1, 1 }));
+        scene.debug.drawCubeAssumeBound(position, 1, vec3(.{ 1, 1, 1 }));
     }
 }
