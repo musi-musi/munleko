@@ -157,10 +157,42 @@ fn createAndAddChunk(self: *World, position: Vec3i) !Chunk {
 
 pub const ChunkPositionStore = util.IjoDataStoreValueInit(Chunk, Vec3i, Vec3i.zero);
 
+const Cardinal3 = nm.Cardinal3;
+
+pub const ChunkNeighbors = struct {
+
+    // zig wont let me @atomicLoad on an optional so >:c
+    neighbor_chunks: [6]Chunk = undefined,
+    neighbor_flags: [6]bool = .{false} ** 6,
+
+    pub fn get(self: *const ChunkNeighbors, cardinal: Cardinal3) ?Chunk {
+        if (@atomicLoad(bool, &self.neighbor_flags[@enumToInt(cardinal)], .Monotonic)) {
+            return @atomicLoad(Chunk, &self.neighbor_chunks[@enumToInt(cardinal)], .Monotonic);
+        }
+        else {
+            return null;
+        }
+    }
+
+    fn set(self: *ChunkNeighbors, cardinal: Cardinal3, chunk: ?Chunk) void {
+        if (chunk) |neighbor| {
+            @atomicStore(Chunk, &self.neighbor_chunks[@enumToInt(cardinal)], neighbor, .Monotonic);
+            @atomicStore(bool, &self.neighbor_flags[@enumToInt(cardinal)], true, .Monotonic);
+        }
+        else {
+            @atomicStore(bool, &self.neighbor_flags[@enumToInt(cardinal)], false, .Monotonic);
+        }
+    }
+
+};
+
+pub const ChunkNeighborsStore = util.IjoDataStoreDefaultInit(Chunk, ChunkNeighbors);
+
 pub const Graph = struct {
 
     allocator: Allocator,
     positions: ChunkPositionStore,
+    neighbors: ChunkNeighborsStore,
     position_map: PositionMap(Chunk) = .{},
 
     position_map_mutex: Mutex = .{},
@@ -169,27 +201,46 @@ pub const Graph = struct {
         self.* = .{
             .allocator = allocator,
             .positions = ChunkPositionStore.init(allocator),
+            .neighbors = ChunkNeighborsStore.init(allocator),
         };
     }
 
     fn deinit(self: *Graph) void {
         const allocator = self.allocator;
         self.positions.deinit();
+        self.neighbors.deinit();
         self.position_map.deinit(allocator);
     }
 
     fn matchDataCapacity(self: *Graph, pool: ChunkPool) !void {
         try self.positions.matchCapacity(pool);
+        try self.neighbors.matchCapacity(pool);
     }
 
     fn addChunk(self: *Graph, chunk: Chunk, position: Vec3i) !void {
         self.positions.getPtr(chunk).* = position;
-        self.position_map_mutex.lock();
-        defer self.position_map_mutex.unlock();
-        try self.position_map.put(self.allocator, position, chunk);
+        {
+            self.position_map_mutex.lock();
+            defer self.position_map_mutex.unlock();
+            try self.position_map.put(self.allocator, position, chunk);
+        }
+        const neighbors = self.neighbors.getPtr(chunk);
+        inline for (comptime std.enums.values(Cardinal3)) |cardinal| {
+            if (self.position_map.get(position.add(Vec3i.unitSigned(cardinal)))) |neighbor| {
+                neighbors.set(cardinal, neighbor);
+                self.neighbors.getPtr(neighbor).set(comptime cardinal.negate(), chunk);
+            }
+            neighbors.set(cardinal, null);
+        }
     }
 
     fn removeChunk(self: *Graph, chunk: Chunk) void {
+        const neighbors = self.neighbors.getPtr(chunk);
+        inline for (comptime std.enums.values(Cardinal3)) |cardinal| {
+            if (neighbors.get(cardinal)) |neighbor| {
+                self.neighbors.getPtr(neighbor).set(comptime cardinal.negate(), null);
+            }
+        }
         self.position_map_mutex.lock();
         defer self.position_map_mutex.unlock();
         _ =  self.position_map.remove(self.positions.get(chunk));

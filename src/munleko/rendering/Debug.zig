@@ -139,8 +139,8 @@ fn generateFace(comptime n: Cardinal3) [4]Vert {
     const vec = Vec3.unitSigned;
     const up = cardU(n);
     const vp = cardV(n);
-    const un = up.neg();
-    const vn = vp.neg();
+    const un = up.negate();
+    const vn = vp.negate();
     return .{
         .{
             .position = vec(n).add(vec(un)).add(vec(vp)).v,
