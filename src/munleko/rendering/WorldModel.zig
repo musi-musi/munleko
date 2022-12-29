@@ -122,7 +122,7 @@ const ChunkModels = struct {
 pub const Manager = struct {
 
     pub const ChunkModelJob = union(enum) {
-        enter: struct { chunk: Chunk, chunk_model: ChunkModel, },
+        enter: ChunkModel,
     };
 
     const ChunkModelJobQueue = util.JobQueueUnmanaged(ChunkModelJob);
@@ -183,11 +183,10 @@ pub const Manager = struct {
             const chunk_model = try model.createAndAddChunkModel(chunk);
             const chunk_position = world.graph.positions.get(chunk);
             const priority = chunk_position.sub(observer_position).mag2();
+            // const chunk_status = world.chunks.statuses.getPtr(chunk);
+            world.chunks.startUsing(chunk);
             try self.chunk_model_job_queue.push(self.allocator, .{
-                .enter = .{
-                    .chunk = chunk,
-                    .chunk_model = chunk_model,
-                }
+                .enter = chunk_model 
             }, priority);
         }
         for(observer_chunk_events.get(.exit)) |chunk| {
@@ -196,10 +195,19 @@ pub const Manager = struct {
     }
 
     fn generateThreadMain(self: *Manager) !void {
+        const world_model = self.world_model;
+        const world = world_model.world;
         while (self.is_running.get()) {
             if (self.chunk_model_job_queue.pop()) |node| {
                 const job = node.item;
                 try self.leko_mesh_system.processChunkModelJob(self.world_model, job);
+                switch (job) {
+                    .enter => |chunk_model| {
+                        const status = world_model.chunk_models.statuses.getPtr(chunk_model);
+                        world.chunks.stopUsing(status.chunk);
+                        status.state.store(.ready, .Monotonic);
+                    }
+                }
             }
         }
     }

@@ -5,6 +5,8 @@ const nm = @import("nm");
 const Allocator = std.mem.Allocator;
 const List = std.ArrayListUnmanaged;
 const Thread = std.Thread;
+const Atomic = std.atomic.Atomic;
+const AtomicFlag = util.AtomicFlag;
 const Mutex = Thread.Mutex;
 
 const Vec3 = nm.Vec3;
@@ -41,6 +43,9 @@ world_model: *WorldModel,
 world_model_manager: *WorldModel.Manager,
 observer: Observer = undefined,
 
+draw_list_update_thread: Thread = undefined,
+is_running: AtomicFlag = .{},
+
 draw_list: DrawList = .{},
 back_draw_list: DrawList = .{},
 draw_list_mutex: Mutex = .{},
@@ -69,18 +74,36 @@ pub fn destroy(self: *WorldRenderer) void {
 }
 
 pub fn start(self: *WorldRenderer, observer: Observer) !void {
+    if (self.is_running.get()) {
+        @panic("world renderer is already running");
+    }
     self.observer = observer;
+    self.is_running.set(true);
+    self.draw_list_update_thread = try Thread.spawn(.{}, drawListUpdateThreadMain, .{self});
     try self.world_model_manager.start(observer);
 }
 
 pub fn stop(self: *WorldRenderer) void {
-    self.world_model_manager.stop();
+    if (self.is_running.get()) {
+        self.is_running.set(false);
+        self.draw_list_update_thread.join();
+        self.world_model_manager.stop();
+    }
 }
 
-pub fn onWorldUpdate(self: *WorldRenderer, world: *World) !void {
-    try self.world_model_manager.onWorldUpdate(world);
+fn drawListUpdateThreadMain(self: *WorldRenderer) !void {
+    while (self.is_running.get()) {
+        try self.updateDrawList();
+        self.swapDrawLists();
+        std.time.sleep(100000);
+    }
+}
+
+fn updateDrawList(self: *WorldRenderer) !void {
     const world_model = self.world_model;
     self.back_draw_list.clearRetainingCapacity();
+    self.world_model.chunk_models.map_mutex.lock();
+    defer self.world_model.chunk_models.map_mutex.unlock();
     var iter = world_model.chunk_models.map.iterator();
     while (iter.next()) |kv| {
         const chunk = kv.key_ptr.*;
@@ -97,9 +120,16 @@ pub fn onWorldUpdate(self: *WorldRenderer, world: *World) !void {
         };
         try self.back_draw_list.append(self.allocator, draw_chunk);
     }
+}
+
+fn swapDrawLists(self: *WorldRenderer) void {
     self.draw_list_mutex.lock();
     defer self.draw_list_mutex.unlock();
     std.mem.swap(DrawList, &self.draw_list, &self.back_draw_list);
+}
+
+pub fn onWorldUpdate(self: *WorldRenderer, world: *World) !void {
+    try self.world_model_manager.onWorldUpdate(world);
 }
 
 pub fn update(self: *WorldRenderer) !void {

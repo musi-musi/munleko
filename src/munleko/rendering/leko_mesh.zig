@@ -23,7 +23,20 @@ const Allocator = std.mem.Allocator;
 
 const List = std.ArrayListUnmanaged;
 
-pub const LekoFace = u32;
+/// ```
+///     0 --- 1
+///     | \   |   ^
+///     |  \  |   |
+///     |   \ |   v
+///     2 --- 3   + u -- >
+/// ```
+///  base = 0b 000000 xxxxx yyyyy zzzzz nnn aaaaaaaa
+///  - xyz  position of leko
+///  - n    0-5 face index; Cardinal3 (face normal)
+///  - a    ao strength per vertex, packed 0b33221100
+pub const LekoFace = struct {
+    base: u32,
+};
 
 const LekoFaceList = List(LekoFace);
 
@@ -43,14 +56,13 @@ pub const LekoMeshDataStore = util.IjoDataStore(ChunkModel, LekoMeshData, struct
 });
 
 pub const ChunkLekoMeshes = struct {
-
     allocator: Allocator,
     mesh_data: LekoMeshDataStore,
 
     pub fn init(self: *ChunkLekoMeshes, allocator: Allocator) !void {
         self.* = .{
             .allocator = allocator,
-            .mesh_data = LekoMeshDataStore.initWithContext(allocator, .{.allocator = allocator}),
+            .mesh_data = LekoMeshDataStore.initWithContext(allocator, .{ .allocator = allocator }),
         };
     }
 
@@ -61,7 +73,6 @@ pub const ChunkLekoMeshes = struct {
     pub fn matchDataCapacity(self: *ChunkLekoMeshes, world_model: *const WorldModel) !void {
         try self.mesh_data.matchCapacity(world_model.chunk_models.pool);
     }
-
 };
 
 pub const LekoMeshSystem = struct {
@@ -82,13 +93,15 @@ pub const LekoMeshSystem = struct {
 
     pub fn processChunkModelJob(self: *LekoMeshSystem, world_model: *WorldModel, job: WorldModel.Manager.ChunkModelJob) !void {
         _ = self;
+        _ = world_model;
         switch (job) {
-            .enter => |enter| {
-                const chunk_model = enter.chunk_model;
-                const status = world_model.chunk_models.statuses.getPtr(chunk_model);
+            .enter => |chunk_model| {
+                _ = chunk_model;
+                // const chunk_model = enter.chunk_model;
+                // const status = world_model.chunk_models.statuses.getPtr(chunk_model);
                 std.time.sleep(10_000_000);
-                status.state.store(.ready, .Monotonic);
-            }
+                // status.state.store(.ready, .Monotonic);
+            },
         }
     }
 };
