@@ -7,6 +7,7 @@ const Thread = std.Thread;
 const Mutex = Thread.Mutex;
 const ThreadGroup = util.ThreadGroup;
 const AtomicFlag = util.AtomicFlag;
+const ResetEvent = Thread.ResetEvent;
 
 const Client = @import("../Client.zig");
 const Engine = @import("../Engine.zig");
@@ -27,6 +28,7 @@ allocator: Allocator,
 world: *World,
 chunk_models: ChunkModels = undefined,
 chunk_leko_meshes: ChunkLekoMeshes = undefined,
+dirty_event: ResetEvent = .{},
 
 pub fn create(allocator: Allocator, world: *World) !*WorldModel {
     const self = try allocator.create(WorldModel);
@@ -206,6 +208,7 @@ pub const Manager = struct {
                         const status = world_model.chunk_models.statuses.getPtr(chunk_model);
                         world.chunks.stopUsing(status.chunk);
                         status.state.store(.ready, .Monotonic);
+                        world_model.dirty_event.set();
                     }
                 }
             }

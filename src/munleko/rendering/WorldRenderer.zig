@@ -86,6 +86,7 @@ pub fn start(self: *WorldRenderer, observer: Observer) !void {
 pub fn stop(self: *WorldRenderer) void {
     if (self.is_running.get()) {
         self.is_running.set(false);
+        self.world_model.dirty_event.set();
         self.draw_list_update_thread.join();
         self.world_model_manager.stop();
     }
@@ -93,6 +94,9 @@ pub fn stop(self: *WorldRenderer) void {
 
 fn drawListUpdateThreadMain(self: *WorldRenderer) !void {
     while (self.is_running.get()) {
+        // disabled for now in case it causes weird behavior (see World.Manager)
+        // self.world_model.dirty_event.wait();
+        // self.world_model.dirty_event.reset();
         try self.updateDrawList();
         self.swapDrawLists();
         std.time.sleep(100000);

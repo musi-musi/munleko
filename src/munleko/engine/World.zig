@@ -14,6 +14,7 @@ const Thread = std.Thread;
 const Mutex = Thread.Mutex;
 const Atomic = std.atomic.Atomic;
 const AtomicFlag = util.AtomicFlag;
+const ResetEvent = Thread.ResetEvent;
 
 const World = @This();
 
@@ -36,6 +37,7 @@ chunks: Chunks = undefined,
 observers: Observers = undefined,
 graph: Graph = undefined,
 leko: leko.LekoData = undefined,
+dirty_event: ResetEvent = .{},
 
 pub const ChunkLoadState = enum {
     deleted,
@@ -72,8 +74,8 @@ pub fn create(allocator: Allocator) !*World {
     self.* = .{
         .allocator = allocator,
     };
-    try self.observers.init(allocator);
-    try self.chunks.init(allocator);
+    try self.observers.init(self);
+    try self.chunks.init(self);
     try self.graph.init(allocator);
     try self.leko.init(allocator);
     return self;
@@ -94,14 +96,17 @@ pub fn destroy(self: *World) void {
 pub const Chunks = struct {
 
     allocator: Allocator,
+    world: *World,
     pool: ChunkPool,
     statuses: ChunkStatusStore,
     load_state_events: ChunkLoadStateEvents,
     chunk_list: List(Chunk) = .{},
 
-    fn init(self: *Chunks, allocator: Allocator) !void {
+    fn init(self: *Chunks, world: *World) !void {
+        const allocator = world.allocator;
         self.* = .{
             .allocator = allocator,
+            .world = world,
             .pool = ChunkPool.init(allocator),
             .statuses = ChunkStatusStore.init(allocator),
             .load_state_events = ChunkLoadStateEvents.init(allocator),
@@ -117,10 +122,12 @@ pub const Chunks = struct {
 
     pub fn startUsing(self: *Chunks, chunk: Chunk) void {
         assertOnWorldUpdateThread();
+        defer self.world.dirty_event.set();
         _ = self.statuses.getPtr(chunk).user_count.fetchAdd(1, .Monotonic);
     }
 
     pub fn stopUsing(self: *Chunks, chunk: Chunk) void {
+        defer self.world.dirty_event.set();
         _ = self.statuses.getPtr(chunk).user_count.fetchSub(1, .Monotonic);
     }
 
@@ -441,6 +448,7 @@ const ObserverPendingListStore = util.IjoDataListStore(Observer, Chunk);
 pub const Observers = struct {
 
     allocator: Allocator,
+    world: *World,
     pool: ObserverPool,
     mutex: Mutex = .{},
 
@@ -450,9 +458,11 @@ pub const Observers = struct {
     statuses: ObserverStatusStore,
 
 
-    fn init(self: *Observers, allocator: Allocator) !void {
+    fn init(self: *Observers, world: *World) !void {
+        const allocator = world.allocator;
         self.* = .{
             .allocator = allocator,
+            .world = world,
             .pool = ObserverPool.init(allocator),
             .zones = ObserverZoneStore.init(allocator),
             .statuses = ObserverStatusStore.init(allocator),
@@ -476,6 +486,7 @@ pub const Observers = struct {
     }
 
     pub fn create(self: *Observers, initial_position: Vec3i) !Observer {
+        defer self.world.dirty_event.set();
         self.mutex.lock();
         defer self.mutex.unlock();
 
@@ -495,12 +506,14 @@ pub const Observers = struct {
     }
 
     pub fn delete(self: *Observers, observer: Observer) !void {
+        defer self.world.dirty_event.set();
         const status = self.statuses.getPtr(observer);
         status.state.store(.deleting, .Monotonic);
         status.is_dirty.set(true);
     }
 
     pub fn setPosition(self: *Observers, observer: Observer, position: Vec3i) void {
+        defer self.world.dirty_event.set();
         const zone = self.zones.getPtr(observer);
         zone.mutex.lock();
         defer zone.mutex.unlock();
@@ -608,6 +621,7 @@ pub const Manager = struct {
         if (self.is_running.get()) {
             self.leko_load_system.stop();
             self.is_running.set(false);
+            self.world.dirty_event.set();
             self.update_thread.join();
         }
     }
@@ -615,6 +629,13 @@ pub const Manager = struct {
     fn threadMain(self: *Manager, context: anytype, comptime on_update_fn: OnWorldUpdateFn(@TypeOf(context))) !void {
         on_world_update_thread = true;
         while (self.is_running.get()) {
+
+            // if this is enabled, it causes an assertion failure that i have no idea how to debug
+            // without this or some other check, the world update thread will spin
+            // when it has nothing else to do. this overuses cpu
+
+            // self.world.dirty_event.wait();
+            // defer self.world.dirty_event.reset();
 
             self.range_load_events.clearAll();
 
