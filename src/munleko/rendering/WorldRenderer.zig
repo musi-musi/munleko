@@ -85,6 +85,10 @@ pub fn onWorldUpdate(self: *WorldRenderer, world: *World) !void {
     while (iter.next()) |kv| {
         const chunk = kv.key_ptr.*;
         const chunk_model = kv.value_ptr.*;
+        const status = self.world_model.chunk_models.statuses.getPtr(chunk_model);
+        if (status.state.load(.Monotonic) != .ready) {
+            continue;
+        }
         const position = self.world.graph.positions.get(chunk);
         const draw_chunk = DrawChunk{
             .chunk = chunk,
