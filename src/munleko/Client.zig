@@ -87,7 +87,7 @@ pub fn run(self: *Client) !void {
     cam.move_speed = 256;
 
     const cam_obs = try session.world.observers.create(cam.position.cast(i32));
-    defer session.world.observers.delete(cam_obs) catch {};
+    defer session.world.observers.delete(cam_obs);
     self.observer = cam_obs;
 
     try session_renderer.start(cam_obs);
