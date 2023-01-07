@@ -146,21 +146,17 @@ fn swapDrawLists(self: *WorldRenderer) void {
 }
 
 pub fn onWorldUpdate(self: *WorldRenderer, world: *World) !void {
-    const events = &world.chunks.load_state_events;
-    for (events.get(.loading)) |event| {
-        const chunk = event.chunk;
+    const events = world.observers.chunk_events.get(self.observer);
+    for (events.get(.enter)) |chunk| {
         self.chunk_map_mutex.lock();
         defer self.chunk_map_mutex.unlock();
-        try self.chunk_map.put(self.allocator, chunk, .loading);
-    }
-    for (events.get(.active)) |chunk| {
-        self.chunk_map_mutex.lock();
-        defer self.chunk_map_mutex.unlock();
+        std.debug.assert(!self.chunk_map.contains(chunk));
         try self.chunk_map.put(self.allocator, chunk, .active);
     }
-    for (events.get(.unloading)) |chunk| {
+    for (events.get(.exit)) |chunk| {
         self.chunk_map_mutex.lock();
         defer self.chunk_map_mutex.unlock();
+        std.debug.assert(self.chunk_map.contains(chunk));
         _ =  self.chunk_map.remove(chunk);
     }
     // try self.world_model_manager.onWorldUpdate(world);

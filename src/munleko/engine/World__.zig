@@ -442,7 +442,6 @@ const ObserverStatusStore = util.IjoDataStore(Observer, ObserverStatus, struct {
         status.waiting_chunks.deinit();
     }
 });
-const ObserverEventsStore = util.IjoEventsStore(Observer, );
 const ObserverPendingListStore = util.IjoDataListStore(Observer, Chunk);
 
 pub const Observers = struct {

@@ -271,12 +271,19 @@ const ObserverChunkMapStore = util.IjoDataStore(Observer, *ObserverChunkMaps, st
     }
 });
 
+const ObserverChunkEventsStore = util.IjoEventsStore(Observer, union(enum) {
+    enter: Chunk,
+    exit: Chunk,
+});
+
 pub const Observers = struct {
     world: *World,
     pool: ObserverPool,
+
     statuses: ObserverStatusStore,
     zones: ObserverZoneStore,
     chunk_maps: ObserverChunkMapStore,
+    chunk_events: ObserverChunkEventsStore,
 
     list: List(Observer) = .{},
     mutex: Mutex = .{},
@@ -288,14 +295,18 @@ pub const Observers = struct {
             .statuses = ObserverStatusStore.init(world.allocator),
             .zones = ObserverZoneStore.init(world.allocator),
             .chunk_maps = ObserverChunkMapStore.init(world.allocator),
+            .chunk_events = ObserverChunkEventsStore.init(world.allocator),
         };
     }
 
     fn deinit(self: *Observers) void {
         self.pool.deinit();
+
         self.statuses.deinit();
         self.zones.deinit();
         self.chunk_maps.deinit();
+        self.chunk_events.deinit();
+
         self.list.deinit(self.world.allocator);
     }
 
@@ -332,6 +343,7 @@ pub const Observers = struct {
         try self.statuses.matchCapacity(self.pool);
         try self.zones.matchCapacity(self.pool);
         try self.chunk_maps.matchCapacity(self.pool);
+        try self.chunk_events.matchCapacity(self.pool);
 
         const status = self.statuses.getPtr(observer);
         status.state.store(.creating, .Monotonic);
@@ -429,7 +441,7 @@ pub const Manager = struct {
         while (self.is_running.get()) {
             try self.processUnloadingChunks();
             try self.processLoadingChunks(&loading_chunks);
-            try self.processDirtyObservers(&load_range_events);
+            try self.processObservers(&load_range_events);
             try self.processLoadRangeEvents(&load_range_events, &loading_chunks);
             try on_update_fn(context, self.world);
             self.world.chunks.load_state_events.clearAll();
@@ -481,7 +493,7 @@ pub const Manager = struct {
         }
     }
 
-    fn processDirtyObservers(self: *Manager, load_range_events: *LoadRangeEvents) !void {
+    fn processObservers(self: *Manager, load_range_events: *LoadRangeEvents) !void {
         const world = self.world;
         const observers = &world.observers;
         var i: usize = 0;
@@ -492,6 +504,8 @@ pub const Manager = struct {
             const state = status.state.load(.Monotonic);
             const zone = observers.zones.getPtr(observer);
             if (state == .active) {
+                const events = observers.chunk_events.get(observer);
+                events.clearAll();
                 try self.processActiveObserverMaps(observer);
             }
             if (!status.is_dirty.get()) {
@@ -551,17 +565,23 @@ pub const Manager = struct {
         const observers = &world.observers;
         const chunks = &world.chunks;
         const maps = observers.chunk_maps.get(observer);
-        var iter = maps.loading.keyIterator();
-        while (iter.next()) |chunk| {
+        const chunk_events = observers.chunk_events.get(observer);
+        var loading_iter = maps.loading.keyIterator();
+        while (loading_iter.next()) |chunk| {
             const status = chunks.statuses.getPtr(chunk.*);
             switch (status.load_state) {
                 .loading => {},
                 .active => {
                     try maps.active.put(chunk.*, {});
+                    try chunk_events.post(.enter, chunk.*);
                 },
                 .unloading => {},
                 .deleted => unreachable,
             }
+        }
+        var active_iter = maps.active.keyIterator();
+        while (active_iter.next()) |chunk| {
+            _ = maps.loading.remove(chunk.*);
         }
     }
 
@@ -587,6 +607,7 @@ pub const Manager = struct {
         const graph = &world.graph;
         const observers = &world.observers;
         const maps = observers.chunk_maps.get(observer);
+        const events = observers.chunk_events.get(observer);
         if (graph.position_map.get(chunk_position)) |chunk| {
             // if the chunk is already mapped in this observer, we dont need to do anything
             if (maps.loading.contains(chunk) or maps.active.contains(chunk)) {
@@ -602,6 +623,7 @@ pub const Manager = struct {
                 },
                 .active => {
                     try maps.active.put(chunk, {});
+                    try events.post(.enter, chunk);
                 },
                 else => unreachable,
             }
@@ -645,12 +667,16 @@ pub const Manager = struct {
         _ = maps.loading.remove(chunk);
         _ = maps.active.remove(chunk);
 
+        const events = observers.chunk_events.get(observer);
+        try events.post(.exit, chunk);
+
         const chunk_status = chunks.statuses.getPtr(chunk);
 
         chunk_status.mutex.lock();
         defer chunk_status.mutex.unlock();
 
         chunk_status.observer_count -= 1;
+
 
         if (chunk_status.observer_count > 0) {
             return;
