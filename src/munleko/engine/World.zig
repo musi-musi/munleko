@@ -440,11 +440,11 @@ pub const Manager = struct {
 
         while (self.is_running.get()) {
             try self.processUnloadingChunks();
-            try self.processLoadingChunks(&loading_chunks);
-            try self.processObservers(&load_range_events);
-            try self.processLoadRangeEvents(&load_range_events, &loading_chunks);
-            try on_update_fn(context, self.world);
+            try self.processLoadingChunks();
             self.world.chunks.load_state_events.clearAll();
+            try self.processObservers(&load_range_events);
+            try self.processLoadRangeEvents(&load_range_events);
+            try on_update_fn(context, self.world);
         }
     }
 
@@ -469,11 +469,12 @@ pub const Manager = struct {
         }
     }
 
-    fn processLoadingChunks(self: *Manager, loading_chunks: *List(Chunk)) !void {
-        defer loading_chunks.clearRetainingCapacity();
-        var finished_chunks = List(Chunk){};
-        defer finished_chunks.deinit(self.allocator);
-        try self.loadChunks(loading_chunks.items, &finished_chunks);
+    fn processLoadingChunks(self: *Manager) !void {
+        const load_state_events = &self.world.chunks.load_state_events;
+        load_state_events.clear(.active);
+        var finished_chunks = std.ArrayList(Chunk).init(self.allocator);
+        defer finished_chunks.deinit();
+        try loadChunks(self.world, &finished_chunks);
         defer finished_chunks.clearRetainingCapacity();
         for (finished_chunks.items) |chunk| {
             const status = self.world.chunks.statuses.getPtr(chunk);
@@ -483,13 +484,13 @@ pub const Manager = struct {
             status.mutex.lock();
             defer status.mutex.unlock();
             status.load_state = .active;
-            try self.world.chunks.load_state_events.post(.active, chunk);
+            try load_state_events.post(.active, chunk);
         }
     }
 
-    fn loadChunks(self: *Manager, loading_chunks: []const Chunk, finished_chunks: *List(Chunk)) !void {
-        for (loading_chunks) |chunk| {
-            try finished_chunks.append(self.allocator, chunk);
+    fn loadChunks(world: *World, finished_chunks: *std.ArrayList(Chunk)) !void {
+        for (world.chunks.load_state_events.get(.loading)) |event| {
+            try finished_chunks.append(event.chunk);
         }
     }
 
@@ -585,14 +586,17 @@ pub const Manager = struct {
         }
     }
 
-    fn processLoadRangeEvents(self: *Manager, events: *LoadRangeEvents, loading_chunks: *List(Chunk)) !void {
+    fn processLoadRangeEvents(self: *Manager, events: *LoadRangeEvents) !void {
+        const load_state_events = &self.world.chunks.load_state_events;
         defer events.clearAll();
+        load_state_events.clear(.loading);
         for (events.get(.load)) |event| {
             var iter = event.range.iterate();
             while (iter.next()) |position| {
-                try self.processObserverChunkLoad(event.observer, position, loading_chunks);
+                try self.processObserverChunkLoad(event.observer, position);
             }
         }
+        load_state_events.clear(.unloading);
         for (events.get(.unload)) |event| {
             var iter = event.range.iterate();
             while (iter.next()) |position| {
@@ -601,7 +605,7 @@ pub const Manager = struct {
         }
     }
 
-    fn processObserverChunkLoad(self: *Manager, observer: Observer, chunk_position: Vec3i, loading_chunks: *List(Chunk)) !void {
+    fn processObserverChunkLoad(self: *Manager, observer: Observer, chunk_position: Vec3i) !void {
         const world = self.world;
         const chunks = &world.chunks;
         const graph = &world.graph;
@@ -635,7 +639,7 @@ pub const Manager = struct {
             chunk_status.user_count = 0;
             try maps.loading.put(chunk, {});
             try graph.addChunk(chunk, chunk_position);
-            try loading_chunks.append(self.allocator, chunk);
+            // try loading_chunks.append(self.allocator, chunk);
             try chunks.load_state_events.post(.loading, .{
                 .chunk = chunk,
                 .priority = 0,
