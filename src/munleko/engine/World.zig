@@ -16,6 +16,8 @@ const Atomic = std.atomic.Atomic;
 const AtomicFlag = util.AtomicFlag;
 const ResetEvent = Thread.ResetEvent;
 
+const ThreadGroup = util.ThreadGroup;
+
 const World = @This();
 
 const Vec3 = nm.Vec3;
@@ -127,15 +129,16 @@ pub const Chunks = struct {
 
     pub fn startUsingChunk(self: *Chunks, chunk: Chunk) void {
         const status = self.statuses.getPtr(chunk);
-        try status.mutex.lock();
+        status.mutex.lock();
+        defer status.mutex.unlock();
         status.user_count += 1;
     }
 
     pub fn tryStartUsingChunk(self: *Chunks, chunk: Chunk, generation: u32) bool {
         const status = self.statuses.getPtr(chunk);
-        try status.mutex.lock();
+        status.mutex.lock();
+        defer status.mutex.unlock();
         if (status.generation != generation) {
-            status.mutex.unlock();
             return false;
         }
         status.user_count += 1;
@@ -144,6 +147,7 @@ pub const Chunks = struct {
 
     pub fn stopUsingChunk(self: *Chunks, chunk: Chunk) void {
         const status = self.statuses.getPtr(chunk);
+        status.mutex.lock();
         defer status.mutex.unlock();
         status.user_count -= 1;
     }
@@ -379,6 +383,8 @@ pub const Manager = struct {
 
     unloading_chunks: List(Chunk) = .{},
 
+    loader: *Loader,
+
     const LoadRange = struct {
         observer: Observer,
         range: Range3i,
@@ -394,6 +400,7 @@ pub const Manager = struct {
         self.* = .{
             .allocator = allocator,
             .world = world,
+            .loader = try Loader.create(allocator, world),
         };
         return self;
     }
@@ -402,6 +409,7 @@ pub const Manager = struct {
         const allocator = self.allocator;
         defer allocator.destroy(self);
         self.unloading_chunks.deinit(allocator);
+        self.loader.destroy();
     }
 
     pub fn OnWorldUpdateFn(comptime Context: type) type {
@@ -421,6 +429,7 @@ pub const Manager = struct {
         }
         self.is_running.set(true);
         self.thread = try Thread.spawn(.{}, thread_main, .{ self, context });
+        try self.loader.start();
     }
 
     pub fn stop(self: *Manager) void {
@@ -429,6 +438,7 @@ pub const Manager = struct {
         }
         self.is_running.set(false);
         self.thread.join();
+        self.loader.stop();
     }
 
     fn threadMain(self: *Manager, context: anytype, comptime on_update_fn: OnWorldUpdateFn(@TypeOf(context))) !void {
@@ -474,7 +484,7 @@ pub const Manager = struct {
         load_state_events.clear(.active);
         var finished_chunks = std.ArrayList(Chunk).init(self.allocator);
         defer finished_chunks.deinit();
-        try loadChunks(self.world, &finished_chunks);
+        try self.loader.processChunkLoadStateEvents(&finished_chunks);
         defer finished_chunks.clearRetainingCapacity();
         for (finished_chunks.items) |chunk| {
             const status = self.world.chunks.statuses.getPtr(chunk);
@@ -485,12 +495,6 @@ pub const Manager = struct {
             defer status.mutex.unlock();
             status.load_state = .active;
             try load_state_events.post(.active, chunk);
-        }
-    }
-
-    fn loadChunks(world: *World, finished_chunks: *std.ArrayList(Chunk)) !void {
-        for (world.chunks.load_state_events.get(.loading)) |event| {
-            try finished_chunks.append(event.chunk);
         }
     }
 
@@ -640,9 +644,11 @@ pub const Manager = struct {
             try maps.loading.put(chunk, {});
             try graph.addChunk(chunk, chunk_position);
             // try loading_chunks.append(self.allocator, chunk);
+            const center_chunk_position = observers.zones.get(observer).center_chunk_position;
+            const priority = center_chunk_position.sub(chunk_position).mag2();
             try chunks.load_state_events.post(.loading, .{
                 .chunk = chunk,
-                .priority = 0,
+                .priority = priority,
             });
         }
     }
@@ -669,10 +675,11 @@ pub const Manager = struct {
         const maps = observers.chunk_maps.get(observer);
         assert(maps.active.contains(chunk) or maps.loading.contains(chunk));
         _ = maps.loading.remove(chunk);
-        _ = maps.active.remove(chunk);
-
-        const events = observers.chunk_events.get(observer);
-        try events.post(.exit, chunk);
+        const was_active = maps.active.remove(chunk);
+        if (was_active) {
+            const events = observers.chunk_events.get(observer);
+            try events.post(.exit, chunk);
+        }
 
         const chunk_status = chunks.statuses.getPtr(chunk);
 
@@ -680,7 +687,6 @@ pub const Manager = struct {
         defer chunk_status.mutex.unlock();
 
         chunk_status.observer_count -= 1;
-
 
         if (chunk_status.observer_count > 0) {
             return;
@@ -695,5 +701,95 @@ pub const Manager = struct {
 
     pub fn tick(self: *Manager) !void {
         _ = self;
+    }
+};
+
+const ChunkLoadJob = struct {
+    chunk: Chunk,
+    generation: u32,
+};
+
+const ChunkLoadJobQueue = util.JobQueueUnmanaged(ChunkLoadJob);
+
+const Loader = struct {
+    allocator: Allocator,
+    world: *World,
+
+    thread_group: ThreadGroup = undefined,
+    is_running: AtomicFlag = .{},
+
+    chunk_load_job_queue: ChunkLoadJobQueue = .{},
+    finished_chunks: List(Chunk) = .{},
+    finished_chunks_mutex: Mutex = .{},
+
+    fn create(allocator: Allocator, world: *World) !*Loader {
+        const self = try allocator.create(Loader);
+        self.* = .{
+            .allocator = allocator,
+            .world = world,
+        };
+        return self;
+    }
+
+    fn destroy(self: *Loader) void {
+        const allocator = self.allocator;
+        defer allocator.destroy(self);
+        self.stop();
+        self.finished_chunks.deinit(self.allocator);
+    }
+
+    fn start(self: *Loader) !void {
+        if (self.is_running.get()) {
+            @panic("world loader is already running");
+        }
+        self.is_running.set(true);
+        self.thread_group = try ThreadGroup.spawnCpuCount(self.allocator, 0.5, .{}, threadGroupMain, .{ self });
+    }
+
+    fn stop(self: *Loader) void {
+        if (!self.is_running.get()) {
+            return;
+        }
+        self.is_running.set(false);
+        self.chunk_load_job_queue.flush(self.allocator);
+        self.thread_group.join();
+    }
+
+    fn processChunkLoadStateEvents(self: *Loader, finished_chunks: *std.ArrayList(Chunk)) !void {
+        for (self.world.chunks.load_state_events.get(.loading)) |event| {
+            const generation = self.world.chunks.statuses.get(event.chunk).generation;
+            try self.chunk_load_job_queue.push(self.allocator, .{
+                .chunk = event.chunk,
+                .generation = generation,
+            }, event.priority);
+        }
+        self.finished_chunks_mutex.lock();
+        defer self.finished_chunks_mutex.unlock();
+        try finished_chunks.appendSlice(self.finished_chunks.items);
+        self.finished_chunks.clearRetainingCapacity();
+    }
+
+    fn threadGroupMain(self: *Loader) !void {
+        const world = self.world;
+        const chunks = &world.chunks;
+        while (self.is_running.get()) {
+            const node = self.chunk_load_job_queue.pop() orelse continue;
+            const chunk = node.item.chunk;
+            const generation = node.item.generation;
+            if (!chunks.tryStartUsingChunk(chunk, generation)) {
+                continue;
+            }
+            defer chunks.stopUsingChunk(chunk);
+            try self.loadChunk(chunk);
+            self.finished_chunks_mutex.lock();
+            defer self.finished_chunks_mutex.unlock();
+            try self.finished_chunks.append(self.allocator, chunk);
+        }
+    }
+
+    fn loadChunk(self: *Loader, chunk: Chunk) !void {
+        _ = self;
+        _ = chunk;
+        std.time.sleep(10_000_000); // artificial load
     }
 };
