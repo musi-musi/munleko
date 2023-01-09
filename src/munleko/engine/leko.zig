@@ -15,6 +15,11 @@ const AtomicFlag = util.AtomicFlag;
 const JobQueue = util.JobQueueUnmanaged;
 const List = std.ArrayListUnmanaged;
 
+const Vec3 = nm.Vec3;
+const vec3 = nm.vec3;
+const Vec3i = nm.Vec3i;
+const vec3i = nm.vec3i;
+
 const chunk_width_bits = World.chunk_width_bits;
 const chunk_width = World.chunk_width;
 const chunk_leko_count = 1 << chunk_width_bits * 3;
@@ -64,12 +69,26 @@ pub const ChunkLoader = struct {
     }
     
     pub fn loadChunk(self: *ChunkLoader, chunk: Chunk) !void {
+        const perlin = nm.Perlin3{};
         const world = self.world;
-        var rng = std.rand.DefaultPrng.init(0xBABE);
-        const r = rng.random();
+        const chunk_origin = world.graph.positions.get(chunk).mulScalar(chunk_width).cast(f32);
+        // var rng = std.rand.DefaultPrng.init(0xBABE);
+        // const r = rng.random();
         const leko = world.leko_data.chunk_leko.get(chunk);
-        for (leko) |*l| {
-            l.* = @intToEnum(LekoValue, r.int(u1));
+        var i: usize = 0;
+        var x: f32 = 0;
+        while (x < chunk_width) : (x += 1) {
+            var y: f32 = 0;
+            while (y < chunk_width) : (y += 1) {
+                var z: f32 = 0;
+                while (z < chunk_width) : (z += 1) {
+                    defer i += 1;
+                    var position = vec3(.{x, y, z}).add(chunk_origin);
+                    const noise = perlin.sample(position.mulScalar(1/32).v);
+                    const leko_value: u16 = if (noise < 0) 1 else 0;
+                    leko[i] = @intToEnum(LekoValue, leko_value);
+                }
+            }
         }
         // std.log.info("load {}", .{chunk});
         // if (status.pending_load_state == World.ChunkLoadState.unloading) {

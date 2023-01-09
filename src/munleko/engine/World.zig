@@ -800,6 +800,6 @@ const Loader = struct {
 
     fn loadChunk(self: *Loader, chunk: Chunk) !void {
         try self.leko_chunk_loader.loadChunk(chunk);
-        std.time.sleep(20_000_000); // artificial load
+        // std.time.sleep(20_000_000); // artificial load
     }
 };

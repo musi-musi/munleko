@@ -94,9 +94,8 @@ pub const LekoMeshSystem = struct {
     pub fn processChunkModelJob(self: *LekoMeshSystem, world_model: *WorldModel, job: WorldModel.Manager.ChunkModelJob) !void {
         _ = self;
         _ = world_model;
-        switch (job) {
-            .enter => |chunk_model| {
-                _ = chunk_model;
+        switch (job.event) {
+            .enter => {
                 // const chunk_model = enter.chunk_model;
                 // const status = world_model.chunk_models.statuses.getPtr(chunk_model);
                 std.time.sleep(10_000_000);

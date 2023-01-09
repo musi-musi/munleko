@@ -123,8 +123,15 @@ const ChunkModels = struct {
 
 pub const Manager = struct {
 
-    pub const ChunkModelJob = union(enum) {
-        enter: ChunkModel,
+    pub const ChunkModelJob = struct {
+        chunk: Chunk,
+        chunk_generation: u32,
+        chunk_model: ChunkModel,
+        event: Event,
+
+        pub const Event = union(enum) {
+            enter: void,
+        };
     };
 
     const ChunkModelJobQueue = util.JobQueueUnmanaged(ChunkModelJob);
@@ -175,20 +182,18 @@ pub const Manager = struct {
 
     pub fn onWorldUpdate(self: *Manager, world: *World) !void {
         const model = self.world_model;
-        const chunk_models = &self.world_model.chunk_models;
-        const observer_chunk_events = &world.observers.statuses.getPtr(self.observer).chunk_events;
+        const observer_chunk_events = world.observers.chunk_events.get(self.observer);
         const observer_position = world.observers.zones.get(self.observer).center_chunk_position;
         for(observer_chunk_events.get(.enter)) |chunk| {
-            if (chunk_models.map.contains(chunk)) {
-                continue;
-            }
             const chunk_model = try model.createAndAddChunkModel(chunk);
             const chunk_position = world.graph.positions.get(chunk);
             const priority = chunk_position.sub(observer_position).mag2();
-            // const chunk_status = world.chunks.statuses.getPtr(chunk);
-            world.chunks.startUsing(chunk);
+            const chunk_status = world.chunks.statuses.getPtr(chunk);
             try self.chunk_model_job_queue.push(self.allocator, .{
-                .enter = chunk_model 
+                .chunk = chunk,
+                .chunk_model = chunk_model,
+                .chunk_generation = chunk_status.generation,
+                .event = .enter,
             }, priority);
         }
         for(observer_chunk_events.get(.exit)) |chunk| {
@@ -202,15 +207,16 @@ pub const Manager = struct {
         while (self.is_running.get()) {
             if (self.chunk_model_job_queue.pop()) |node| {
                 const job = node.item;
-                try self.leko_mesh_system.processChunkModelJob(self.world_model, job);
-                switch (job) {
-                    .enter => |chunk_model| {
-                        const status = world_model.chunk_models.statuses.getPtr(chunk_model);
-                        world.chunks.stopUsing(status.chunk);
-                        status.state.store(.ready, .Monotonic);
-                        world_model.dirty_event.set();
-                    }
+                const chunk = job.chunk;
+                const chunk_model = job.chunk_model;
+                const chunk_model_status = world_model.chunk_models.statuses.getPtr(chunk_model);
+                if (!world.chunks.tryStartUsingChunk(chunk, job.chunk_generation)) {
+                    continue;
                 }
+                defer world.chunks.stopUsingChunk(chunk);
+                try self.leko_mesh_system.processChunkModelJob(self.world_model, job);
+                chunk_model_status.state.store(.ready, .Monotonic);
+                world_model.dirty_event.set();
             }
         }
     }
