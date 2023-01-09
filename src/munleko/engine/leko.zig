@@ -26,13 +26,13 @@ pub const ChunkLeko = [chunk_leko_count]LekoValue;
 pub const ChunkLekoStore = util.IjoDataStoreArenaInit(Chunk, ChunkLeko);
 
 pub const LekoData = struct {
-    allocator: Allocator,
+    world: *World,
     chunk_leko: ChunkLekoStore,
 
-    pub fn init(self: *LekoData, allocator: Allocator) !void {
+    pub fn init(self: *LekoData, world: *World) !void {
         self.* = .{
-            .allocator = allocator,
-            .chunk_leko = ChunkLekoStore.init(allocator),
+            .world = world,
+            .chunk_leko = ChunkLekoStore.init(world.allocator),
         };
     }
 
@@ -40,81 +40,44 @@ pub const LekoData = struct {
         self.chunk_leko.deinit();
     }
 
-    fn matchDataCapacity(self: *LekoData, world: *World) !void {
-        try self.chunk_leko.matchCapacity(world.chunks.pool);
+    pub fn matchDataCapacity(self: *LekoData) !void {
+        try self.chunk_leko.matchCapacity(self.world.chunks.pool);
     }
 };
 
-pub const LekoLoadSystem = struct {
+pub const ChunkLoader = struct {
     allocator: Allocator,
-    load_group: util.ThreadGroup = undefined,
-    is_running: AtomicFlag = .{},
+    world: *World,
 
-    chunk_job_queue: ChunkJobQueue = .{},
-
-    const ChunkJobQueue = JobQueue(Chunk);
-
-    pub fn create(allocator: Allocator) !*LekoLoadSystem {
-        const self = try allocator.create(LekoLoadSystem);
+    pub fn create(allocator: Allocator, world: *World) !*ChunkLoader {
+        const self = try allocator.create(ChunkLoader);
         self.* = .{
             .allocator = allocator,
+            .world = world,
         };
         return self;
     }
 
-    pub fn destroy(self: *LekoLoadSystem) void {
+    pub fn destroy(self: *ChunkLoader) void {
         const allocator = self.allocator;
         defer allocator.destroy(self);
-        self.stop();
     }
-
-    pub fn start(self: *LekoLoadSystem, world: *World) !void {
-        if (self.is_running.get()) {
-            @panic("leko load system is already running");
-        }
-        self.is_running.set(true);
-        self.load_group = try ThreadGroup.spawnCpuCount(self.allocator, 0.5, .{}, loadGroupMain, .{ self, world });
-    }
-
-    pub fn stop(self: *LekoLoadSystem) void {
-        if (self.is_running.get()) {
-            self.chunk_job_queue.flush(self.allocator);
-            self.is_running.set(false);
-            self.load_group.join();
-        }
-    }
-
-    pub fn onWorldUpdate(self: *LekoLoadSystem, world: *World) !void {
-        const leko = &world.leko;
-        try leko.matchDataCapacity(world);
-        for (world.chunks.load_state_events.get(.loading)) |event| {
-            world.chunks.startUsing(event.chunk);
-            try self.chunk_job_queue.push(self.allocator, event.chunk, event.priority);
-        }
-    }
-
-    fn loadGroupMain(self: *LekoLoadSystem, world: *World) !void {
+    
+    pub fn loadChunk(self: *ChunkLoader, chunk: Chunk) !void {
+        const world = self.world;
         var rng = std.rand.DefaultPrng.init(0xBABE);
         const r = rng.random();
-        while (self.is_running.get()) {
-            if (self.chunk_job_queue.pop()) |node| {
-                const chunk = node.item;
-                const status = world.chunks.statuses.get(chunk);
-                std.debug.assert(status.load_state == .loading);
-                std.debug.assert(status.pending_load_state == World.ChunkLoadState.active or status.pending_load_state == World.ChunkLoadState.unloading);
-                const leko = world.leko.chunk_leko.get(chunk);
-
-                for (leko) |*l| {
-                    l.* = @intToEnum(LekoValue, r.int(u1));
-                }
-                // std.log.info("load {}", .{chunk});
-                // if (status.pending_load_state == World.ChunkLoadState.unloading) {
-                //     world.chunks.stopUsing(chunk);
-                //     continue;
-                // }
-                // std.time.sleep(10000000 + @enumToInt(chunk) * 100);
-                world.chunks.stopUsing(chunk);
-            }
+        const leko = world.leko_data.chunk_leko.get(chunk);
+        for (leko) |*l| {
+            l.* = @intToEnum(LekoValue, r.int(u1));
         }
+        // std.log.info("load {}", .{chunk});
+        // if (status.pending_load_state == World.ChunkLoadState.unloading) {
+        //     world.chunks.stopUsing(chunk);
+        //     continue;
+        // }
+        // std.time.sleep(10000000 + @enumToInt(chunk) * 100);
+
     }
+
 };

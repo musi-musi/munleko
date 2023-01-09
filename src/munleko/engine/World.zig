@@ -25,6 +25,8 @@ const vec3 = nm.vec3;
 const Vec3i = nm.Vec3i;
 const vec3i = nm.vec3i;
 
+const LekoData = leko.LekoData;
+
 const Range3i = nm.Range3i;
 
 pub const Chunk = util.Ijo("world chunk");
@@ -39,6 +41,7 @@ allocator: Allocator,
 
 chunks: Chunks = undefined,
 graph: Graph = undefined,
+leko_data: LekoData = undefined,
 
 observers: Observers = undefined,
 
@@ -50,6 +53,7 @@ pub fn create(allocator: Allocator) !*World {
     try self.chunks.init(self);
     try self.graph.init(self);
     try self.observers.init(self);
+    try self.leko_data.init(self);
     return self;
 }
 
@@ -59,6 +63,7 @@ pub fn destroy(self: *World) void {
     self.chunks.deinit();
     self.graph.deinit();
     self.observers.deinit();
+    self.leko_data.deinit();
 }
 
 fn createChunk(self: *World) !Chunk {
@@ -66,6 +71,7 @@ fn createChunk(self: *World) !Chunk {
     errdefer self.chunks.pool.delete(chunk);
     try self.chunks.matchDataCapacity();
     try self.graph.matchDataCapacity();
+    try self.leko_data.matchDataCapacity();
     return chunk;
 }
 
@@ -675,16 +681,17 @@ pub const Manager = struct {
         const maps = observers.chunk_maps.get(observer);
         assert(maps.active.contains(chunk) or maps.loading.contains(chunk));
         _ = maps.loading.remove(chunk);
-        const was_active = maps.active.remove(chunk);
-        if (was_active) {
-            const events = observers.chunk_events.get(observer);
-            try events.post(.exit, chunk);
-        }
+        _ = maps.active.remove(chunk);
 
         const chunk_status = chunks.statuses.getPtr(chunk);
 
         chunk_status.mutex.lock();
         defer chunk_status.mutex.unlock();
+
+        if (chunk_status.load_state == .active) {
+            const events = observers.chunk_events.get(observer);
+            try events.post(.exit, chunk);
+        }
 
         chunk_status.observer_count -= 1;
 
@@ -715,6 +722,8 @@ const Loader = struct {
     allocator: Allocator,
     world: *World,
 
+    leko_chunk_loader: *leko.ChunkLoader,
+
     thread_group: ThreadGroup = undefined,
     is_running: AtomicFlag = .{},
 
@@ -727,6 +736,7 @@ const Loader = struct {
         self.* = .{
             .allocator = allocator,
             .world = world,
+            .leko_chunk_loader = try leko.ChunkLoader.create(allocator, world),
         };
         return self;
     }
@@ -736,6 +746,7 @@ const Loader = struct {
         defer allocator.destroy(self);
         self.stop();
         self.finished_chunks.deinit(self.allocator);
+        self.leko_chunk_loader.destroy();
     }
 
     fn start(self: *Loader) !void {
@@ -788,8 +799,7 @@ const Loader = struct {
     }
 
     fn loadChunk(self: *Loader, chunk: Chunk) !void {
-        _ = self;
-        _ = chunk;
-        std.time.sleep(10_000_000); // artificial load
+        try self.leko_chunk_loader.loadChunk(chunk);
+        std.time.sleep(20_000_000); // artificial load
     }
 };
