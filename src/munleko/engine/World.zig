@@ -165,10 +165,16 @@ pub const Chunks = struct {
 pub const ChunkPositionStore = util.IjoDataStoreValueInit(Chunk, Vec3i, Vec3i.zero);
 pub const ChunkPositionMap = std.AutoHashMapUnmanaged(Vec3i, Chunk);
 
+pub const ChunkNeighbors = [6]?Chunk;
+
+pub const ChunkNeighborsStore = util.IjoDataStoreValueInit(Chunk, ChunkNeighbors, std.mem.zeroes(ChunkNeighbors));
+
 pub const Graph = struct {
     world: *World,
 
     positions: ChunkPositionStore,
+    neighbors: ChunkNeighborsStore,
+
     position_map: ChunkPositionMap = .{},
     position_map_mutex: Mutex = .{},
 
@@ -176,12 +182,14 @@ pub const Graph = struct {
         self.* = .{
             .world = world,
             .positions = ChunkPositionStore.init(world.allocator),
+            .neighbors = ChunkNeighborsStore.init(world.allocator),
         };
     }
 
     fn deinit(self: *Graph) void {
         const allocator = self.world.allocator;
         self.positions.deinit();
+        self.neighbors.deinit();
         self.position_map.deinit(allocator);
     }
 
@@ -191,9 +199,14 @@ pub const Graph = struct {
         return self.position_map.get(position);
     }
 
+    pub fn neighborChunk(self: *Graph, chunk: Chunk, direction: nm.Cardinal3) ?Chunk {
+        return self.neighbors.get(chunk)[@enumToInt(direction)];
+    }
+
     fn matchDataCapacity(self: *Graph) !void {
         const pool = self.world.chunks.pool;
         try self.positions.matchCapacity(pool);
+        try self.neighbors.matchCapacity(pool);
     }
 
     fn addChunk(self: *Graph, chunk: Chunk, position: Vec3i) !void {
@@ -201,10 +214,27 @@ pub const Graph = struct {
         self.position_map_mutex.lock();
         defer self.position_map_mutex.unlock();
         try self.position_map.put(self.world.allocator, position, chunk);
+        const neighbors = self.neighbors.getPtr(chunk);
+        inline for (comptime std.enums.values(nm.Cardinal3)) |direction| {
+            const neighbor_position = position.add(Vec3i.unitSigned(direction));
+            const neighbor_opt = self.position_map.get(neighbor_position);
+            neighbors.*[@enumToInt(direction)] = neighbor_opt;
+            if (neighbor_opt) |neighbor| {
+                self.neighbors.getPtr(neighbor).*[@enumToInt(direction.negate())] = chunk;
+            }
+        }
     }
 
     fn removeChunk(self: *Graph, position: Vec3i) void {
+        self.position_map_mutex.lock();
+        defer self.position_map_mutex.unlock();
         _ = self.position_map.remove(position);
+        inline for (comptime std.enums.values(nm.Cardinal3)) |direction| {
+            const neighbor_position = position.add(Vec3i.unitSigned(direction));
+            if (self.position_map.get(neighbor_position)) |neighbor| {
+                self.neighbors.getPtr(neighbor).*[@enumToInt(direction.negate())] = null;
+            }
+        }
     }
 };
 
@@ -763,7 +793,7 @@ const Loader = struct {
             @panic("world loader is already running");
         }
         self.is_running.set(true);
-        self.thread_group = try ThreadGroup.spawnCpuCount(self.allocator, 0.5, .{}, threadGroupMain, .{ self });
+        self.thread_group = try ThreadGroup.spawnCpuCount(self.allocator, 0.5, .{}, threadGroupMain, .{self});
     }
 
     fn stop(self: *Loader) void {
