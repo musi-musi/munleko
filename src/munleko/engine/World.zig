@@ -38,11 +38,11 @@ pub const chunk_width = 1 << chunk_width_bits;
 const assert = std.debug.assert;
 
 allocator: Allocator,
+dirty_event: ResetEvent = .{},
 
 chunks: Chunks = undefined,
 graph: Graph = undefined,
 leko_data: LekoData = undefined,
-
 observers: Observers = undefined,
 
 pub fn create(allocator: Allocator) !*World {
@@ -156,6 +156,9 @@ pub const Chunks = struct {
         status.mutex.lock();
         defer status.mutex.unlock();
         status.user_count -= 1;
+        if (status.user_count == 0) {
+            self.world.dirty_event.set();
+        }
     }
 };
 
@@ -343,6 +346,7 @@ pub const Observers = struct {
         const zone = self.zones.getPtr(observer);
         zone.setPosition(position);
         status.is_dirty.set(true);
+        self.world.dirty_event.set();
     }
 
     pub fn create(self: *Observers, position: Vec3i) !Observer {
@@ -364,6 +368,7 @@ pub const Observers = struct {
         const zone = self.zones.getPtr(observer);
         zone.position = position;
         try self.list.append(self.world.allocator, observer);
+        self.world.dirty_event.set();
         return observer;
     }
 
@@ -371,6 +376,7 @@ pub const Observers = struct {
         const status = self.statuses.getPtr(observer);
         status.state.store(.deleting, .Monotonic);
         status.is_dirty.set(true);
+        self.world.dirty_event.set();
     }
 
     fn poolDelete(self: *Observers, observer: Observer) void {
@@ -443,6 +449,7 @@ pub const Manager = struct {
             return;
         }
         self.is_running.set(false);
+        self.world.dirty_event.set();
         self.thread.join();
         self.loader.stop();
     }
@@ -455,6 +462,8 @@ pub const Manager = struct {
         defer loading_chunks.deinit(self.allocator);
 
         while (self.is_running.get()) {
+            self.world.dirty_event.wait();
+            self.world.dirty_event.reset();
             try self.processUnloadingChunks();
             try self.processLoadingChunks();
             self.world.chunks.load_state_events.clearAll();
