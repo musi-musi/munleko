@@ -61,11 +61,11 @@ pub fn EventsUnmanaged(comptime channels_def: type) type {
             const fields = std.meta.fields(channels_def);
             var channels_fields: [fields.len]std.builtin.Type.StructField = undefined;
             for (fields) |field, i| {
-                const List = std.ArrayListUnmanaged(field.field_type);
+                const List = std.ArrayListUnmanaged(field.type);
                 const default_value: List = .{};
                 channels_fields[i] = .{
                     .name = field.name,
-                    .field_type = List,
+                    .type = List,
                     .default_value = &default_value,
                     .is_comptime = false,
                     .alignment = @alignOf(List),
@@ -85,7 +85,7 @@ pub fn EventsUnmanaged(comptime channels_def: type) type {
             const fields = std.meta.fields(channels_def);
             for (fields) |field| {
                 if (std.mem.eql(u8, field.name, @tagName(tag))) {
-                    return field.field_type;
+                    return field.type;
                 }
             }
             unreachable;

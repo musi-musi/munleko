@@ -18,7 +18,7 @@ pub const MeshConfig = struct {
                     defVertIn(
                         location,
                         field.name,
-                        gl.GlslPrimitive.fromType(field.field_type)
+                        gl.GlslPrimitive.fromType(field.type)
                     )
                 };
                 location += 1;
@@ -67,7 +67,7 @@ pub fn Mesh(comptime mesh_cfg: MeshConfig) type {
                     array.setAttributeFormat(
                         @intCast(u32, b),
                         a,
-                        comptime gl.AttrType.fromType(field.field_type),
+                        comptime gl.AttrType.fromType(field.type),
                         @offsetOf(buffer.data_type, field.name),
                     );
                     a += 1;
@@ -186,7 +186,6 @@ pub const ShaderDefs = struct {
         }
         return @Type(.{
             .Enum = .{
-                .layout = .Auto,
                 .tag_type = usize,
                 .fields = &uniform_tag_fields,
                 .decls = &.{},

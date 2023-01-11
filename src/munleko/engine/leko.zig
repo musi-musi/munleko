@@ -48,6 +48,15 @@ pub const LekoData = struct {
     pub fn matchDataCapacity(self: *LekoData) !void {
         try self.chunk_leko.matchCapacity(self.world.chunks.pool);
     }
+
+    pub fn lekoValueAt(self: *LekoData, reference: Reference) LekoValue {
+        return self.chunk_leko.get(reference.chunk).*[reference.address.v];
+    }
+
+    pub fn isSolid(self: *LekoData, value: LekoValue) bool {
+        _ = self;
+        return @enumToInt(value) != 0;
+    }
 };
 
 pub const ChunkLoader = struct {

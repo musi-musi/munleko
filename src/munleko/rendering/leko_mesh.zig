@@ -23,6 +23,14 @@ const Allocator = std.mem.Allocator;
 
 const List = std.ArrayListUnmanaged;
 
+const leko = Engine.leko;
+const Reference = leko.Reference;
+
+const Vec3i = nm.Vec3i;
+const vec3i = nm.vec3i;
+const Cardinal3 = nm.Cardinal3;
+const Axis3 = nm.Axis3;
+
 /// ```
 ///     0 --- 1
 ///     | \   |   ^
@@ -39,6 +47,11 @@ pub const LekoFace = struct {
 };
 
 const LekoFaceList = List(LekoFace);
+
+pub const LekoMeshDataPart = enum {
+    middle,
+    border,
+};
 
 pub const LekoMeshData = struct {
     middle_faces: LekoFaceList = .{},
@@ -98,9 +111,36 @@ pub const LekoMeshSystem = struct {
             .enter => {
                 // const chunk_model = enter.chunk_model;
                 // const status = world_model.chunk_models.statuses.getPtr(chunk_model);
-                std.time.sleep(10_000_000);
+                // std.time.sleep(10_000_000);
                 // status.state.store(.ready, .Monotonic);
             },
         }
+    }
+
+    inline fn getLekoFace(self: *LekoMeshSystem, world: *World, comptime traverse_edges: bool, reference: Reference, normal: Cardinal3) ?LekoFace {
+        _ = self;
+        const leko_data = &world.leko_data;
+        const leko_value = leko_data.lekoValueAt(reference);
+        if (!leko_data.isSolid(leko_value)) {
+            return null;
+        }
+        const neighbor_reference = (
+            if (traverse_edges) reference.incr(world, normal) orelse return null
+            else reference.incrUnchecked(normal)
+        );
+        const neighbor_leko_value = leko_data.lekoValueAt(neighbor_reference);
+        if (leko_data.isSolid(neighbor_leko_value)) {
+            return null;
+        }
+        return encodeLekoFace(reference.address, normal, 0);
+    }
+
+    fn encodeLekoFace(address: leko.Address, normal: Cardinal3, ao: u8) LekoFace {
+        var face: u32 = address.v;
+        face = (face << 3) | @as(u32, @enumToInt(normal));
+        face = (face << 8) | ao;
+        return LekoFace {
+            .base = face,
+        };
     }
 };
