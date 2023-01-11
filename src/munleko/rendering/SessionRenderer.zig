@@ -2,6 +2,11 @@ const std = @import("std");
 const util = @import("util");
 const nm = @import("nm");
 
+const Vec3 = nm.Vec3;
+const vec3 = nm.vec3;
+const Vec3i = nm.Vec3i;
+const vec3i = nm.vec3i;
+
 const Scene = @import("Scene.zig");
 const WorldRenderer = @import("WorldRenderer.zig");
 const Client = @import("../Client.zig");
@@ -26,9 +31,10 @@ pub fn create(allocator: Allocator, session: *Session) !*SessionRenderer {
         .allocator = allocator,
         .scene = undefined,
         .session = session,
-        .world_renderer = try WorldRenderer.create(allocator, session.world),
+        .world_renderer = undefined,
     };
     try self.scene.init();
+    self.world_renderer = try WorldRenderer.create(allocator, &self.scene, session.world);
     return self;
 }
 
@@ -58,4 +64,14 @@ pub fn update(self: *SessionRenderer) !void {
 
 pub fn draw(self: *SessionRenderer) void {
     self.world_renderer.draw(&self.scene);
+}
+
+pub fn setDirectionalLight(self: *SessionRenderer, light: Vec3) void {
+    self.scene.setDirectionalLight(light);
+    self.world_renderer.setDirectionalLight(light);
+}
+
+pub fn setCameraMatrices(self: *SessionRenderer, view: nm.Mat4, proj: nm.Mat4) void {
+    self.scene.setCameraMatrices(view, proj);
+    self.world_renderer.setCameraMatrices(view, proj);
 }

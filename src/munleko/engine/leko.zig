@@ -82,12 +82,21 @@ pub const ChunkLoader = struct {
         const world = self.world;
         const chunk_origin = world.graph.positions.get(chunk).mulScalar(chunk_width).cast(f32);
         const leko = world.leko_data.chunk_leko.get(chunk);
+        // const seed: u64 = (
+        //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[0]))) << 32 | 
+        //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[1]))) << 16 | 
+        //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[2])))
+        // ); 
+        // var rng = std.rand.DefaultPrng.init(seed);
+        // const r = rng.random();
         var i: usize = 0;
         while (i < chunk_leko_count) : (i += 1) {
             const address = Address.initI(i);
             const position = address.localPosition().cast(f32).add(chunk_origin);
-            const noise = perlin.sample(position.mulScalar(1 / 32).v);
-            const leko_value: u16 = if (noise < 0) 1 else 0;
+            const noise = perlin.sample(position.mulScalar(0.025).v);
+            // _ = noise;
+            // const leko_value: u16 = if (r.float(f32) > 0.95) 1 else 0;
+            const leko_value: u16 = if (noise < 0.15) 1 else 0;
             leko[i] = @intToEnum(LekoValue, leko_value);
         }
 
@@ -123,7 +132,7 @@ pub const Address = struct {
     }
 
     pub fn isEdge(self: Address, direction: nm.Cardinal3) bool {
-        const w: UChunkWidth = @intCast(UChunkWidth, Chunk.width - 1);
+        const w: UChunkWidth = @intCast(UChunkWidth, chunk_width - 1);
         return switch (direction.sign()) {
             .positive => self.get(direction.axis()) == w,
             .negative => self.get(direction.axis()) == 0,
@@ -132,7 +141,7 @@ pub const Address = struct {
 
     /// move this index to the edge of the chunk in `direction`
     pub fn toEdge(self: Address, direction: nm.Cardinal3) Address {
-        const w: UChunkWidth = @intCast(UChunkWidth, Chunk.width - 1);
+        const w: UChunkWidth = @intCast(UChunkWidth, chunk_width - 1);
         return switch (direction.sign()) {
             .positive => .{ .v = self.v | single(UChunkWidth, w, direction.axis()).v },
             .negative => .{ .v = self.v & ~single(UChunkWidth, w, direction.axis()).v },
@@ -140,7 +149,7 @@ pub const Address = struct {
     }
 
     pub fn edge(comptime T: type, offset: T, direction: nm.Cardinal3) Address {
-        const w: UChunkWidth = @intCast(UChunkWidth, Chunk.width - 1);
+        const w: UChunkWidth = @intCast(UChunkWidth, chunk_width - 1);
         return switch (direction.sign()) {
             .positive => .{ .v = single(u32, w - offset, direction.axis()).v },
             .negative => .{ .v = single(u32, offset, direction.axis()).v },
@@ -164,7 +173,7 @@ pub const Address = struct {
     /// increment this index one cell in a cardinal direction
     /// trying to increment out of bounds is UB, only use when in bounds
     pub fn incrUnchecked(self: Address, card: nm.Cardinal3) Address {
-        const w: UChunkWidth = @intCast(UChunkWidth, Chunk.width - 1);
+        const w: UChunkWidth = @intCast(UChunkWidth, chunk_width - 1);
         const offset = switch (card) {
             .x_pos => init(UChunkWidth, .{ 1, 0, 0 }),
             .x_neg => init(UChunkWidth, .{ w, 0, 0 }),

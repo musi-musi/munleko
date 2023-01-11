@@ -172,6 +172,7 @@ pub const ShaderDefs = struct {
     vert_inputs: []const VertInDef = &.{},
     frag_outputs: []const FragOutDef = &.{ defFragOut(0, "color", .vec4)},
     uniforms: []const UniformDef = &.{},
+    source_modules: []const []const u8 = &.{},
 
     fn UniformTag(comptime self: ShaderDefs) type {
         if (self.uniforms.len == 0) {
@@ -336,6 +337,9 @@ pub fn Shader(comptime shader_defs: ShaderDefs) type {
                 }
                 try w.writeAll("#define vf in\n");
                 try w.writeAll("#define STAGE_FRAGMENT\n");
+            }
+            for (shader_defs.source_modules) |module| {
+                try w.print("{s}\n", .{module});
             }
             try w.writeAll("#line 1 0\n");
             try w.writeAll(body);

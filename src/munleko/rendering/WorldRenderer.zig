@@ -25,13 +25,15 @@ const Observer = World.Observer;
 const Scene = @import("Scene.zig");
 const WorldModel = @import("WorldModel.zig");
 const ChunkModel = WorldModel.ChunkModel;
+const leko_mesh = @import("leko_mesh.zig");
+const LekoMeshRenderer = leko_mesh.LekoMeshRenderer;
 
 const Debug = @import("Debug.zig");
 
 const WorldRenderer = @This();
 
 const DrawList = List(DrawChunk);
-const DrawChunk = struct {
+pub const DrawChunk = struct {
     chunk: Chunk,
     chunk_model: ChunkModel,
     // load_state: World.ChunkLoadState,
@@ -39,6 +41,7 @@ const DrawChunk = struct {
 };
 
 allocator: Allocator,
+scene: *Scene,
 world: *World,
 world_model: *WorldModel,
 world_model_manager: *WorldModel.Manager,
@@ -54,17 +57,21 @@ draw_list_mutex: Mutex = .{},
 chunk_map: ChunkMap = .{},
 chunk_map_mutex: Mutex = .{},
 
+leko_mesh_renderer: *LekoMeshRenderer,
+
 const ChunkMap = std.HashMapUnmanaged(Chunk, World.ChunkLoadState, Chunk.HashContext, std.hash_map.default_max_load_percentage);
 
-pub fn create(allocator: Allocator, world: *World) !*WorldRenderer {
+pub fn create(allocator: Allocator, scene: *Scene, world: *World) !*WorldRenderer {
     const self = try allocator.create(WorldRenderer);
     const world_model = try WorldModel.create(allocator, world);
     const world_model_manager = try WorldModel.Manager.create(allocator, world_model);
     self.* = WorldRenderer{
         .allocator = allocator,
+        .scene = scene,
         .world = world,
         .world_model = world_model,
         .world_model_manager = world_model_manager,
+        .leko_mesh_renderer = try LekoMeshRenderer.create(allocator, scene, world_model),
     };
     return self;
 }
@@ -76,6 +83,8 @@ pub fn destroy(self: *WorldRenderer) void {
 
     self.world_model.destroy();
     self.world_model_manager.destroy();
+    self.leko_mesh_renderer.destroy();
+
     self.draw_list.deinit(allocator);
     self.back_draw_list.deinit(allocator);
     self.chunk_map.deinit(allocator);
@@ -146,6 +155,14 @@ pub fn update(self: *WorldRenderer) !void {
     _ = self;
 }
 
+pub fn setDirectionalLight(self: WorldRenderer, light: Vec3) void {
+    self.leko_mesh_renderer.setDirectionalLight(light);
+}
+
+pub fn setCameraMatrices(self: WorldRenderer, view: nm.Mat4, proj: nm.Mat4) void {
+    self.leko_mesh_renderer.setCameraMatrices(view, proj);
+}
+
 pub fn draw(self: *WorldRenderer, scene: *Scene) void {
     scene.debug.start();
     scene.debug.bindCube();
@@ -153,6 +170,7 @@ pub fn draw(self: *WorldRenderer, scene: *Scene) void {
     defer self.draw_list_mutex.unlock();
     for (self.draw_list.items) |draw_chunk| {
         const position = draw_chunk.position.cast(f32).addScalar(0.5).mulScalar(World.chunk_width);
-        scene.debug.drawCubeAssumeBound(position, 1, vec3(.{1, 1, 1}));
+        scene.debug.drawCubeAssumeBound(position, 1, vec3(.{ 1, 1, 1 }));
     }
+    self.leko_mesh_renderer.updateAndDrawLekoMeshes(self.draw_list.items);
 }

@@ -25,7 +25,9 @@ pub const rendering = @import("rendering.zig");
 const SessionRenderer = rendering.SessionRenderer;
 
 pub const main_decls = struct {
-    pub const log_level = std.log.Level.info;
+    pub const std_options = struct {
+        pub const log_level = std.log.Level.info;
+    };
 
     pub fn main() !void {
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -84,7 +86,7 @@ pub fn run(self: *Client) !void {
     defer session_renderer.destroy();
 
     var cam = FlyCam.init(self.window);
-    cam.move_speed = 256;
+    cam.move_speed = 15;
 
     const cam_obs = try session.world.observers.create(cam.position.cast(i32));
     defer session.world.observers.delete(cam_obs);
@@ -109,7 +111,7 @@ pub fn run(self: *Client) !void {
 
     var fps_counter = try util.FpsCounter.start(1);
 
-    session_renderer.scene.setDirectionalLight(nm.vec3(.{ 1, 3, 2 }).norm() orelse unreachable);
+    session_renderer.setDirectionalLight(nm.vec3(.{ 1, 3, 2 }).norm() orelse unreachable);
 
     while (self.window.nextFrame()) {
         for (self.window.events.get(.framebuffer_size)) |size| {
@@ -131,7 +133,7 @@ pub fn run(self: *Client) !void {
         cam.update(self.window);
         session.world.observers.setPosition(cam_obs, cam.position.cast(i32));
 
-        session_renderer.scene.setCameraMatrices(
+        session_renderer.setCameraMatrices(
             cam.viewMatrix(),
             nm.transform.createPerspective(
                 90.0 * std.math.pi / 180.0,

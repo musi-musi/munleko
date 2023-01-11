@@ -151,7 +151,7 @@ pub const Manager = struct {
         self.* = Manager {
             .allocator = allocator,
             .world_model = world_model,
-            .leko_mesh_system = try LekoMeshSystem.create(allocator),
+            .leko_mesh_system = try LekoMeshSystem.create(allocator, world_model),
         };
         return self;
     }
@@ -214,7 +214,7 @@ pub const Manager = struct {
                     continue;
                 }
                 defer world.chunks.stopUsingChunk(chunk);
-                try self.leko_mesh_system.processChunkModelJob(self.world_model, job);
+                try self.leko_mesh_system.processChunkModelJob(job);
                 chunk_model_status.state.store(.ready, .Monotonic);
                 world_model.dirty_event.set();
             }
