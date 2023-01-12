@@ -73,18 +73,16 @@ pub const LekoMeshRenderer = struct {
         self.leko_face_shader.destroy();
     }
 
-    pub fn setDirectionalLight(self: LekoMeshRenderer, light: Vec3) void {
-        self.leko_face_shader.setUniform(.light, light.v);
-    }
-
-    pub fn setCameraMatrices(self: LekoMeshRenderer, view: nm.Mat4, proj: nm.Mat4) void {
-        self.leko_face_shader.setUniform(.view, view.v);
-        self.leko_face_shader.setUniform(.proj, proj.v);
-    }
-
     pub fn updateAndDrawLekoMeshes(self: *LekoMeshRenderer, draw_chunks: []const WorldRenderer.DrawChunk) void {
         self.leko_mesh.bind();
         self.leko_face_shader.use();
+        self.leko_face_shader.setUniform(.light, self.scene.directional_light.v);
+        self.leko_face_shader.setUniform(.view, self.scene.camera_view.v);
+        self.leko_face_shader.setUniform(.proj, self.scene.camera_projection.v);
+        self.leko_face_shader.setUniform(.fog_color, self.scene.fog_color.v);
+        self.leko_face_shader.setUniform(.fog_start, self.scene.fog_start);
+        self.leko_face_shader.setUniform(.fog_end, self.scene.fog_end);
+        self.leko_face_shader.setUniform(.fog_power, self.scene.fog_power);
         for (draw_chunks) |draw_chunk| {
             const buffer = self.world_model.chunk_leko_meshes.getUpdatedFaceBuffer(draw_chunk.chunk_model);
             const face_count = self.world_model.chunk_leko_meshes.mesh_data.get(draw_chunk.chunk_model).face_count;
@@ -122,6 +120,10 @@ pub const LekoFaceShader = ls.Shader(.{
         ls.defUniform("view", .mat4),
         ls.defUniform("proj", .mat4),
         ls.defUniform("chunk_origin", .vec3),
+        ls.defUniform("fog_color", .vec3),
+        ls.defUniform("fog_start", .float),
+        ls.defUniform("fog_end", .float),
+        ls.defUniform("fog_power", .float),
     },
     .source_modules = &.{
         leko_face_shader_defs,

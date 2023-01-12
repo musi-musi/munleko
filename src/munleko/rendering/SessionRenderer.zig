@@ -63,15 +63,5 @@ pub fn update(self: *SessionRenderer) !void {
 }
 
 pub fn draw(self: *SessionRenderer) void {
-    self.world_renderer.draw(&self.scene);
-}
-
-pub fn setDirectionalLight(self: *SessionRenderer, light: Vec3) void {
-    self.scene.setDirectionalLight(light);
-    self.world_renderer.setDirectionalLight(light);
-}
-
-pub fn setCameraMatrices(self: *SessionRenderer, view: nm.Mat4, proj: nm.Mat4) void {
-    self.scene.setCameraMatrices(view, proj);
-    self.world_renderer.setCameraMatrices(view, proj);
+    self.world_renderer.draw();
 }

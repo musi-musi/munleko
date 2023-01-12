@@ -155,22 +155,15 @@ pub fn update(self: *WorldRenderer) !void {
     _ = self;
 }
 
-pub fn setDirectionalLight(self: WorldRenderer, light: Vec3) void {
-    self.leko_mesh_renderer.setDirectionalLight(light);
-}
-
-pub fn setCameraMatrices(self: WorldRenderer, view: nm.Mat4, proj: nm.Mat4) void {
-    self.leko_mesh_renderer.setCameraMatrices(view, proj);
-}
-
-pub fn draw(self: *WorldRenderer, scene: *Scene) void {
-    scene.debug.start();
-    scene.debug.bindCube();
-    self.draw_list_mutex.lock();
-    defer self.draw_list_mutex.unlock();
-    for (self.draw_list.items) |draw_chunk| {
-        const position = draw_chunk.position.cast(f32).addScalar(0.5).mulScalar(World.chunk_width);
-        scene.debug.drawCubeAssumeBound(position, 1, vec3(.{ 1, 1, 1 }));
-    }
+pub fn draw(self: *WorldRenderer) void {
+    // const debug = self.scene.setupDebug();
+    // debug.start();
+    // debug.bindCube();
+    // self.draw_list_mutex.lock();
+    // defer self.draw_list_mutex.unlock();
+    // for (self.draw_list.items) |draw_chunk| {
+    //     const position = draw_chunk.position.cast(f32).addScalar(0.5).mulScalar(World.chunk_width);
+    //     debug.drawCubeAssumeBound(position, 1, vec3(.{ 1, 1, 1 }));
+    // }
     self.leko_mesh_renderer.updateAndDrawLekoMeshes(self.draw_list.items);
 }

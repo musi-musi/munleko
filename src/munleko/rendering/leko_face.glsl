@@ -1,5 +1,5 @@
 vf float light;
-
+vf float fog_strength;
 
 #ifdef STAGE_VERTEX
 void main() {
@@ -15,12 +15,18 @@ void main() {
     vec4 world_position = vec4(u_chunk_origin + local_position, 1);
     gl_Position = u_proj * u_view * world_position;
     light = abs(dot(normal, u_light));
+    vec4 camera_position = inverse(u_view) * vec4(0, 0, 0, 1);
+    float dist = length(camera_position.xyz - world_position.xyz);
+    dist = (dist - u_fog_start) / (u_fog_end - u_fog_start);
+    dist = clamp(dist, 0, 1);
+    fog_strength = pow(dist, u_fog_power);
 }
 #endif
 
 #ifdef STAGE_FRAGMENT
 void main() {
-    f_color.xyz = vec3(light);
+    vec3 color = mix(vec3(light), u_fog_color, fog_strength);
+    f_color.xyz = color;
     f_color.w = 1;
 }
 #endif
