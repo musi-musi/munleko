@@ -128,7 +128,7 @@ pub const Address = struct {
     }
 
     pub fn get(self: Address, axis: nm.Axis3) UChunkWidth {
-        return @truncate(UChunkWidth, shr(UAddress, self.v, chunk_width_bits * (2 - @enumToInt(axis))));
+        return @truncate(UChunkWidth, shr(UAddress, self.v, chunk_width_bits * @as(u32, 2 - @enumToInt(axis))));
     }
 
     pub fn isEdge(self: Address, direction: nm.Cardinal3) bool {
@@ -158,7 +158,7 @@ pub const Address = struct {
 
     pub fn single(comptime T: type, value: T, axis: nm.Axis3) Address {
         return Address{
-            .v = shl(UAddress, @intCast(UAddress, value), (chunk_width_bits * (2 - @enumToInt(axis)))),
+            .v = shl(UAddress, @intCast(UAddress, value), (chunk_width_bits * @as(u32, 2 - @enumToInt(axis)))),
         };
     }
 

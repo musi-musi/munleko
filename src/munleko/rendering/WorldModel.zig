@@ -114,25 +114,16 @@ const ChunkModels = struct {
         self.map_mutex.lock();
         defer self.map_mutex.unlock();
         if (self.map.fetchRemove(chunk)) |kv| {
-            self.pool.delete(kv.value);
+            const chunk_model = kv.value;
+            self.pool.delete(chunk_model);
         }
     }
 
 };
 
 
+
 pub const Manager = struct {
-
-    pub const ChunkModelJob = struct {
-        chunk: Chunk,
-        chunk_generation: u32,
-        chunk_model: ChunkModel,
-        event: Event,
-
-        pub const Event = union(enum) {
-            enter: void,
-        };
-    };
 
     const ChunkModelJobQueue = util.JobQueueUnmanaged(ChunkModelJob);
 
@@ -146,12 +137,34 @@ pub const Manager = struct {
 
     chunk_model_job_queue: ChunkModelJobQueue = .{},
 
+    queue_flags: ChunkModelQueueFlagsStore,
+
+    pub const ChunkModelJob = struct {
+        chunk: Chunk,
+        chunk_generation: u32,
+        chunk_model: ChunkModel,
+        event: Event,
+
+        pub const Event = union(enum) {
+            enter: void,
+            neighbor_enter: void,
+        };
+    };
+
+    const ChunkModelQueueFlags = struct {
+        enter: AtomicFlag = .{},
+        neighbor_enter: AtomicFlag = .{},
+    };
+
+    const ChunkModelQueueFlagsStore = util.IjoDataStoreDefaultInit(ChunkModel, ChunkModelQueueFlags);
+
     pub fn create(allocator: Allocator, world_model: *WorldModel) !*Manager {
         const self = try allocator.create(Manager);
         self.* = Manager {
             .allocator = allocator,
             .world_model = world_model,
             .leko_mesh_system = try LekoMeshSystem.create(allocator, world_model),
+            .queue_flags = ChunkModelQueueFlagsStore.init(allocator),
         };
         return self;
     }
@@ -161,6 +174,7 @@ pub const Manager = struct {
         defer allocator.destroy(self);
         self.stop();
         self.leko_mesh_system.destroy();
+        self.queue_flags.deinit();
     }
 
     pub fn start(self: *Manager, observer: Observer) !void {
@@ -186,6 +200,10 @@ pub const Manager = struct {
         const observer_position = world.observers.zones.get(self.observer).center_chunk_position;
         for(observer_chunk_events.get(.enter)) |chunk| {
             const chunk_model = try model.createAndAddChunkModel(chunk);
+            try self.queue_flags.matchCapacity(model.chunk_models.pool);
+            const queue_flags = self.queue_flags.getPtr(chunk_model);
+            queue_flags.enter.set(true);
+            queue_flags.neighbor_enter.set(false);
             const chunk_position = world.graph.positions.get(chunk);
             const priority = chunk_position.sub(observer_position).mag2();
             const chunk_status = world.chunks.statuses.getPtr(chunk);
@@ -195,6 +213,31 @@ pub const Manager = struct {
                 .chunk_generation = chunk_status.generation,
                 .event = .enter,
             }, priority);
+
+            var neighbor_range_iter = nm.Range3i.init(
+                chunk_position.subScalar(1).v,
+                chunk_position.addScalar(2).v,
+            ).iterate();
+            while (neighbor_range_iter.next()) |neighbor_position| {
+                if (neighbor_position.eql(chunk_position)) {
+                    continue;
+                }
+                const neighbor_chunk = world.graph.position_map.get(neighbor_position) orelse continue;
+                const neighbor_chunk_model = model.chunk_models.map.get(neighbor_chunk) orelse continue;
+                const neighbor_flags = self.queue_flags.getPtr(neighbor_chunk_model);
+                if (neighbor_flags.neighbor_enter.get()) {
+                    continue;
+                }
+                defer neighbor_flags.neighbor_enter.set(true);
+                const neighbor_chunk_generation = world.chunks.statuses.get(neighbor_chunk).generation;
+                const neighbor_priority = neighbor_position.sub(observer_position).mag2();
+                try self.chunk_model_job_queue.push(self.allocator, .{
+                    .chunk = neighbor_chunk,
+                    .chunk_model = neighbor_chunk_model,
+                    .chunk_generation = neighbor_chunk_generation,
+                    .event = .neighbor_enter,
+                }, neighbor_priority);
+            }
         }
         for(observer_chunk_events.get(.exit)) |chunk| {
             model.deleteAndRemoveChunkModel(chunk);
@@ -210,6 +253,11 @@ pub const Manager = struct {
                 const chunk = job.chunk;
                 const chunk_model = job.chunk_model;
                 const chunk_model_status = world_model.chunk_models.statuses.getPtr(chunk_model);
+                const queue_flags = self.queue_flags.getPtr(chunk_model);
+                switch (job.event) {
+                    .enter => queue_flags.enter.set(false),
+                    .neighbor_enter => queue_flags.neighbor_enter.set(false),
+                }
                 if (!world.chunks.tryStartUsingChunk(chunk, job.chunk_generation)) {
                     continue;
                 }

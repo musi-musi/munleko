@@ -26,7 +26,7 @@ const Scene = @import("Scene.zig");
 const WorldModel = @import("WorldModel.zig");
 const ChunkModel = WorldModel.ChunkModel;
 const leko_mesh = @import("leko_mesh.zig");
-const LekoMeshRenderer = leko_mesh.LekoMeshRenderer;
+const LekoMeshRenderer = @import("LekoMeshRenderer.zig");
 
 const Debug = @import("Debug.zig");
 
@@ -159,8 +159,8 @@ pub fn draw(self: *WorldRenderer) void {
     // const debug = self.scene.setupDebug();
     // debug.start();
     // debug.bindCube();
-    // self.draw_list_mutex.lock();
-    // defer self.draw_list_mutex.unlock();
+    self.draw_list_mutex.lock();
+    defer self.draw_list_mutex.unlock();
     // for (self.draw_list.items) |draw_chunk| {
     //     const position = draw_chunk.position.cast(f32).addScalar(0.5).mulScalar(World.chunk_width);
     //     debug.drawCubeAssumeBound(position, 1, vec3(.{ 1, 1, 1 }));
