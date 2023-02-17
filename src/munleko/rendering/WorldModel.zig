@@ -36,7 +36,7 @@ pub fn create(allocator: Allocator, world: *World) !*WorldModel {
         .allocator = allocator,
         .world = world,
     };
-    try self.chunk_models.init(allocator);
+    try self.chunk_models.init(self);
     try self.chunk_leko_meshes.init(allocator);
     return self;
 }
@@ -64,8 +64,13 @@ const ChunkModelMap = std.HashMapUnmanaged(Chunk, ChunkModel, Chunk.HashContext,
 const ChunkModelPool = util.IjoPool(ChunkModel);
 
 pub const ChunkModelStatus = struct {
+    mutex: Mutex = .{},
     chunk: Chunk = undefined,
-    state: Atomic(ChunkModelState) = .{ .value = .deleted },
+    state: ChunkModelState = .deleted,
+    generation: u32 = 0,
+    chunk_generation: u32 = 0,
+    task_flags: ChunkModelTaskFlags = ChunkModelTaskFlags.initEmpty(),
+    is_busy: bool = false,
 };
 
 pub const ChunkModelState = enum(u8) {
@@ -74,9 +79,25 @@ pub const ChunkModelState = enum(u8) {
     ready,
 };
 
+pub const ChunkModelTask = enum {
+    leko_mesh_generate_middle,
+    leko_mesh_generate_border,
+};
+
+pub const ChunkModelTaskFlags = std.enums.EnumSet(ChunkModelTask);
+
+fn initChunkModelTaskFlagsFromSet(set: []const ChunkModelTask) ChunkModelTaskFlags {
+    var flags = ChunkModelTaskFlags.initEmpty();
+    for (set) |flag| {
+        flags.insert(flag);
+    }
+    return flags;
+}
+
 const ChunkModelStatusStore = util.IjoDataStoreDefaultInit(ChunkModel, ChunkModelStatus);
 
 const ChunkModels = struct {
+    world_model: *WorldModel,
     allocator: Allocator,
     pool: ChunkModelPool,
     map: ChunkModelMap = .{},
@@ -84,8 +105,10 @@ const ChunkModels = struct {
 
     statuses: ChunkModelStatusStore,
 
-    fn init(self: *ChunkModels, allocator: Allocator) !void {
+    fn init(self: *ChunkModels, world_model: *WorldModel) !void {
+        const allocator = world_model.allocator;
         self.* = .{
+            .world_model = world_model,
             .allocator = allocator,
             .pool = ChunkModelPool.init(allocator),
             .statuses = ChunkModelStatusStore.init(allocator),
@@ -102,8 +125,14 @@ const ChunkModels = struct {
         const chunk_model = try self.pool.create();
         try self.statuses.matchCapacity(self.pool);
         const status = self.statuses.getPtr(chunk_model);
+        status.mutex.lock();
+        status.mutex.unlock();
         status.chunk = chunk;
-        status.state.store(.pending, .Monotonic);
+        const chunk_status = self.world_model.world.chunks.statuses.getPtr(chunk);
+        status.state = .pending;
+        status.chunk_generation = chunk_status.generation;
+        status.task_flags = ChunkModelTaskFlags.initEmpty();
+        status.is_busy = false;
         self.map_mutex.lock();
         defer self.map_mutex.unlock();
         try self.map.put(self.allocator, chunk, chunk_model);
@@ -116,17 +145,15 @@ const ChunkModels = struct {
         if (self.map.fetchRemove(chunk)) |kv| {
             const chunk_model = kv.value;
             self.pool.delete(chunk_model);
+            const status = self.statuses.getPtr(chunk_model);
+            status.mutex.lock();
+            defer status.mutex.unlock();
+            status.generation +%= 1;
         }
     }
-
 };
 
-
-
 pub const Manager = struct {
-
-    const ChunkModelJobQueue = util.JobQueueUnmanaged(ChunkModelJob);
-
     allocator: Allocator,
     world_model: *WorldModel,
     generate_group: ThreadGroup = undefined,
@@ -135,36 +162,29 @@ pub const Manager = struct {
 
     leko_mesh_system: *LekoMeshSystem,
 
-    chunk_model_job_queue: ChunkModelJobQueue = .{},
+    job_queue: ChunkModelJobQueue = .{},
+    job_queue_mutex: Mutex = .{},
+    job_queue_condition: std.Thread.Condition = .{},
 
-    queue_flags: ChunkModelQueueFlagsStore,
+    const ChunkModelJobQueue = std.ArrayListUnmanaged(ChunkModelQueueItem);
+
+    const ChunkModelQueueItem = struct {
+        chunk_model: ChunkModel,
+        generation: u32,
+    };
 
     pub const ChunkModelJob = struct {
         chunk: Chunk,
-        chunk_generation: u32,
         chunk_model: ChunkModel,
-        event: Event,
-
-        pub const Event = union(enum) {
-            enter: void,
-            neighbor_enter: void,
-        };
+        task_flags: ChunkModelTaskFlags,
     };
-
-    const ChunkModelQueueFlags = struct {
-        enter: AtomicFlag = .{},
-        neighbor_enter: AtomicFlag = .{},
-    };
-
-    const ChunkModelQueueFlagsStore = util.IjoDataStoreDefaultInit(ChunkModel, ChunkModelQueueFlags);
 
     pub fn create(allocator: Allocator, world_model: *WorldModel) !*Manager {
         const self = try allocator.create(Manager);
-        self.* = Manager {
+        self.* = Manager{
             .allocator = allocator,
             .world_model = world_model,
             .leko_mesh_system = try LekoMeshSystem.create(allocator, world_model),
-            .queue_flags = ChunkModelQueueFlagsStore.init(allocator),
         };
         return self;
     }
@@ -174,7 +194,6 @@ pub const Manager = struct {
         defer allocator.destroy(self);
         self.stop();
         self.leko_mesh_system.destroy();
-        self.queue_flags.deinit();
     }
 
     pub fn start(self: *Manager, observer: Observer) !void {
@@ -189,7 +208,7 @@ pub const Manager = struct {
     pub fn stop(self: *Manager) void {
         if (self.is_running.get()) {
             self.is_running.set(false);
-            self.chunk_model_job_queue.flush(self.allocator);
+            self.flushJobQueue();
             self.generate_group.join();
         }
     }
@@ -197,23 +216,13 @@ pub const Manager = struct {
     pub fn onWorldUpdate(self: *Manager, world: *World) !void {
         const model = self.world_model;
         const observer_chunk_events = world.observers.chunk_events.get(self.observer);
-        const observer_position = world.observers.zones.get(self.observer).center_chunk_position;
-        for(observer_chunk_events.get(.enter)) |chunk| {
+        // const observer_position = world.observers.zones.get(self.observer).center_chunk_position;
+        for (observer_chunk_events.get(.enter)) |chunk| {
             const chunk_model = try model.createAndAddChunkModel(chunk);
-            try self.queue_flags.matchCapacity(model.chunk_models.pool);
-            const queue_flags = self.queue_flags.getPtr(chunk_model);
-            queue_flags.enter.set(true);
-            queue_flags.neighbor_enter.set(false);
             const chunk_position = world.graph.positions.get(chunk);
-            const priority = chunk_position.sub(observer_position).mag2();
-            const chunk_status = world.chunks.statuses.getPtr(chunk);
-            try self.chunk_model_job_queue.push(self.allocator, .{
-                .chunk = chunk,
-                .chunk_model = chunk_model,
-                .chunk_generation = chunk_status.generation,
-                .event = .enter,
-            }, priority);
+            // const priority = chunk_position.sub(observer_position).mag2();
 
+            try self.setTaskFlags(chunk_model, &.{ .leko_mesh_generate_middle, .leko_mesh_generate_border });
             var neighbor_range_iter = nm.Range3i.init(
                 chunk_position.subScalar(1).v,
                 chunk_position.addScalar(2).v,
@@ -224,22 +233,12 @@ pub const Manager = struct {
                 }
                 const neighbor_chunk = world.graph.position_map.get(neighbor_position) orelse continue;
                 const neighbor_chunk_model = model.chunk_models.map.get(neighbor_chunk) orelse continue;
-                const neighbor_flags = self.queue_flags.getPtr(neighbor_chunk_model);
-                if (neighbor_flags.neighbor_enter.get()) {
-                    continue;
-                }
-                defer neighbor_flags.neighbor_enter.set(true);
-                const neighbor_chunk_generation = world.chunks.statuses.get(neighbor_chunk).generation;
-                const neighbor_priority = neighbor_position.sub(observer_position).mag2();
-                try self.chunk_model_job_queue.push(self.allocator, .{
-                    .chunk = neighbor_chunk,
-                    .chunk_model = neighbor_chunk_model,
-                    .chunk_generation = neighbor_chunk_generation,
-                    .event = .neighbor_enter,
-                }, neighbor_priority);
+                // const neighbor_chunk_generation = world.chunks.statuses.get(neighbor_chunk).generation;
+                // const neighbor_priority = neighbor_position.sub(observer_position).mag2();
+                try self.setTaskFlags(neighbor_chunk_model, &.{.leko_mesh_generate_border});
             }
         }
-        for(observer_chunk_events.get(.exit)) |chunk| {
+        for (observer_chunk_events.get(.exit)) |chunk| {
             model.deleteAndRemoveChunkModel(chunk);
         }
     }
@@ -247,25 +246,131 @@ pub const Manager = struct {
     fn generateThreadMain(self: *Manager) !void {
         const world_model = self.world_model;
         const world = world_model.world;
+        // self.job_queue_mutex.lock();
+        // self.job_queue_condition.wait(&self.job_queue_mutex);
+        // self.job_queue_mutex.unlock();
         while (self.is_running.get()) {
-            if (self.chunk_model_job_queue.pop()) |node| {
-                const job = node.item;
-                const chunk = job.chunk;
-                const chunk_model = job.chunk_model;
-                const chunk_model_status = world_model.chunk_models.statuses.getPtr(chunk_model);
-                const queue_flags = self.queue_flags.getPtr(chunk_model);
-                switch (job.event) {
-                    .enter => queue_flags.enter.set(false),
-                    .neighbor_enter => queue_flags.neighbor_enter.set(false),
-                }
-                if (!world.chunks.tryStartUsingChunk(chunk, job.chunk_generation)) {
-                    continue;
-                }
-                defer world.chunks.stopUsingChunk(chunk);
+            if (self.waitForNextAvailableJob()) |job| {
+                defer self.finishJob(job.chunk_model);
+                world.chunks.startUsingChunk(job.chunk);
+                defer world.chunks.stopUsingChunk(job.chunk);
                 try self.leko_mesh_system.processChunkModelJob(job);
-                chunk_model_status.state.store(.ready, .Monotonic);
-                world_model.dirty_event.set();
             }
+        }
+        // std.log.info("generate thread exit", .{});
+        // while (self.is_running.get()) {
+        //     if (self.job_queue.pop()) |node| {
+        //         const job = node.item;
+        //         const chunk = job.chunk;
+        //         const chunk_model = job.chunk_model;
+        //         const chunk_model_status = world_model.chunk_models.statuses.getPtr(chunk_model);
+        //         const queue_flags = self.queue_flags.getPtr(chunk_model);
+        //         switch (job.event) {
+        //             .enter => queue_flags.enter.set(false),
+        //             .neighbor_enter => queue_flags.neighbor_enter.set(false),
+        //         }
+        //         if (!world.chunks.tryStartUsingChunk(chunk, job.chunk_generation)) {
+        //             continue;
+        //         }
+        //         defer world.chunks.stopUsingChunk(chunk);
+        //         try self.leko_mesh_system.processChunkModelJob(job);
+        //         chunk_model_status.state.store(.ready, .Monotonic);
+        //         world_model.dirty_event.set();
+        //     }
+        // }
+    }
+
+    fn flushJobQueue(self: *Manager) void {
+        self.job_queue_mutex.lock();
+        defer self.job_queue_mutex.unlock();
+        self.job_queue.deinit(self.allocator);
+        self.job_queue_condition.broadcast();
+    }
+
+    fn setTaskFlags(self: *Manager, chunk_model: ChunkModel, comptime flag_set: []const ChunkModelTask) !void {
+        self.job_queue_mutex.lock();
+        defer self.job_queue_mutex.unlock();
+        const status = self.world_model.chunk_models.statuses.getPtr(chunk_model);
+        status.mutex.lock();
+        defer status.mutex.unlock();
+        const flags = comptime initChunkModelTaskFlagsFromSet(flag_set);
+        const old_flags = status.task_flags;
+        status.task_flags.setUnion(flags);
+        if (old_flags.count() == 0) {
+            try self.job_queue.append(self.allocator, .{
+                .chunk_model = chunk_model,
+                .generation = status.generation,
+            });
+            self.job_queue_condition.signal();
+        }
+    }
+
+    fn waitForNextAvailableJob(self: *Manager) ?ChunkModelJob {
+        // const queue_items = &self.job_queue.items;
+        // while (true) {
+            // self.job_queue_mutex.lock();
+            // defer self.job_queue_mutex.unlock();
+        //     self.job_queue_condition.wait(&self.job_queue_mutex);
+        //     if (queue_items.*.len == 0) {
+        //         return null;
+        //     }
+        //     if (self.getNextAvailableJob()) |job| {
+        //         return job;
+        //     }
+        // }
+        //     // self.job_queue_condition.wait(&self.job_queue_mutex);
+        self.job_queue_mutex.lock();
+        defer self.job_queue_mutex.unlock();
+        // self.job_queue_condition.wait(&self.job_queue_mutex);
+        while (self.job_queue.items.len > 0) {
+            if (self.getNextAvailableJob()) |job| {
+                return job;
+            }
+            self.job_queue_condition.wait(&self.job_queue_mutex);
+        }
+        return null;
+    }
+
+    fn getNextAvailableJob(self: *Manager) ?ChunkModelJob {
+        var i: usize = 0;
+        while (i < self.job_queue.items.len) {
+            const item = self.job_queue.items[i];
+            const chunk_model = item.chunk_model;
+            const status = self.world_model.chunk_models.statuses.getPtr(chunk_model);
+            status.mutex.lock();
+            defer status.mutex.unlock();
+            if (status.generation != item.generation) {
+                _ = self.job_queue.swapRemove(i);
+                continue;
+            }
+            if (status.is_busy) {
+                i += 1;
+                continue;
+            }
+            const flags = status.task_flags;
+            status.task_flags = ChunkModelTaskFlags.initEmpty();
+            status.is_busy = true;
+            _ = self.job_queue.swapRemove(i);
+            return ChunkModelJob{
+                .chunk = status.chunk,
+                .chunk_model = chunk_model,
+                .task_flags = flags,
+            };
+        }
+        return null;
+    }
+
+    fn finishJob(self: *Manager, chunk_model: ChunkModel) void {
+        self.job_queue_mutex.lock();
+        defer self.job_queue_mutex.unlock();
+        defer self.world_model.dirty_event.set();
+        const status = self.world_model.chunk_models.statuses.getPtr(chunk_model);
+        status.mutex.lock();
+        defer status.mutex.unlock();
+        status.is_busy = false;
+        status.state = .ready;
+        if (status.task_flags.count() != 0) {
+            self.job_queue_condition.signal();
         }
     }
 };

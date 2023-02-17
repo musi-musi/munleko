@@ -203,16 +203,19 @@ pub const LekoMeshSystem = struct {
         const mesh_data = self.world_model.chunk_leko_meshes.mesh_data.getPtr(chunk_model);
         mesh_data.mutex.lock();
         defer mesh_data.mutex.unlock();
-        switch (job.event) {
-            .enter => {
-                try self.generateMiddleFaces(self.world_model.world, chunk, mesh_data);
-                try self.generateBorderFaces(self.world_model.world, chunk, mesh_data);
-            },
-            .neighbor_enter => {
-                try self.generateBorderFaces(self.world_model.world, chunk, mesh_data);
-            }
+        const task_flags = job.task_flags;
+        var mesh_is_dirty = false;
+        if (task_flags.contains(.leko_mesh_generate_middle)) {
+            try self.generateMiddleFaces(self.world_model.world, chunk, mesh_data);
+            mesh_is_dirty = true;
         }
-        mesh_data.is_dirty.set(true);
+        if (task_flags.contains(.leko_mesh_generate_border)) {
+            try self.generateBorderFaces(self.world_model.world, chunk, mesh_data);
+            mesh_is_dirty = true;
+        }
+        if (mesh_is_dirty) {
+            mesh_data.is_dirty.set(true);
+        }
     }
 
     fn generateMiddleFaces(self: *LekoMeshSystem, world: *World, chunk: Chunk, mesh_data: *LekoMeshData) !void {

@@ -127,7 +127,9 @@ fn updateDrawList(self: *WorldRenderer) !void {
     while (iter.next()) |kv| {
         const chunk_model = kv.value_ptr.*;
         const status = self.world_model.chunk_models.statuses.getPtr(chunk_model);
-        if (status.state.load(.Monotonic) != .ready) {
+        status.mutex.lock();
+        defer status.mutex.unlock();
+        if (status.state != .ready) {
             continue;
         }
         const chunk = status.chunk;
