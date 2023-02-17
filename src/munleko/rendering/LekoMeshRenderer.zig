@@ -87,13 +87,19 @@ pub fn updateAndDrawLekoMeshes(self: *LekoMeshRenderer, draw_chunks: []const Wor
     self.leko_face_shader.setUniform(.fog_start, self.scene.fog_start);
     self.leko_face_shader.setUniform(.fog_end, self.scene.fog_end);
     self.leko_face_shader.setUniform(.fog_power, self.scene.fog_power);
+    var update_count: usize = 0;
     for (draw_chunks) |draw_chunk| {
-        const buffer = self.world_model.chunk_leko_meshes.getUpdatedFaceBuffer(draw_chunk.chunk_model);
+        var was_updated: bool = false;
+        const buffer = self.world_model.chunk_leko_meshes.getUpdatedFaceBuffer(draw_chunk.chunk_model, &was_updated);
+        if (was_updated) {
+            update_count += 1;
+        }
         const face_count = self.world_model.chunk_leko_meshes.mesh_data.get(draw_chunk.chunk_model).face_count;
         self.leko_mesh.setBuffer(0, buffer);
         self.leko_face_shader.setUniform(.chunk_origin, draw_chunk.position.mulScalar(chunk_width).cast(f32).v);
         self.leko_mesh.drawInstancedAssumeBound(4, face_count);
     }
+    // std.log.info("updated {d} leko meshes", .{update_count});
 }
 
 pub const LekoMesh = ls.Mesh(.{

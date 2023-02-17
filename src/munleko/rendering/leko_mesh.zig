@@ -148,7 +148,7 @@ pub const ChunkLekoMeshes = struct {
         try self.face_buffers.matchCapacity(world_model.chunk_models.pool);
     }
 
-    pub fn getUpdatedFaceBuffer(self: *ChunkLekoMeshes, chunk_model: ChunkModel) LekoFaceBuffer {
+    pub fn getUpdatedFaceBuffer(self: *ChunkLekoMeshes, chunk_model: ChunkModel, was_updated: *bool) LekoFaceBuffer {
         const buffer = self.getFaceBuffer(chunk_model);
         const data = self.mesh_data.getPtr(chunk_model);
         if (!data.mutex.tryLock()) {
@@ -159,6 +159,7 @@ pub const ChunkLekoMeshes = struct {
             return buffer;
         }
         data.is_dirty.set(false);
+        was_updated.* = true;
         const middle_faces = data.middle_faces.items;
         const border_faces = data.border_faces.items;
         data.face_count = middle_faces.len + border_faces.len;
