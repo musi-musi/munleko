@@ -248,8 +248,12 @@ pub const Manager = struct {
     fn generateThreadMain(self: *Manager) !void {
         const world_model = self.world_model;
         const world = world_model.world;
+        self.job_queue_mutex.lock();
+        defer self.job_queue_mutex.unlock();
         while (self.waitForNextAvailableJob()) |job| {
             defer self.finishJob(job.chunk_model);
+            self.job_queue_mutex.unlock();
+            defer self.job_queue_mutex.lock();
             world.chunks.startUsingChunk(job.chunk);
             defer world.chunks.stopUsingChunk(job.chunk);
             try self.leko_mesh_system.processChunkModelJob(job);
@@ -282,8 +286,8 @@ pub const Manager = struct {
     }
 
     fn waitForNextAvailableJob(self: *Manager) ?ChunkModelJob {
-        self.job_queue_mutex.lock();
-        defer self.job_queue_mutex.unlock();
+        // self.job_queue_mutex.lock();
+        // defer self.job_queue_mutex.unlock();
         while (self.is_running.get()) {
             if (self.getNextAvailableJob()) |job| {
                 return job;
@@ -323,8 +327,8 @@ pub const Manager = struct {
     }
 
     fn finishJob(self: *Manager, chunk_model: ChunkModel) void {
-        self.job_queue_mutex.lock();
-        defer self.job_queue_mutex.unlock();
+        // self.job_queue_mutex.lock();
+        // defer self.job_queue_mutex.unlock();
         defer self.world_model.dirty_event.set();
         const status = self.world_model.chunk_models.statuses.getPtr(chunk_model);
         status.mutex.lock();
