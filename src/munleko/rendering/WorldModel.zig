@@ -194,6 +194,7 @@ pub const Manager = struct {
         defer allocator.destroy(self);
         self.stop();
         self.leko_mesh_system.destroy();
+        self.job_queue.deinit(self.allocator);
     }
 
     pub fn start(self: *Manager, observer: Observer) !void {
@@ -208,6 +209,7 @@ pub const Manager = struct {
     pub fn stop(self: *Manager) void {
         if (self.is_running.get()) {
             self.is_running.set(false);
+            // self.job_queue_condition.broadcast();
             self.flushJobQueue();
             self.generate_group.join();
         }
@@ -246,44 +248,18 @@ pub const Manager = struct {
     fn generateThreadMain(self: *Manager) !void {
         const world_model = self.world_model;
         const world = world_model.world;
-        // self.job_queue_mutex.lock();
-        // self.job_queue_condition.wait(&self.job_queue_mutex);
-        // self.job_queue_mutex.unlock();
-        while (self.is_running.get()) {
-            if (self.waitForNextAvailableJob()) |job| {
-                defer self.finishJob(job.chunk_model);
-                world.chunks.startUsingChunk(job.chunk);
-                defer world.chunks.stopUsingChunk(job.chunk);
-                try self.leko_mesh_system.processChunkModelJob(job);
-            }
+        while (self.waitForNextAvailableJob()) |job| {
+            defer self.finishJob(job.chunk_model);
+            world.chunks.startUsingChunk(job.chunk);
+            defer world.chunks.stopUsingChunk(job.chunk);
+            try self.leko_mesh_system.processChunkModelJob(job);
         }
-        // std.log.info("generate thread exit", .{});
-        // while (self.is_running.get()) {
-        //     if (self.job_queue.pop()) |node| {
-        //         const job = node.item;
-        //         const chunk = job.chunk;
-        //         const chunk_model = job.chunk_model;
-        //         const chunk_model_status = world_model.chunk_models.statuses.getPtr(chunk_model);
-        //         const queue_flags = self.queue_flags.getPtr(chunk_model);
-        //         switch (job.event) {
-        //             .enter => queue_flags.enter.set(false),
-        //             .neighbor_enter => queue_flags.neighbor_enter.set(false),
-        //         }
-        //         if (!world.chunks.tryStartUsingChunk(chunk, job.chunk_generation)) {
-        //             continue;
-        //         }
-        //         defer world.chunks.stopUsingChunk(chunk);
-        //         try self.leko_mesh_system.processChunkModelJob(job);
-        //         chunk_model_status.state.store(.ready, .Monotonic);
-        //         world_model.dirty_event.set();
-        //     }
-        // }
     }
 
     fn flushJobQueue(self: *Manager) void {
         self.job_queue_mutex.lock();
         defer self.job_queue_mutex.unlock();
-        self.job_queue.deinit(self.allocator);
+        self.job_queue.clearRetainingCapacity();
         self.job_queue_condition.broadcast();
     }
 
@@ -306,23 +282,9 @@ pub const Manager = struct {
     }
 
     fn waitForNextAvailableJob(self: *Manager) ?ChunkModelJob {
-        // const queue_items = &self.job_queue.items;
-        // while (true) {
-            // self.job_queue_mutex.lock();
-            // defer self.job_queue_mutex.unlock();
-        //     self.job_queue_condition.wait(&self.job_queue_mutex);
-        //     if (queue_items.*.len == 0) {
-        //         return null;
-        //     }
-        //     if (self.getNextAvailableJob()) |job| {
-        //         return job;
-        //     }
-        // }
-        //     // self.job_queue_condition.wait(&self.job_queue_mutex);
         self.job_queue_mutex.lock();
         defer self.job_queue_mutex.unlock();
-        // self.job_queue_condition.wait(&self.job_queue_mutex);
-        while (self.job_queue.items.len > 0) {
+        while (self.is_running.get()) {
             if (self.getNextAvailableJob()) |job| {
                 return job;
             }
