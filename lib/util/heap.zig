@@ -89,23 +89,23 @@ pub fn HeapUnmanaged(comptime T: type, comptime before: fn(T, T) bool) type {
         }
 
         pub fn pop(self: *Self) ?T {
+            return self.popAtIndex(0);
+        }
+
+        pub fn popAtIndex(self: *Self, i: usize) ?T {
             const len = self.items.items.len;
-            if (len > 0) {
-                const node = self.items.items[0];
-                if (len == 1) {
-                    self.items.items.len = 0;
-                    return node;
-                }
-                else {
-                    self.swap(0, len - 1);
-                    self.items.items.len -= 1;
-                    self.down(0);
-                    return node;
-                }
-            }
-            else {
+            if (i >= len) {
                 return null;
             }
+            const node = self.items.items[i];
+            if (i == len - 1) {
+                self.items.items.len -= 1;
+                return node;
+            }
+            self.swap(i, len - 1);
+            self.items.items.len -= 1;
+            self.down(i);
+            return node;
         }
     };
 }
