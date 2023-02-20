@@ -429,6 +429,16 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             try w.writeAll(")");
         }
 
+        pub fn project(self: Self, target: Self) Self {
+            comptime nm.assertFloat(Scalar);
+            return target.mul(self.dot(target) / target.dot(target));
+        }
+
+        pub fn scalarProject(self: Self, target: Self) Scalar {
+            comptime nm.assertFloat(Scalar);
+            return self.dot(target) / target.mag();
+        }
+
 
     };
 }

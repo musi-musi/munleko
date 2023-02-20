@@ -23,6 +23,8 @@ const Window = window.Window;
 
 pub const rendering = @import("rendering.zig");
 const SessionRenderer = rendering.SessionRenderer;
+const Scene = rendering.Scene;
+const Camera = Scene.Camera;
 
 pub const main_decls = struct {
     pub const std_options = struct {
@@ -82,15 +84,19 @@ pub fn run(self: *Client) !void {
     var session = try self.engine.createSession();
     defer session.destroy();
 
-    const session_renderer = try SessionRenderer.create(allocator, session);
+    var camera = Camera{};
+    const session_renderer = try SessionRenderer.create(allocator, session, &camera);
     defer session_renderer.destroy();
 
-    var cam = FlyCam.init(self.window);
-    cam.move_speed = 32;
+    var fly_cam = FlyCam.init(self.window);
+    fly_cam.move_speed = 32;
 
-    const cam_obs = try session.world.observers.create(cam.position.cast(i32));
+
+    const cam_obs = try session.world.observers.create(fly_cam.position.cast(i32));
     defer session.world.observers.delete(cam_obs);
     self.observer = cam_obs;
+
+
 
     try session_renderer.start(cam_obs);
     defer session_renderer.stop();
@@ -130,18 +136,26 @@ pub fn run(self: *Client) !void {
             });
         }
 
-        cam.update(self.window);
-        session.world.observers.setPosition(cam_obs, cam.position.cast(i32));
+        fly_cam.update(self.window);
+        session.world.observers.setPosition(cam_obs, fly_cam.position.cast(i32));
 
-        session_renderer.scene.camera_view = cam.viewMatrix();
-        session_renderer.scene.camera_projection = (
-            nm.transform.createPerspective(
-                90.0 * std.math.pi / 180.0,
-                @intToFloat(f32, self.window.size[0]) / @intToFloat(f32, self.window.size[1]),
-                0.001,
-                1000,
-            )
-        );
+        camera.setViewMatrix(fly_cam.viewMatrix());
+        camera.setProjectionPerspective(.{
+            .fov = 90,
+            .aspect_ratio = @intToFloat(f32, self.window.size[0]) / @intToFloat(f32, self.window.size[1]),
+            .near_plane = 0.001,
+            .far_plane = 1000,
+        });
+
+        // session_renderer.scene.camera_view = fly_cam.viewMatrix();
+        // session_renderer.scene.camera_projection = (
+        //     nm.transform.createPerspective(
+        //         90.0 * std.math.pi / 180.0,
+        //         @intToFloat(f32, self.window.size[0]) / @intToFloat(f32, self.window.size[1]),
+        //         0.001,
+        //         1000,
+        //     )
+        // );
 
         gl.clearColor(session_renderer.scene.fog_color.addDimension(1).v);
         gl.clear(.color_depth);

@@ -73,8 +73,8 @@ fn transformGeneric(comptime Scalar: type) type {
         }
 
         pub fn createLook(eye: Vec3, direction: Vec3, up: Vec3) Mat4 {
-            const f = direction.norm();
-            const s = up.cross(f).norm();
+            const f = direction.norm() orelse Vec3.zero;
+            const s = up.cross(f).norm() orelse Vec3.zero;
             const u = f.cross(s);
             var result = Mat4.identity;
             result.v[0][0] = s.get(.x);

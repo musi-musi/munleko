@@ -38,6 +38,7 @@ pub const DrawChunk = struct {
     chunk_model: ChunkModel,
     // load_state: World.ChunkLoadState,
     position: Vec3i,
+    bounds_center: Vec3,
 };
 
 allocator: Allocator,
@@ -134,10 +135,12 @@ fn updateDrawList(self: *WorldRenderer) !void {
         }
         const chunk = status.chunk;
         const position = self.world.graph.positions.get(status.chunk);
+        const bounds_center = position.cast(f32).addScalar(0.5).mulScalar(World.chunk_width);
         const draw_chunk = DrawChunk{
             .chunk = chunk,
             .chunk_model = chunk_model,
             .position = position,
+            .bounds_center = bounds_center,
         };
         try self.back_draw_list.append(self.allocator, draw_chunk);
     }

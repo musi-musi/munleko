@@ -64,7 +64,6 @@ pub fn create(allocator: Allocator, scene: *Scene, world_model: *WorldModel) !*L
         .leko_face_shader = try LekoFaceShader.create(.{}, @embedFile("leko_face.glsl")),
     };
     self.leko_face_index_buffer.data(&.{ 0, 2, 3, 1 }, .static_draw);
-    // self.leko_face_index_buffer.data(&.{0, 1, 3, 0, 3, 2}, .static_draw);
     self.leko_mesh.setIndexBuffer(self.leko_face_index_buffer);
     return self;
 }
@@ -81,14 +80,18 @@ pub fn updateAndDrawLekoMeshes(self: *LekoMeshRenderer, draw_chunks: []const Wor
     self.leko_mesh.bind();
     self.leko_face_shader.use();
     self.leko_face_shader.setUniform(.light, self.scene.directional_light.v);
-    self.leko_face_shader.setUniform(.view, self.scene.camera_view.v);
-    self.leko_face_shader.setUniform(.proj, self.scene.camera_projection.v);
+    self.leko_face_shader.setUniform(.view, self.scene.camera.view_matrix.v);
+    self.leko_face_shader.setUniform(.proj, self.scene.camera.projection_matrix.v);
     self.leko_face_shader.setUniform(.fog_color, self.scene.fog_color.v);
     self.leko_face_shader.setUniform(.fog_start, self.scene.fog_start);
     self.leko_face_shader.setUniform(.fog_end, self.scene.fog_end);
     self.leko_face_shader.setUniform(.fog_power, self.scene.fog_power);
     var update_count: usize = 0;
     for (draw_chunks) |draw_chunk| {
+        
+        if (!self.scene.camera.sphereInInFrustum(draw_chunk.bounds_center, WorldModel.chunk_model_bounds_radius)) {
+            continue;
+        }
         var was_updated: bool = false;
         const buffer = self.world_model.chunk_leko_meshes.getUpdatedFaceBuffer(draw_chunk.chunk_model, &was_updated);
         if (was_updated) {

@@ -12,6 +12,8 @@ const WorldRenderer = @import("WorldRenderer.zig");
 const Client = @import("../Client.zig");
 const Engine = @import("../Engine.zig");
 
+const Camera = Scene.Camera;
+
 const Session = Engine.Session;
 const World = Engine.World;
 const Observer = World.Observer;
@@ -25,7 +27,7 @@ scene: Scene,
 session: *Session,
 world_renderer: *WorldRenderer,
 
-pub fn create(allocator: Allocator, session: *Session) !*SessionRenderer {
+pub fn create(allocator: Allocator, session: *Session, camera: *Camera) !*SessionRenderer {
     const self = try allocator.create(SessionRenderer);
     self.* = SessionRenderer{
         .allocator = allocator,
@@ -33,7 +35,7 @@ pub fn create(allocator: Allocator, session: *Session) !*SessionRenderer {
         .session = session,
         .world_renderer = undefined,
     };
-    try self.scene.init();
+    try self.scene.init(camera);
     self.world_renderer = try WorldRenderer.create(allocator, &self.scene, session.world);
     return self;
 }

@@ -7,3 +7,4 @@ pub usingnamespace @import("noise.zig");
 pub usingnamespace @import("scalar.zig");
 pub usingnamespace @import("transform.zig");
 pub usingnamespace @import("vector.zig");
+pub usingnamespace @import("plane.zig");

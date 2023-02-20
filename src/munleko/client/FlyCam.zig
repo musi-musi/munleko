@@ -50,7 +50,7 @@ pub fn update(self: *Self, window: Window) void {
         if (window.buttonHeld(.w)) move.v[2] += 1;
         if (window.buttonHeld(.s)) move.v[2] -= 1;
         move = (move.norm() orelse Vec3.zero).mulScalar(self.move_speed * dt);
-        move = self.lookMatrix().transformDirection(move);
+        move = self.lookMatrix().transpose().transformDirection(move);
         self.position = self.position.add(move);
     }
     self.prev_cursor = mouse_pos;

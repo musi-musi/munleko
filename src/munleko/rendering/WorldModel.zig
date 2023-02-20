@@ -24,6 +24,10 @@ const Observer = World.Observer;
 const Allocator = std.mem.Allocator;
 const WorldModel = @This();
 
+const Vec3 = nm.Vec3;
+
+pub const chunk_model_bounds_radius = std.math.sqrt(3) * World.chunk_width;
+
 allocator: Allocator,
 world: *World,
 chunk_models: ChunkModels = undefined,
@@ -307,7 +311,6 @@ pub const Manager = struct {
     fn getNextAvailableJob(self: *Manager) ?ChunkModelJob {
         var i: usize = 0;
         while (i < self.job_queue.items.items.len) {
-            // std.log.info("loop {d}", .{i});
             const item = self.job_queue.items.items[i];
             const chunk_model = item.chunk_model;
             const status = self.world_model.chunk_models.statuses.getPtr(chunk_model);

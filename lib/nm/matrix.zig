@@ -1,8 +1,6 @@
 const std = @import("std");
 const nm = @import("lib.zig");
 
-
-
 pub fn Matrix(comptime Scalar_: type, comptime rows_: comptime_int, comptime cols_: comptime_int) type {
     comptime nm.assertFloat(Scalar_);
     comptime nm.assertValidDimensionCount(rows_);
@@ -18,11 +16,21 @@ pub fn Matrix(comptime Scalar_: type, comptime rows_: comptime_int, comptime col
         pub const rows = rows_;
         pub const cols = cols_;
 
-        pub const row_indices = ([_]usize{ 0, 1, 2, 3, })[0..rows];
-        pub const col_indices = ([_]usize{ 0, 1, 2, 3, })[0..cols];
+        pub const row_indices = ([_]usize{
+            0,
+            1,
+            2,
+            3,
+        })[0..rows];
+        pub const col_indices = ([_]usize{
+            0,
+            1,
+            2,
+            3,
+        })[0..cols];
 
         const Self = @This();
-        
+
         pub const zero = fill(0);
         pub const identity = blk: {
             var id = zero;
@@ -33,13 +41,13 @@ pub fn Matrix(comptime Scalar_: type, comptime rows_: comptime_int, comptime col
         };
 
         pub fn init(value: Value) Self {
-            return Self { .v = value };
+            return Self{ .v = value };
         }
 
         pub fn fill(v: Scalar) Self {
             var self: Self = undefined;
-            inline for(row_indices) |r| {
-                inline for(col_indices) |c| {
+            inline for (row_indices) |r| {
+                inline for (col_indices) |c| {
                     self.v[r][c] = v;
                 }
             }
@@ -48,9 +56,9 @@ pub fn Matrix(comptime Scalar_: type, comptime rows_: comptime_int, comptime col
 
         pub fn transform(self: Self, vec: Vector) Vector {
             var res = Vector.zero;
-            inline for(col_indices) |c| {
-                inline for(row_indices) |r| {
-                    res.v[r] += vec.v[c] * self.v[r][c];
+            inline for (col_indices) |c| {
+                inline for (row_indices) |r| {
+                    res.v[c] += vec.v[r] * self.v[r][c];
                 }
             }
             return res;
@@ -62,7 +70,7 @@ pub fn Matrix(comptime Scalar_: type, comptime rows_: comptime_int, comptime col
         pub fn transformDirection(self: Self, vec: ShortVector) ShortVector {
             return self.transform(vec.addDimension(0)).removeDimension();
         }
-        
+
         pub fn transformPosition(self: Self, vec: ShortVector) ShortVector {
             return self.transform(vec.addDimension(1)).removeDimension();
         }
@@ -155,7 +163,19 @@ pub fn Matrix(comptime Scalar_: type, comptime rows_: comptime_int, comptime col
             return init(@bitCast([4][4]Scalar, result));
         }
 
-
+        pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, w: anytype) !void {
+            try w.writeAll("\n");
+            inline for (row_indices) |r| {
+                try w.writeAll("[");
+                inline for (col_indices) |c| {
+                    if (c != 0) {
+                        try w.writeAll(", ");
+                    }
+                    try std.fmt.formatType(self.v[r][c], fmt, options, w, 1);
+                }
+                try w.writeAll("]\n");
+            }
+        }
     };
 }
 
