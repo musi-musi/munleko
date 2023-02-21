@@ -71,6 +71,9 @@ pub fn deinit(self: *Client) void {
 
 pub fn run(self: *Client) !void {
     const allocator = self.allocator;
+
+    try self.engine.load();
+    
     try self.window.create(.{});
     defer self.window.destroy();
     self.window.makeContextCurrent();

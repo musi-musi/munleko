@@ -35,14 +35,19 @@ pub fn create(allocator: Allocator, arguments: Arguments) !*Engine {
         defer allocator.free(exe_dir_path);
         self.data_root_path = try std.fs.path.resolve(allocator, &.{exe_dir_path, "data" });
     }
+    errdefer allocator.free(self.data_root_path);
     std.log.info("path: {s}", .{self.data_root_path});
+    try self.initLua();
     return self;
 }
 
 
-// pub fn load(self: *Engine) !void {
-    // const lua_main_path = try std.path
-// }
+pub fn load(self: *Engine) !void {
+    const l = &self.lua;
+    const lua_main_path = try std.fs.path.joinZ(self.allocator, &.{self.data_root_path, "main.lua"});
+    defer self.allocator.free(lua_main_path);
+    try l.doFile(lua_main_path);
+}
 
 fn initLua(self: *Engine) !void {
     const l = &self.lua;
@@ -55,9 +60,13 @@ fn initLua(self: *Engine) !void {
         .math = true,
     });
     try l.getGlobal("package");
+    const require_path = try std.fs.path.joinZ(self.allocator, &.{self.data_root_path, "?.lua"});
+    defer self.allocator.free(require_path);
+    std.log.info("require path: {s}", .{require_path});
 
-    // l.pushBytes(self.data_root_path);
-    // l.setField(-2, "")
+    l.pushString(require_path);
+    l.setField(-2, "path");
+    l.pop(2);
 }
 
 pub fn destroy(self: *Engine) void {
