@@ -53,6 +53,7 @@ pub fn build(b: *std.build.Builder) !void {
 
     const install_client = &b.addInstallArtifact(client).step;
     const run_cmd = client.run();
+    run_cmd.addArg("-datapath=./data");
 
     sequence(&[_]*Step{
         install_client,
@@ -94,7 +95,14 @@ fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build
 
 
     const exe = b.addExecutable("munleko", "src/" ++ frontend_id ++ "_main.zig");
-    exe.addPackage(ziglua.linkAndPackage(b, exe, .{}));
+    const lua = ziglua.linkAndPackage(b, exe, .{});
+    exe.addPackage(lua);
+    const mun = Pkg {
+        .name = "mun",
+        .source = .{ .path = "lib/mun/lib.zig"},
+        .dependencies = &.{lua},
+    };
+    exe.addPackage(mun);
 
 
     inline for (comptime std.meta.declarations(pkgs)) |decl| {

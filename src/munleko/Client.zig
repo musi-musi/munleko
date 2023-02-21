@@ -52,20 +52,21 @@ const FlyCam = @import("client/FlyCam.zig");
 
 allocator: Allocator,
 window: Window,
-engine: Engine,
+engine: *Engine,
 observer: World.Observer = undefined,
 
 pub fn init(self: *Client, allocator: Allocator) !void {
+    const args = try Engine.Arguments.initFromCommandLineArgs();
     self.* = .{
         .allocator = allocator,
         .window = Window.init(allocator),
-        .engine = try Engine.init(allocator),
+        .engine = try Engine.create(allocator, args),
     };
 }
 
 pub fn deinit(self: *Client) void {
     self.window.deinit();
-    self.engine.deinit();
+    self.engine.destroy();
 }
 
 pub fn run(self: *Client) !void {
