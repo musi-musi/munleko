@@ -12,13 +12,13 @@ pub fn toVector(lua: *Lua, comptime Scalar: type, comptime dimensions: comptime_
     var vector: [dimensions]Scalar = undefined;
     for (vector) |*v, i| {
         _ = lua.getIndex(index, @intCast(Integer, i + 1));
+        defer lua.pop(1);
         if (is_float) {
             v.* = @floatCast(Scalar, try lua.toNumber(-1));
         }
         else {
             v.* = @intCast(Scalar, try lua.toInteger(-1));
         }
-        lua.pop(1);
     }
     return vector;
 }

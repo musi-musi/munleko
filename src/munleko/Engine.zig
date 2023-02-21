@@ -1,8 +1,10 @@
 const std = @import("std");
 const ziglua = @import("ziglua");
 const mun = @import("mun");
+const nm = @import("nm");
 
 pub const Session = @import("engine/Session.zig");
+pub const AssetDatabase = @import("engine/AssetDatabase.zig");
 pub const World = @import("engine/World.zig");
 pub const leko = @import("engine/leko.zig");
 
@@ -13,7 +15,9 @@ const Lua = ziglua.Lua;
 allocator: Allocator,
 arguments: Arguments,
 data_root_path: []const u8,
+
 lua: Lua,
+asset_database: *AssetDatabase,
 
 const Engine = @This();
 
@@ -25,6 +29,7 @@ pub fn create(allocator: Allocator, arguments: Arguments) !*Engine {
         .arguments = arguments,
         .data_root_path = undefined,
         .lua = try Lua.init(allocator),
+        .asset_database = try AssetDatabase.create(allocator),
     };
     errdefer self.lua.deinit();
     if (arguments.data_root_path) |data_root_path| {
@@ -36,17 +41,24 @@ pub fn create(allocator: Allocator, arguments: Arguments) !*Engine {
         self.data_root_path = try std.fs.path.resolve(allocator, &.{exe_dir_path, "data" });
     }
     errdefer allocator.free(self.data_root_path);
-    std.log.info("path: {s}", .{self.data_root_path});
     try self.initLua();
     return self;
 }
 
+pub fn destroy(self: *Engine) void {
+    const allocator = self.allocator;
+    defer allocator.destroy(self);
+    allocator.free(self.data_root_path);
+    self.lua.deinit();
+    self.asset_database.destroy();
+}
 
 pub fn load(self: *Engine) !void {
     const l = &self.lua;
     const lua_main_path = try std.fs.path.joinZ(self.allocator, &.{self.data_root_path, "main.lua"});
     defer self.allocator.free(lua_main_path);
     try l.doFile(lua_main_path);
+    try self.asset_database.load(l);
 }
 
 fn initLua(self: *Engine) !void {
@@ -62,19 +74,13 @@ fn initLua(self: *Engine) !void {
     try l.getGlobal("package");
     const require_path = try std.fs.path.joinZ(self.allocator, &.{self.data_root_path, "?.lua"});
     defer self.allocator.free(require_path);
-    std.log.info("require path: {s}", .{require_path});
 
     l.pushString(require_path);
     l.setField(-2, "path");
     l.pop(2);
 }
 
-pub fn destroy(self: *Engine) void {
-    const allocator = self.allocator;
-    defer allocator.destroy(self);
-    allocator.free(self.data_root_path);
-    self.lua.deinit();
-}
+
 
 pub fn createSession(self: *Engine) !*Session {
     return Session.create(self.allocator);
