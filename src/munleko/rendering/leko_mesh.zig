@@ -35,6 +35,7 @@ const List = std.ArrayListUnmanaged;
 const leko = Engine.leko;
 const Address = leko.Address;
 const Reference = leko.Reference;
+const LekoValue = leko.LekoValue;
 
 const Vec3 = nm.Vec3;
 const vec3 = nm.vec3;
@@ -59,6 +60,7 @@ const Axis3 = nm.Axis3;
 ///  - a    ao strength per vertex, packed 0b33221100
 pub const LekoFace = struct {
     base: u32,
+    color: [3]f32,
 };
 
 
@@ -275,35 +277,38 @@ pub const LekoMeshSystem = struct {
 
     fn appendLekoFaces(self: *LekoMeshSystem, list: *std.ArrayList(LekoFace), world: *World, chunk: Chunk, comptime traverse_edges: bool, x: u32, y: u32, z: u32) !void {
         const reference = Reference.init(chunk, Address.init(u32, .{ x, y, z }));
+        const material = self.getMaterial(reference) orelse return;
+        if (material == .invisible) {
+            return;
+        }
         inline for (comptime std.enums.values(Cardinal3)) |normal| {
-            if (self.getLekoFace(world, traverse_edges, reference, normal)) |leko_face| {
-                try list.append(leko_face);
+            if (self.getLekoFaceBase(world, traverse_edges, reference, normal)) |base| {
+                try list.append(.{
+                    .base = base,
+                    .color = material.color.v,
+                });
             }
         }
     }
 
-    inline fn getLekoFace(self: *LekoMeshSystem, world: *World, comptime traverse_edges: bool, reference: Reference, normal: Cardinal3) ?LekoFace {
-        _ = self;
-        const leko_data = &world.leko_data;
-        const leko_value = leko_data.lekoValueAt(reference);
-        if (!leko_data.isSolid(leko_value)) {
-            return null;
-        }
+    inline fn getLekoFaceBase(self: *LekoMeshSystem, world: *World, comptime traverse_edges: bool, reference: Reference, normal: Cardinal3) ?u32 {
         const neighbor_reference = (if (traverse_edges) reference.incr(world, normal) orelse return null else reference.incrUnchecked(normal));
-        const neighbor_leko_value = leko_data.lekoValueAt(neighbor_reference);
-        if (leko_data.isSolid(neighbor_leko_value)) {
-            return null;
-        }
-        return encodeLekoFace(reference.address, normal, 0);
+        const neighbor_material = self.getMaterial(neighbor_reference) orelse return null;
+        if (neighbor_material != .invisible) return null;
+        const base = encodeLekoFaceBase(reference.address, normal, 0);
+        return base;
     }
 
-    fn encodeLekoFace(address: leko.Address, normal: Cardinal3, ao: u8) LekoFace {
-        var face: u32 = address.v;
-        face = (face << 3) | @as(u32, @enumToInt(normal));
-        face = (face << 8) | ao;
-        return LekoFace{
-            .base = face,
-        };
+    fn encodeLekoFaceBase(address: leko.Address, normal: Cardinal3, ao: u8) u32 {
+        var base: u32 = address.v;
+        base = (base << 3) | @as(u32, @enumToInt(normal));
+        base = (base << 8) | ao;
+        return base;
+    }
+
+    fn getMaterial(self: LekoMeshSystem, reference: Reference) ?FaceMaterial {
+        const leko_value = self.world_model.world.leko_data.lekoValueAt(reference);
+        return self.world_model.chunk_leko_meshes.face_material_table.getForLekoValue(leko_value);
     }
 };
 
@@ -336,10 +341,18 @@ pub const FaceMaterialTable = struct {
             const asset = asset_table.getByName(name) orelse unreachable;
             const material = (
                 if (asset.is_visible) FaceMaterial { .color = asset.color}
-                else FaceMaterial.invisible
+                else FaceMaterial{ .invisible = {} }
             );
             try self.list.append(self.allocator, material);
         }
+    }
+
+    pub fn getForLekoValue(self: *FaceMaterialTable, value: LekoValue) ?FaceMaterial {
+        const index = @enumToInt(value);
+        if (index >= self.list.items.len) {
+            return null;
+        }
+        return self.list.items[index];
     }
 
 };

@@ -131,7 +131,7 @@ fn loadLekoLuaAsset(l: *Lua, name: []const u8) !?LekoAsset {
     }
     l.pop(1);
     if (l.getField(-1, "is_visible") != .nil) {
-        asset.is_solid = l.toBoolean(-1);
+        asset.is_visible = l.toBoolean(-1);
     }
     l.pop(1);
     if (l.getField(-1, "color") == .nil) {

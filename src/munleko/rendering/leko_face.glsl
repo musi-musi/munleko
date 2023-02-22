@@ -1,5 +1,6 @@
 vf float light;
 vf float fog_strength;
+vf vec3 face_color;
 
 #ifdef STAGE_VERTEX
 void main() {
@@ -20,12 +21,13 @@ void main() {
     dist = (dist - u_fog_start) / (u_fog_end - u_fog_start);
     dist = clamp(dist, 0, 1);
     fog_strength = pow(dist, u_fog_power);
+    face_color = v_color;
 }
 #endif
 
 #ifdef STAGE_FRAGMENT
 void main() {
-    vec3 color = mix(vec3(light), u_fog_color, fog_strength);
+    vec3 color = mix(face_color * light, u_fog_color, fog_strength);
     f_color.xyz = color;
     f_color.w = 1;
 }

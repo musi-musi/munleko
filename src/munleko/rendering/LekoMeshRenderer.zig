@@ -63,7 +63,7 @@ pub fn create(allocator: Allocator, scene: *Scene, world_model: *WorldModel) !*L
         .leko_face_index_buffer = LekoMesh.IndexBuffer.create(),
         .leko_face_shader = try LekoFaceShader.create(.{}, @embedFile("leko_face.glsl")),
     };
-    self.leko_face_index_buffer.data(&.{ 0, 2, 3, 1 }, .static_draw);
+    self.leko_face_index_buffer.data(&.{ 0, 1, 3, 2 }, .static_draw);
     self.leko_mesh.setIndexBuffer(self.leko_face_index_buffer);
     return self;
 }

@@ -86,8 +86,17 @@ pub const ChunkLoader = struct {
     pub fn loadChunk(self: *ChunkLoader, chunk: Chunk) !void {
         const perlin = nm.Perlin3{};
         const world = self.world;
-        const chunk_origin = world.graph.positions.get(chunk).mulScalar(chunk_width).cast(f32);
+        const chunk_origin = world.graph.positions.get(chunk).mulScalar(chunk_width);
         const leko = world.leko_data.chunk_leko.get(chunk);
+        const types = &world.leko_data.leko_types;
+
+        const pallete = [_]LekoValue {
+            types.getValueForName("stone") orelse .empty,
+            types.getValueForName("dirt") orelse .empty,
+            types.getValueForName("grass") orelse .empty,
+            types.getValueForName("sand") orelse .empty,
+        };
+
         // const seed: u64 = (
         //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[0]))) << 32 | 
         //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[1]))) << 16 | 
@@ -98,12 +107,16 @@ pub const ChunkLoader = struct {
         var i: usize = 0;
         while (i < chunk_leko_count) : (i += 1) {
             const address = Address.initI(i);
-            const position = address.localPosition().cast(f32).add(chunk_origin);
-            const noise = perlin.sample(position.mulScalar(0.025).v);
+            const leko_position = address.localPosition().add(chunk_origin);
+            const sample_position = leko_position.cast(f32).mul(vec3(.{0.5, 1, 0.5}));
+            const noise = perlin.sample(sample_position.mulScalar(0.025).v);
             // _ = noise;
             // const leko_value: u16 = if (r.float(f32) > 0.95) 1 else 0;
-            const leko_value: u16 = if (noise < 0.15) 1 else 0;
-            leko[i] = @intToEnum(LekoValue, leko_value);
+            if (noise > 0.15) {
+                leko[i] = .empty;
+                continue;
+            }
+            leko[i] = pallete[@intCast(usize, @mod(leko_position.v[1], @intCast(i32, pallete.len)))];
         }
 
     }
@@ -176,6 +189,22 @@ pub const LekoTypeTable = struct {
             return null;
         }
         return self.list.items[index];
+    }
+
+    pub fn getForName(self: LekoTypeTable, name: []const u8) ?LekoType {
+        if (self.name_map.get(name)) |leko_type| {
+            return leko_type.*;
+        }
+        return null;
+    }
+
+    pub fn getValueForName(self: LekoTypeTable, name: []const u8) ?LekoValue {
+        if (self.getForName(name)) |leko_type| {
+            return leko_type.value;
+        }
+        else {
+            return null;
+        }
     }
 
 };
