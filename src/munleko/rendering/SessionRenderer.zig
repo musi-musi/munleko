@@ -16,6 +16,7 @@ const Camera = Scene.Camera;
 
 const Session = Engine.Session;
 const World = Engine.World;
+const AssetDatabase = Engine.AssetDatabase;
 const Observer = World.Observer;
 
 const Allocator = std.mem.Allocator;
@@ -46,6 +47,10 @@ pub fn destroy(self: *SessionRenderer) void {
     self.stop();
     self.world_renderer.destroy();
     self.scene.deinit();
+}
+
+pub fn applyAssets(self: *SessionRenderer, assets: *const AssetDatabase) !void {
+    try self.world_renderer.applyAssets(assets);
 }
 
 pub fn start(self: *SessionRenderer, observer: Observer) !void {

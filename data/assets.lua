@@ -4,7 +4,7 @@ leko.stone = {
     color = {0.5, 0.5, 0.5}
 }
 leko.grass = {
-    color = {0.1, 0.7}
+    color = {0.1, 0.7, 0.3}
 }
 leko.dirt = {
     color = {0.5, 0.4, 0.1}

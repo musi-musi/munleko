@@ -9,7 +9,9 @@ const Timer = time.Timer;
 const Session = @This();
 
 const World = @import("World.zig");
-const WorldMan = World.Manager;
+const WorldManager = World.Manager;
+
+const AssetDatabase = @import("AssetDatabase.zig");
 
 const Thread = std.Thread;
 const AtomicFlag = util.AtomicFlag;
@@ -17,7 +19,7 @@ const AtomicFlag = util.AtomicFlag;
 allocator: Allocator,
 
 world: *World,
-world_man: *WorldMan,
+world_man: *WorldManager,
 
 thread: Thread = undefined,
 is_running: AtomicFlag = .{},
@@ -30,7 +32,7 @@ tick_rate: f32 = 40,
 pub fn create(allocator: Allocator) !*Session {
     const self = try allocator.create(Session);
     const world = try World.create(allocator);
-    const world_man = try WorldMan.create(allocator, world);
+    const world_man = try WorldManager.create(allocator, world);
     self.* = .{
         .allocator = allocator,
         .world = world,
@@ -45,6 +47,10 @@ pub fn destroy(self: *Session) void {
     defer allocator.destroy(self);
     self.world.destroy();
     self.world_man.destroy();
+}
+
+pub fn applyAssets(self: *Session, assets: *const AssetDatabase) !void {
+    try self.world.leko_data.leko_types.addLekoTypesFromAssetTable(assets.leko_table);
 }
 
 pub fn start(self: *Session, ctx: anytype, comptime hooks: Hooks(@TypeOf(ctx))) !void {
@@ -64,7 +70,7 @@ pub fn start(self: *Session, ctx: anytype, comptime hooks: Hooks(@TypeOf(ctx))) 
 pub fn Hooks(comptime Ctx: type) type {
     return struct {
         on_tick: ?HookFunction(Ctx) = null,
-        on_world_update: ?WorldMan.OnWorldUpdateFn(Ctx) = null,
+        on_world_update: ?WorldManager.OnWorldUpdateFn(Ctx) = null,
     };
 }
 

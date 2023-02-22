@@ -2,8 +2,10 @@ const std = @import("std");
 const nm = @import("nm");
 const util = @import("util");
 const World = @import("World.zig");
+const AssetDatabase = @import("AssetDatabase.zig");
 
 const Allocator = std.mem.Allocator;
+const Arena = std.heap.ArenaAllocator;
 
 const Chunk = World.Chunk;
 
@@ -24,7 +26,7 @@ const chunk_width_bits = World.chunk_width_bits;
 const chunk_width = World.chunk_width;
 const chunk_leko_count = 1 << chunk_width_bits * 3;
 
-pub const LekoValue = enum(u16) { _ };
+pub const LekoValue = enum(u16) { empty = 0, _ };
 
 pub const ChunkLeko = [chunk_leko_count]LekoValue;
 
@@ -33,16 +35,20 @@ pub const ChunkLekoStore = util.IjoDataStoreArenaInit(Chunk, ChunkLeko);
 pub const LekoData = struct {
     world: *World,
     chunk_leko: ChunkLekoStore,
+    leko_types: LekoTypeTable,
 
     pub fn init(self: *LekoData, world: *World) !void {
         self.* = .{
             .world = world,
             .chunk_leko = ChunkLekoStore.init(world.allocator),
+            .leko_types = undefined,
         };
+        try self.leko_types.init(world.allocator);
     }
 
     pub fn deinit(self: *LekoData) void {
         self.chunk_leko.deinit();
+        self.leko_types.deinit();
     }
 
     pub fn matchDataCapacity(self: *LekoData) !void {
@@ -101,6 +107,77 @@ pub const ChunkLoader = struct {
         }
 
     }
+};
+
+const LekoAsset = AssetDatabase.LekoAsset;
+const LekoAssetTable = AssetDatabase.LekoAssetTable;
+
+pub const LekoType = struct {
+    value: LekoValue,
+    name: []const u8,
+    properties: Properties,
+
+    pub const Properties = struct {
+        is_solid: bool,
+    };
+};
+
+pub const LekoTypeTable = struct {
+    allocator: Allocator,
+    arena: Arena,
+    list: List(LekoType) = .{},
+    name_map: std.StringHashMapUnmanaged(*LekoType) = .{},
+
+    fn init(self: *LekoTypeTable, allocator: Allocator) !void {
+        self.* = .{
+            .allocator = allocator,
+            .arena = Arena.init(allocator),
+        };
+
+        errdefer self.deinit();
+        try self.addLekoType("empty", .{
+            .is_solid = false,
+        });
+    }
+
+    fn deinit(self: *LekoTypeTable) void {
+        self.arena.deinit();
+        self.list.deinit(self.allocator);
+        self.name_map.deinit(self.allocator);
+    }
+
+    pub fn addLekoType(self: *LekoTypeTable, name: []const u8, properties: LekoType.Properties) !void {
+        const index = @intCast(u16, self.list.items.len);
+        const leko_value = @intToEnum(LekoValue, index);
+        const owned_name = try self.arena.allocator().dupe(u8, name);
+        const leko_type = LekoType {
+            .value = leko_value,
+            .name = owned_name,
+            .properties = properties,
+        };
+        try self.list.append(self.allocator, leko_type);
+        try self.name_map.put(self.allocator, owned_name, &self.list.items[index]);
+    }
+
+    pub fn addLekoTypesFromAssetTable(self: *LekoTypeTable, asset_table: LekoAssetTable) !void {
+        var iter = asset_table.map.iterator();
+        while (iter.next()) |kvp| {
+            const name = kvp.key_ptr.*;
+            const asset = kvp.value_ptr.*;
+            try self.addLekoType(name, .{
+                .is_solid = asset.is_solid,
+            });
+        }
+    }
+
+    pub fn getForValue(self: LekoTypeTable, value: LekoValue) ?LekoType {
+        const index = @enumToInt(value);
+        if (index >= self.list.items.len) {
+            return null;
+        }
+        return self.list.items[index];
+    }
+
 };
 
 pub const UAddress = std.meta.Int(.unsigned, chunk_width_bits * 3);

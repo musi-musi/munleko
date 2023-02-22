@@ -59,6 +59,10 @@ pub fn AssetTable(comptime Asset_: type) type {
             try self.map.put(owned_name, asset);
         }
 
+        pub fn getByName(self: Self, name: []const u8) ?Asset {
+            return self.map.get(name);
+        }
+
         pub const LuaAssetLoader = fn(*Lua, []const u8) anyerror!?Asset;
 
         /// add assets from the assets table loaded by lua
@@ -93,6 +97,7 @@ pub fn AssetTable(comptime Asset_: type) type {
             }
             return error_count;
         }
+
     };
 }
 
@@ -116,6 +121,10 @@ pub const LekoAsset = struct {
 pub const LekoAssetTable = AssetTable(LekoAsset);
 
 fn loadLekoLuaAsset(l: *Lua, name: []const u8) !?LekoAsset {
+    if (std.mem.eql(u8, name, "empty")) {
+        std.log.err("leko asset '{s}' uses reserved name", .{name});
+        return null;
+    }
     var asset: LekoAsset = .{};
     if (l.getField(-1, "is_solid") != .nil) {
         asset.is_solid = l.toBoolean(-1);

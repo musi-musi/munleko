@@ -12,6 +12,8 @@ const ResetEvent = Thread.ResetEvent;
 const Client = @import("../Client.zig");
 const Engine = @import("../Engine.zig");
 
+const AssetDatabase = Engine.AssetDatabase;
+
 const leko_mesh = @import("leko_mesh.zig");
 const ChunkLekoMeshes = leko_mesh.ChunkLekoMeshes;
 const LekoMeshSystem = leko_mesh.LekoMeshSystem;
@@ -25,6 +27,7 @@ const Allocator = std.mem.Allocator;
 const WorldModel = @This();
 
 const Vec3 = nm.Vec3;
+const vec3 = nm.vec3;
 
 pub const chunk_model_bounds_radius = std.math.sqrt(3) * World.chunk_width;
 
@@ -50,6 +53,10 @@ pub fn destroy(self: *WorldModel) void {
     defer allocator.destroy(self);
     self.chunk_models.deinit();
     self.chunk_leko_meshes.deinit();
+}
+
+pub fn applyAssets(self: *WorldModel, assets: *const AssetDatabase) !void {
+    try self.chunk_leko_meshes.face_material_table.addMaterialsFromLekoAssetTable(assets.leko_table, self.world.leko_data.leko_types);
 }
 
 fn createAndAddChunkModel(self: *WorldModel, chunk: Chunk) !ChunkModel {

@@ -15,6 +15,8 @@ const Engine = @import("../Engine.zig");
 
 const Session = Engine.Session;
 const World = Engine.World;
+const AssetDatabase = Engine.AssetDatabase;
+
 const Chunk = World.Chunk;
 const Observer = World.Observer;
 
@@ -26,6 +28,7 @@ const WorldRenderer = @import("WorldRenderer.zig");
 const ChunkModel = WorldModel.ChunkModel;
 
 const Allocator = std.mem.Allocator;
+const Arena = std.heap.ArenaAllocator;
 
 const List = std.ArrayListUnmanaged;
 
@@ -130,17 +133,22 @@ pub const ChunkLekoMeshes = struct {
     mesh_data: LekoMeshDataStore,
     face_buffers: LekoFaceBufferStore,
 
+    face_material_table: FaceMaterialTable,
+
     pub fn init(self: *ChunkLekoMeshes, allocator: Allocator) !void {
         self.* = .{
             .allocator = allocator,
             .mesh_data = LekoMeshDataStore.initWithContext(allocator, .{ .allocator = allocator }),
             .face_buffers = LekoFaceBufferStore.init(allocator),
+            .face_material_table = undefined,
         };
+        try self.face_material_table.init(allocator);
     }
 
     pub fn deinit(self: *ChunkLekoMeshes) void {
         self.mesh_data.deinit();
         self.face_buffers.deinit();
+        self.face_material_table.deinit();
     }
 
     pub fn matchDataCapacity(self: *ChunkLekoMeshes, world_model: *const WorldModel) !void {
@@ -297,4 +305,41 @@ pub const LekoMeshSystem = struct {
             .base = face,
         };
     }
+};
+
+
+pub const FaceMaterial = union(enum) {
+    invisible: void,
+    color: Vec3,
+};
+
+pub const FaceMaterialTable = struct {
+    allocator: Allocator,
+    list: std.ArrayListUnmanaged(FaceMaterial) = .{},
+
+    fn init(self: *FaceMaterialTable, allocator: Allocator) !void {
+        self.* = .{
+            .allocator = allocator,
+        };
+        errdefer self.deinit();
+        // material for the empty leko type
+        try self.list.append(self.allocator, .invisible);
+    }
+
+    fn deinit(self: *FaceMaterialTable) void {
+        self.list.deinit(self.allocator);
+    }
+
+    pub fn addMaterialsFromLekoAssetTable(self: *FaceMaterialTable, asset_table: AssetDatabase.LekoAssetTable, type_table: leko.LekoTypeTable) !void {
+        for (type_table.list.items[1..]) |leko_type| {
+            const name = leko_type.name;
+            const asset = asset_table.getByName(name) orelse unreachable;
+            const material = (
+                if (asset.is_visible) FaceMaterial { .color = asset.color}
+                else FaceMaterial.invisible
+            );
+            try self.list.append(self.allocator, material);
+        }
+    }
+
 };

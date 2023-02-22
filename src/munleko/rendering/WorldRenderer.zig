@@ -19,6 +19,7 @@ const Engine = @import("../Engine.zig");
 
 const Session = Engine.Session;
 const World = Engine.World;
+const AssetDatabase = Engine.AssetDatabase;
 const Chunk = World.Chunk;
 const Observer = World.Observer;
 
@@ -89,6 +90,10 @@ pub fn destroy(self: *WorldRenderer) void {
     self.draw_list.deinit(allocator);
     self.back_draw_list.deinit(allocator);
     self.chunk_map.deinit(allocator);
+}
+
+pub fn applyAssets(self: *WorldRenderer, assets: *const AssetDatabase) !void {
+    try self.world_model.applyAssets(assets);
 }
 
 pub fn start(self: *WorldRenderer, observer: Observer) !void {
