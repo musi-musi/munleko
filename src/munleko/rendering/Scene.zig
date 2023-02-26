@@ -14,8 +14,8 @@ debug: Debug,
 directional_light: Vec3 = Vec3.zero,
 camera: *Camera,
 
-fog_color: Vec3 = Vec3.zero,
-fog_start: f32 = 16,
+fog_color: Vec3 = vec3(.{0.7, 0.7, 0.7}),
+fog_start: f32 = 32,
 fog_end: f32 = 100,
 fog_power: f32 = 1.5,
 

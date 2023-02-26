@@ -31,7 +31,7 @@ pub fn build(b: *std.build.Builder) !void {
     client.setBuildMode(mode);
     client.setTarget(target);
 
-    client.addPackage(pkgs.pkg("window", &.{ pkgs.util }));
+    client.addPackage(pkgs.pkg("window", &.{pkgs.util}));
 
     client.addIncludePath("lib/window/c");
     client.addLibraryPath("lib/window/c/");
@@ -39,15 +39,17 @@ pub fn build(b: *std.build.Builder) !void {
 
     const gl = pkgs.pkg("gl", null);
     client.addPackage(gl);
-    const ls = pkgs.pkg("ls", &.{ gl });
+    const ls = pkgs.pkg("ls", &.{gl});
     client.addPackage(ls);
 
     client.addIncludePath("lib/gl/c");
     client.addCSourceFile("lib/gl/c/glad.c", &.{"-std=c99"});
-    
+
+    client.addIncludePath("src/munleko/engine/c");
+    client.addCSourceFile("src/munleko/engine/c/stb_image.c", &.{"-std=c99"});
     if (target.getOsTag() == .windows) {
         client.step.dependOn(
-            &b.addInstallBinFile(.{.path = "lib/window/c/glfw3.dll"}, "glfw3.dll").step,
+            &b.addInstallBinFile(.{ .path = "lib/window/c/glfw3.dll" }, "glfw3.dll").step,
         );
     }
 
@@ -73,16 +75,12 @@ pub fn build(b: *std.build.Builder) !void {
 
 const fs = std.fs;
 
-
-
-
 const pkgs = struct {
-
     const nm = pkg("nm", null);
     const util = pkg("util", null);
 
     fn pkg(comptime name: []const u8, deps: ?[]const Pkg) Pkg {
-        return Pkg {
+        return Pkg{
             .name = name,
             .source = .{ .path = "lib/" ++ name ++ "/lib.zig" },
             .dependencies = deps,
@@ -90,20 +88,16 @@ const pkgs = struct {
     }
 };
 
-
 fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build.LibExeObjStep {
-
-
     const exe = b.addExecutable("munleko", "src/" ++ frontend_id ++ "_main.zig");
     const lua = ziglua.linkAndPackage(b, exe, .{});
     exe.addPackage(lua);
-    const mun = Pkg {
+    const mun = Pkg{
         .name = "mun",
-        .source = .{ .path = "lib/mun/lib.zig"},
+        .source = .{ .path = "lib/mun/lib.zig" },
         .dependencies = &.{lua},
     };
     exe.addPackage(mun);
-
 
     inline for (comptime std.meta.declarations(pkgs)) |decl| {
         const pkg = @field(pkgs, decl.name);
@@ -111,7 +105,6 @@ fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build
             exe.addPackage(pkg);
         }
     }
-
 
     return exe;
 }

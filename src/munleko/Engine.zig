@@ -4,7 +4,7 @@ const mun = @import("mun");
 const nm = @import("nm");
 
 pub const Session = @import("engine/Session.zig");
-pub const AssetDatabase = @import("engine/AssetDatabase.zig");
+pub const Assets = @import("engine/Assets.zig");
 pub const World = @import("engine/World.zig");
 pub const leko = @import("engine/leko.zig");
 
@@ -17,7 +17,7 @@ arguments: Arguments,
 data_root_path: []const u8,
 
 lua: Lua,
-asset_database: *AssetDatabase,
+assets: *Assets,
 
 const Engine = @This();
 
@@ -29,7 +29,7 @@ pub fn create(allocator: Allocator, arguments: Arguments) !*Engine {
         .arguments = arguments,
         .data_root_path = undefined,
         .lua = try Lua.init(allocator),
-        .asset_database = try AssetDatabase.create(allocator),
+        .assets = try Assets.create(allocator),
     };
     errdefer self.lua.deinit();
     if (arguments.data_root_path) |data_root_path| {
@@ -50,7 +50,7 @@ pub fn destroy(self: *Engine) void {
     defer allocator.destroy(self);
     allocator.free(self.data_root_path);
     self.lua.deinit();
-    self.asset_database.destroy();
+    self.assets.destroy();
 }
 
 pub fn load(self: *Engine) !void {
@@ -58,7 +58,7 @@ pub fn load(self: *Engine) !void {
     const lua_main_path = try std.fs.path.joinZ(self.allocator, &.{self.data_root_path, "main.lua"});
     defer self.allocator.free(lua_main_path);
     try l.doFile(lua_main_path);
-    try self.asset_database.load(l);
+    try self.assets.load(l, self.data_root_path);
 }
 
 fn initLua(self: *Engine) !void {

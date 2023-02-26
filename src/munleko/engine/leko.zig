@@ -2,7 +2,7 @@ const std = @import("std");
 const nm = @import("nm");
 const util = @import("util");
 const World = @import("World.zig");
-const AssetDatabase = @import("AssetDatabase.zig");
+const Assets = @import("Assets.zig");
 
 const Allocator = std.mem.Allocator;
 const Arena = std.heap.ArenaAllocator;
@@ -92,9 +92,23 @@ pub const ChunkLoader = struct {
 
         const pallete = [_]LekoValue {
             types.getValueForName("stone") orelse .empty,
+            types.getValueForName("stone") orelse .empty,
+            types.getValueForName("stone") orelse .empty,
+            types.getValueForName("stone") orelse .empty,
+            types.getValueForName("stone") orelse .empty,
+            types.getValueForName("stone") orelse .empty,
+            types.getValueForName("stone") orelse .empty,
+            types.getValueForName("stone") orelse .empty,
+            types.getValueForName("stone") orelse .empty,
+            types.getValueForName("stone") orelse .empty,
+            types.getValueForName("dirt") orelse .empty,
+            types.getValueForName("dirt") orelse .empty,
+            types.getValueForName("dirt") orelse .empty,
+            types.getValueForName("dirt") orelse .empty,
             types.getValueForName("dirt") orelse .empty,
             types.getValueForName("grass") orelse .empty,
-            types.getValueForName("sand") orelse .empty,
+            types.getValueForName("grass") orelse .empty,
+            // types.getValueForName("sand") orelse .empty,
         };
 
         // const seed: u64 = (
@@ -122,8 +136,8 @@ pub const ChunkLoader = struct {
     }
 };
 
-const LekoAsset = AssetDatabase.LekoAsset;
-const LekoAssetTable = AssetDatabase.LekoAssetTable;
+const LekoAsset = Assets.LekoAsset;
+const LekoAssetTable = Assets.LekoAssetTable;
 
 pub const LekoType = struct {
     value: LekoValue,

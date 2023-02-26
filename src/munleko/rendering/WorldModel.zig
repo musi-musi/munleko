@@ -12,7 +12,7 @@ const ResetEvent = Thread.ResetEvent;
 const Client = @import("../Client.zig");
 const Engine = @import("../Engine.zig");
 
-const AssetDatabase = Engine.AssetDatabase;
+const Assets = Engine.Assets;
 
 const leko_mesh = @import("leko_mesh.zig");
 const ChunkLekoMeshes = leko_mesh.ChunkLekoMeshes;
@@ -55,8 +55,8 @@ pub fn destroy(self: *WorldModel) void {
     self.chunk_leko_meshes.deinit();
 }
 
-pub fn applyAssets(self: *WorldModel, assets: *const AssetDatabase) !void {
-    try self.chunk_leko_meshes.face_material_table.addMaterialsFromLekoAssetTable(assets.leko_table, self.world.leko_data.leko_types);
+pub fn applyAssets(self: *WorldModel, assets: *const Assets) !void {
+    try self.chunk_leko_meshes.face_material_table.addMaterialsFromLekoAssets(assets, self.world.leko_data.leko_types);
 }
 
 fn createAndAddChunkModel(self: *WorldModel, chunk: Chunk) !ChunkModel {
@@ -220,7 +220,7 @@ pub const Manager = struct {
         }
         self.observer = observer;
         self.is_running.set(true);
-        self.generate_group = try ThreadGroup.spawnCpuCount(self.allocator, 0.5, .{}, generateThreadMain, .{self});
+        self.generate_group = try ThreadGroup.spawnCpuCount(self.allocator, 0.75, .{}, generateThreadMain, .{self});
     }
 
     pub fn stop(self: *Manager) void {

@@ -15,7 +15,7 @@ const Engine = @import("../Engine.zig");
 
 const Session = Engine.Session;
 const World = Engine.World;
-const AssetDatabase = Engine.AssetDatabase;
+const Assets = Engine.Assets;
 
 const Chunk = World.Chunk;
 const Observer = World.Observer;
@@ -61,6 +61,7 @@ const Axis3 = nm.Axis3;
 pub const LekoFace = struct {
     base: u32,
     color: [3]f32,
+    texture_index: u32,
 };
 
 
@@ -278,14 +279,12 @@ pub const LekoMeshSystem = struct {
     fn appendLekoFaces(self: *LekoMeshSystem, list: *std.ArrayList(LekoFace), world: *World, chunk: Chunk, comptime traverse_edges: bool, x: u32, y: u32, z: u32) !void {
         const reference = Reference.init(chunk, Address.init(u32, .{ x, y, z }));
         const material = self.getMaterial(reference) orelse return;
-        if (material == .invisible) {
-            return;
-        }
         inline for (comptime std.enums.values(Cardinal3)) |normal| {
             if (self.getLekoFaceBase(world, traverse_edges, reference, normal)) |base| {
                 try list.append(.{
                     .base = base,
                     .color = material.color.v,
+                    .texture_index = material.texture_index,
                 });
             }
         }
@@ -293,8 +292,9 @@ pub const LekoMeshSystem = struct {
 
     inline fn getLekoFaceBase(self: *LekoMeshSystem, world: *World, comptime traverse_edges: bool, reference: Reference, normal: Cardinal3) ?u32 {
         const neighbor_reference = (if (traverse_edges) reference.incr(world, normal) orelse return null else reference.incrUnchecked(normal));
-        const neighbor_material = self.getMaterial(neighbor_reference) orelse return null;
-        if (neighbor_material != .invisible) return null;
+        if (self.getMaterial(neighbor_reference) != null) {
+            return null;
+        }
         const base = encodeLekoFaceBase(reference.address, normal, 0);
         return base;
     }
@@ -313,14 +313,14 @@ pub const LekoMeshSystem = struct {
 };
 
 
-pub const FaceMaterial = union(enum) {
-    invisible: void,
+pub const FaceMaterial = struct {
     color: Vec3,
+    texture_index: u32,
 };
 
 pub const FaceMaterialTable = struct {
     allocator: Allocator,
-    list: std.ArrayListUnmanaged(FaceMaterial) = .{},
+    list: std.ArrayListUnmanaged(?FaceMaterial) = .{},
 
     fn init(self: *FaceMaterialTable, allocator: Allocator) !void {
         self.* = .{
@@ -328,22 +328,33 @@ pub const FaceMaterialTable = struct {
         };
         errdefer self.deinit();
         // material for the empty leko type
-        try self.list.append(self.allocator, .invisible);
+        try self.list.append(self.allocator, null);
     }
 
     fn deinit(self: *FaceMaterialTable) void {
         self.list.deinit(self.allocator);
     }
 
-    pub fn addMaterialsFromLekoAssetTable(self: *FaceMaterialTable, asset_table: AssetDatabase.LekoAssetTable, type_table: leko.LekoTypeTable) !void {
+    pub fn addMaterialsFromLekoAssets(self: *FaceMaterialTable, assets: *const Assets, type_table: leko.LekoTypeTable) !void {
         for (type_table.list.items[1..]) |leko_type| {
             const name = leko_type.name;
-            const asset = asset_table.getByName(name) orelse unreachable;
-            const material = (
-                if (asset.is_visible) FaceMaterial { .color = asset.color}
-                else FaceMaterial{ .invisible = {} }
+            const leko_asset = assets.leko_table.getByName(name) orelse unreachable;
+            if (!leko_asset.is_visible) {
+                try self.list.append(self.allocator, null);
+                continue;
+            }
+            const texture_index = (
+                if (assets.leko_texture_table.getByName(leko_asset.texture_name)) |leko_texture_asset| (
+                    leko_texture_asset.index
+                )
+                else (
+                    0
+                )
             );
-            try self.list.append(self.allocator, material);
+            try self.list.append(self.allocator, FaceMaterial {
+                .color = leko_asset.color,
+                .texture_index = @intCast(u32, texture_index),
+            });
         }
     }
 

@@ -19,7 +19,7 @@ const Engine = @import("../Engine.zig");
 
 const Session = Engine.Session;
 const World = Engine.World;
-const AssetDatabase = Engine.AssetDatabase;
+const Assets = Engine.Assets;
 const Chunk = World.Chunk;
 const Observer = World.Observer;
 
@@ -92,8 +92,9 @@ pub fn destroy(self: *WorldRenderer) void {
     self.chunk_map.deinit(allocator);
 }
 
-pub fn applyAssets(self: *WorldRenderer, assets: *const AssetDatabase) !void {
+pub fn applyAssets(self: *WorldRenderer, assets: *const Assets) !void {
     try self.world_model.applyAssets(assets);
+    try self.leko_mesh_renderer.applyAssets(assets);
 }
 
 pub fn start(self: *WorldRenderer, observer: Observer) !void {

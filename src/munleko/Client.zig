@@ -88,13 +88,13 @@ pub fn run(self: *Client) !void {
     var session = try self.engine.createSession();
     defer session.destroy();
 
-    try session.applyAssets(self.engine.asset_database);
+    try session.applyAssets(self.engine.assets);
 
     var camera = Camera{};
     const session_renderer = try SessionRenderer.create(allocator, session, &camera);
     defer session_renderer.destroy();
 
-    try session_renderer.applyAssets(self.engine.asset_database);
+    try session_renderer.applyAssets(self.engine.assets);
 
     var fly_cam = FlyCam.init(self.window);
     fly_cam.move_speed = 32;

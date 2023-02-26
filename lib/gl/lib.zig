@@ -6,7 +6,7 @@ const c = @cImport({
 
 const UInt = c.GLuint;
 
-pub const InitError = error {
+pub const InitError = error{
     LoadGlProcsFailed,
 };
 
@@ -28,7 +28,6 @@ fn vptrCast(p: anytype) *const anyopaque {
     return @ptrCast(*const anyopaque, p);
 }
 
-
 pub const Enabled = enum {
     enabled,
     disabled,
@@ -43,7 +42,6 @@ pub const Capability = enum(UInt) {
     multisample = c.GL_MULTISAMPLE,
     cull_face = c.GL_CULL_FACE,
 };
-
 
 pub fn enable(cap: Capability) void {
     c.glEnable(@enumToInt(cap));
@@ -83,13 +81,12 @@ pub const IndexType = enum(c_int) {
     uint = c.GL_UNSIGNED_INT,
 
     pub fn Type(comptime self: IndexType) type {
-        return switch(self) {
+        return switch (self) {
             .ubyte => u8,
             .ushort => u16,
             .uint => u32,
         };
     }
-
 };
 
 pub fn clearColor(color: [4]f32) void {
@@ -101,12 +98,11 @@ pub const DepthBits = enum {
     double,
 
     pub fn Type(comptime self: DepthBits) type {
-        return switch(self) {
+        return switch (self) {
             .float => f32,
             .double => f64,
         };
     }
-
 };
 
 pub fn clearDepth(comptime bits: DepthBits, depth: bits.Type()) void {
@@ -175,7 +171,6 @@ fn assertIsBuffer(comptime T: type) void {
 
 pub fn Buffer(comptime T: type) type {
     return struct {
-
         name: Name = 0,
 
         pub const Element = T;
@@ -208,12 +203,10 @@ pub fn Buffer(comptime T: type) type {
             const size = iptrCast(slice.len * stride);
             c.glNamedBufferSubData(self.name, iptrCast(offset * stride), size, ptr);
         }
-
     };
 }
 
 pub const Array = struct {
-    
     name: Name = 0,
 
     pub fn create() Array {
@@ -229,28 +222,11 @@ pub const Array = struct {
     pub fn setAttributeFormat(self: Array, binding: u32, attr: u32, attr_type: AttrType, stride: usize) void {
         c.glEnableVertexArrayAttrib(self.name, attr);
         switch (attr_type.primitive) {
-            .half, .float, => c.glVertexArrayAttribFormat(
-                self.name,
-                @intCast(UInt, attr),
-                @intCast(c_int, attr_type.len),
-                @enumToInt(attr_type.primitive),
-                0,
-                @intCast(UInt, stride)
-            ),
-            .double, => c.glVertexArrayAttribLFormat(
-                self.name,
-                @intCast(UInt, attr),
-                @intCast(c_int, attr_type.len),
-                @enumToInt(attr_type.primitive),
-                @intCast(UInt, stride)
-            ),
-            else => c.glVertexArrayAttribIFormat(
-                self.name,
-                @intCast(UInt, attr),
-                @intCast(c_int, attr_type.len),
-                @enumToInt(attr_type.primitive),
-                @intCast(UInt, stride)
-            ),
+            .half,
+            .float,
+            => c.glVertexArrayAttribFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @enumToInt(attr_type.primitive), 0, @intCast(UInt, stride)),
+            .double => c.glVertexArrayAttribLFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @enumToInt(attr_type.primitive), @intCast(UInt, stride)),
+            else => c.glVertexArrayAttribIFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @enumToInt(attr_type.primitive), @intCast(UInt, stride)),
         }
         c.glVertexArrayAttribBinding(
             self.name,
@@ -287,7 +263,6 @@ pub const Array = struct {
     pub fn bind(self: Array) void {
         c.glBindVertexArray(self.name);
     }
-
 };
 
 /// pair of a gl primitive type enum and length (1-4 inc.)
@@ -340,13 +315,12 @@ pub const AttrType = struct {
                 else => @compileError("unsupported attrib primitive " ++ @typeName(T)),
             };
         }
-
     };
 
     pub fn fromType(comptime Attribute: type) AttrType {
         switch (@typeInfo(Attribute)) {
             .Int, .Float => {
-                return AttrType {
+                return AttrType{
                     .primitive = Primitive.fromType(Attribute),
                     .len = 1,
                 };
@@ -355,10 +329,7 @@ pub const AttrType = struct {
                 const len = array.len;
                 switch (len) {
                     1, 2, 3, 4 => {
-                        return AttrType {
-                            .primitive = Primitive.fromType(array.child),
-                            .len = len
-                        };
+                        return AttrType{ .primitive = Primitive.fromType(array.child), .len = len };
                     },
                     else => @compileError("only vectors up to 4d are supported"),
                 }
@@ -366,7 +337,6 @@ pub const AttrType = struct {
             else => @compileError("only primitives or vectors of primitives (arrays 1-4 long) supported"),
         }
     }
-
 };
 
 pub const StageType = enum(UInt) {
@@ -385,7 +355,6 @@ pub const FragmentStage = Stage(.fragment);
 
 pub fn Stage(comptime stage: StageType) type {
     return struct {
-
         name: Name = 0,
 
         pub const stage_type = stage;
@@ -415,7 +384,7 @@ pub fn Stage(comptime stage: StageType) type {
                 const max_msg_size = 512;
                 var msg: [512]u8 = undefined;
                 c.glGetShaderInfoLog(self.name, max_msg_size, null, &msg);
-                std.log.err("failed to compile {s} shader:\n{s}", .{ @tagName(stage_type), msg});
+                std.log.err("failed to compile {s} shader:\n{s}", .{ @tagName(stage_type), msg });
                 return Program.Error.CompilationFailed;
             }
         }
@@ -423,10 +392,9 @@ pub fn Stage(comptime stage: StageType) type {
 }
 
 pub const Program = struct {
-
     name: Name = 0,
 
-    pub const Error = error {
+    pub const Error = error{
         CompilationFailed,
         LinkingFailed,
     };
@@ -477,7 +445,7 @@ pub const Program = struct {
         comptime uniform_type: GlslPrimitive,
         value: uniform_type.Type(),
     ) void {
-        const v = [1]uniform_type.Type(){ value };
+        const v = [1]uniform_type.Type(){value};
         self.setUniformArray(uniform, uniform_type, &v);
     }
 
@@ -499,7 +467,7 @@ pub const Program = struct {
             .mat2 => c.glProgramUniformMatrix2fv(self.name, uniform, count, transpose, ptr),
             .mat3 => c.glProgramUniformMatrix3fv(self.name, uniform, count, transpose, ptr),
             .mat4 => c.glProgramUniformMatrix4fv(self.name, uniform, count, transpose, ptr),
-            
+
             .int => c.glProgramUniform1iv(self.name, uniform, count, ptr),
             .ivec2 => c.glProgramUniform2iv(self.name, uniform, count, ptr),
             .ivec3 => c.glProgramUniform3iv(self.name, uniform, count, ptr),
@@ -509,10 +477,8 @@ pub const Program = struct {
             .uivec2 => c.glProgramUniform2uiv(self.name, uniform, count, ptr),
             .uivec3 => c.glProgramUniform3uiv(self.name, uniform, count, ptr),
             .uivec4 => c.glProgramUniform4uiv(self.name, uniform, count, ptr),
-
         }
     }
-
 };
 
 pub const UniformLocation = c_int;
@@ -546,11 +512,11 @@ pub const GlslPrimitive = enum(u8) {
             }
             @compileError(@typeName(T) ++ " us not a gl.GlslPrimitive");
         }
-    } 
+    }
 
     /// get the zig type used to represent this glsl type
     pub fn Type(comptime self: GlslPrimitive) type {
-        return switch(self) {
+        return switch (self) {
             .float => f32,
             .vec2 => [2]f32,
             .vec3 => [3]f32,
@@ -574,7 +540,7 @@ pub const GlslPrimitive = enum(u8) {
     /// get the zig type used to represent the underlying element
     /// eg vec4, mat3, float -> f32
     pub fn Element(comptime self: GlslPrimitive) type {
-        return switch(self) {
+        return switch (self) {
             .float,
             .vec2,
             .vec3,
@@ -582,19 +548,316 @@ pub const GlslPrimitive = enum(u8) {
             .mat2,
             .mat3,
             .mat4,
-                => f32,
+            => f32,
 
             .int,
             .ivec2,
             .ivec3,
             .ivec4,
-                => i32,
+            => i32,
 
             .uint,
             .uivec2,
             .uivec3,
             .uivec4,
-                => u32,
+            => u32,
+        };
+    }
+};
+
+pub fn TextureRgba8(comptime target_: TextureTarget) type {
+    return Texture(target_, .{
+        .channels = .rgba,
+        .component = .u8norm,
+    });
+}
+
+pub fn Texture(comptime target_: TextureTarget, comptime format_: PixelFormat) type {
+    return struct {
+        name: Name,
+
+        pub const target = target_;
+        pub const format = format_;
+
+        pub const Pixel = format.Pixel();
+
+        const Self = @This();
+
+        pub fn create() Self {
+            var name: Name = undefined;
+            c.glCreateTextures(@enumToInt(target), 1, &name);
+            return .{
+                .name = name,
+            };
+        }
+
+        pub fn destroy(self: Self) void {
+            c.glDeleteTextures(1, &self.name);
+        }
+
+        pub fn bind(self: Self, unit: i32) void {
+            c.glBindTextureUnit(@intCast(c_uint, unit), self.name);
+        }
+
+        pub fn setFilter(self: Self, min_filter: TextureFilter, mag_filter: TextureFilter) void {
+            c.glTextureParameteri(self.name, c.GL_TEXTURE_MIN_FILTER, @intCast(c_int, @enumToInt(min_filter)));
+            c.glTextureParameteri(self.name, c.GL_TEXTURE_MAG_FILTER, @intCast(c_int, @enumToInt(mag_filter)));
+        }
+
+        pub usingnamespace switch (target) {
+            .texture_2d => struct {
+                pub fn alloc(self: Self, width: usize, height: usize) void {
+                    const w = @intCast(c_int, width);
+                    const h = @intCast(c_int, height);
+                    c.glTextureStorage2D(self.name, 1, comptime format.sizedFormat(), w, h);
+                }
+
+                pub fn upload(self: Self, width: usize, height: usize, data: []const Pixel) void {
+                    const w = @intCast(c_int, width);
+                    const h = @intCast(c_int, height);
+                    const x: c_int = 0;
+                    const y: c_int = 0;
+                    const mip: c_int = 0;
+                    const channels = format.channels.glType();
+                    const component = format.component.glType();
+                    c.glTextureSubImage2D(self.name, mip, x, y, w, h, channels, component, @ptrCast(*const anyopaque, data.ptr));
+                }
+
+                /// allocate for framebuffer usage
+                pub fn allocFramebuffer(self: Self, width: usize, height: usize) void {
+                    // const w = @intCast(c_int, width);
+                    // const h = @intCast(c_int, height);
+                    // const mip: c_int = 0;
+                    // const channels = format.channels.glType();
+                    // const component = format.component.glType();
+                    // c.glTextureImage2D(self.name, mip, comptime format.sizedFormat(), w, h, 0, channels, component, null);
+                    self.alloc(width, height);
+                }
+            },
+            .array_2d => struct {
+                pub fn alloc(self: Self, width: usize, height: usize, count: usize) void {
+                    const w = @intCast(c_int, width);
+                    const h = @intCast(c_int, height);
+                    const cnt = @intCast(c_int, count);
+                    c.glTextureStorage3D(self.name, 1, comptime format.sizedFormat(), w, h, cnt);
+                }
+
+                pub fn upload(self: Self, width: usize, height: usize, index: usize, data: []const Pixel) void {
+                    const w = @intCast(c_int, width);
+                    const h = @intCast(c_int, height);
+                    const i = @intCast(c_int, index);
+                    const x: c_int = 0;
+                    const y: c_int = 0;
+                    const mip: c_int = 0;
+                    const channels = format.channels.glType();
+                    const component = format.component.glType();
+                    c.glTextureSubImage3D(self.name, mip, x, y, i, w, h, 1, channels, component, @ptrCast(*const anyopaque, data.ptr));
+                }
+            },
+        };
+    };
+}
+
+pub const TextureTarget = enum(UInt) {
+    texture_2d = c.GL_TEXTURE_2D,
+    array_2d = c.GL_TEXTURE_2D_ARRAY,
+
+    pub fn isArray(self: TextureTarget) bool {
+        return switch (self) {
+            .texture_2d => false,
+            .array_2d => true,
+        };
+    }
+
+    pub fn dimensions(self: TextureTarget) u32 {
+        return switch (self) {
+            .texture_2d => 2,
+            .array_2d => 3,
+        };
+    }
+};
+
+pub const TextureFilter = enum(UInt) {
+    nearest = c.GL_NEAREST,
+    linear = c.GL_LINEAR,
+};
+
+pub const PixelFormat = struct {
+    channels: PixelChannels = .rgba,
+    component: PixelComponent = .u8norm,
+
+    pub fn Pixel(comptime self: PixelFormat) type {
+        return [self.channels.dimensions()]self.component.Type();
+    }
+
+    pub fn sizedFormat(comptime self: PixelFormat) c_uint {
+        return switch (self.channels) {
+            .r => switch (self.component) {
+                .u8norm => @as(c_uint, c.GL_R8),
+                .i8norm => @as(c_uint, c.GL_R8_SNORM),
+                .u8 => @as(c_uint, c.GL_R8UI),
+                .i8 => @as(c_uint, c.GL_R8I),
+                .u16norm => @as(c_uint, c.GL_R16),
+                .i16norm => @as(c_uint, c.GL_R16_SNORM),
+                .u16 => @as(c_uint, c.GL_R16UI),
+                .i16 => @as(c_uint, c.GL_R16I),
+                .u32 => @as(c_uint, c.GL_R32UI),
+                .i32 => @as(c_uint, c.GL_R32I),
+                .f32 => @as(c_uint, c.GL_R32F),
+            },
+            .rg => switch (self.component) {
+                .u8norm => @as(c_uint, c.GL_RG8),
+                .i8norm => @as(c_uint, c.GL_RG8_SNORM),
+                .u8 => @as(c_uint, c.GL_RG8UI),
+                .i8 => @as(c_uint, c.GL_RG8I),
+                .u16norm => @as(c_uint, c.GL_RG16),
+                .i16norm => @as(c_uint, c.GL_RG16_SNORM),
+                .u16 => @as(c_uint, c.GL_RG16UI),
+                .i16 => @as(c_uint, c.GL_RG16I),
+                .u32 => @as(c_uint, c.GL_RG32UI),
+                .i32 => @as(c_uint, c.GL_RG32I),
+                .f32 => @as(c_uint, c.GL_RG32F),
+            },
+            .rgb => switch (self.component) {
+                .u8norm => @as(c_uint, c.GL_RGB8),
+                .i8norm => @as(c_uint, c.GL_RGB8_SNORM),
+                .u8 => @as(c_uint, c.GL_RGB8UI),
+                .i8 => @as(c_uint, c.GL_RGB8I),
+                .u16norm => @as(c_uint, c.GL_RGB16),
+                .i16norm => @as(c_uint, c.GL_RGB16_SNORM),
+                .u16 => @as(c_uint, c.GL_RGB16UI),
+                .i16 => @as(c_uint, c.GL_RGB16I),
+                .u32 => @as(c_uint, c.GL_RGB32UI),
+                .i32 => @as(c_uint, c.GL_RGB32I),
+                .f32 => @as(c_uint, c.GL_RGB32F),
+            },
+            .srgb => switch (self.component) {
+                .u8norm => @as(c_uint, c.GL_SRGB8),
+                else => @compileError("srgb is only valid for byte bit depth"),
+            },
+            .rgba => switch (self.component) {
+                .u8norm => @as(c_uint, c.GL_RGBA8),
+                .i8norm => @as(c_uint, c.GL_RGBA8_SNORM),
+                .u8 => @as(c_uint, c.GL_RGBA8UI),
+                .i8 => @as(c_uint, c.GL_RGBA8I),
+                .u16norm => @as(c_uint, c.GL_RGBA16),
+                .i16norm => @as(c_uint, c.GL_RGBA16_SNORM),
+                .u16 => @as(c_uint, c.GL_RGBA16UI),
+                .i16 => @as(c_uint, c.GL_RGBA16I),
+                .u32 => @as(c_uint, c.GL_RGBA32UI),
+                .i32 => @as(c_uint, c.GL_RGBA32I),
+                .f32 => @as(c_uint, c.GL_RGBA32F),
+            },
+            .srgb_alpha => switch (self.component) {
+                .u8norm => @as(c_uint, c.GL_SRGB8_ALPHA8),
+                else => @compileError("srgb_alpha is only valid for byte bit depth"),
+            },
+            .depth => switch (self.component) {
+                .u16 => @as(c_uint, c.GL_DEPTH_COMPONENT16),
+                .u32 => @as(c_uint, c.GL_DEPTH_COMPONENT32),
+                .f32 => @as(c_uint, c.GL_DEPTH_COMPONENT32F),
+                else => @compileError("unsupported depth format"),
+            },
+        };
+    }
+};
+
+pub const PixelChannels = enum(c_uint) {
+    r,
+    rg,
+    rgb,
+    srgb,
+    rgba,
+    srgb_alpha,
+    depth,
+
+    pub fn fromDimensions(dims: u32, srgb: bool) PixelChannels {
+        return if (!srgb) {
+            switch (dims) {
+                1 => .r,
+                2 => .rg,
+                3 => .rgb,
+                4 => .rgba,
+                else => .rgba,
+            }
+        } else {
+            switch (dims) {
+                1 => @compileError("srgb is not supported for channel count 1"),
+                2 => @compileError("srgb is not supported for channel count 2"),
+                3 => .srgb,
+                4 => .srgb_alpha,
+                else => .srgb_alpha,
+            }
+        };
+    }
+
+    pub fn dimensions(self: PixelChannels) u32 {
+        return switch (self) {
+            .r => 1,
+            .rg => 2,
+            .rgb => 3,
+            .srgb => 3,
+            .rgba => 4,
+            .srgb_alpha => 4,
+            .depth => 1,
+        };
+    }
+
+    pub fn glType(comptime self: PixelChannels) c_uint {
+        return switch (self) {
+            .r => c.GL_RED,
+            .rg => c.GL_RG,
+            .rgb => c.GL_RGB,
+            .srgb => c.GL_RGB,
+            .rgba => c.GL_RGBA,
+            .srgb_alpha => c.GL_RGBA,
+            .depth => c.GL_DEPTH_COMPONENT,
+        };
+    }
+};
+
+pub const PixelComponent = enum(c_uint) {
+    u8norm,
+    i8norm,
+    u8,
+    i8,
+    u16,
+    i16,
+    u16norm,
+    i16norm,
+    u32,
+    i32,
+    f32,
+
+    pub fn Type(comptime self: PixelComponent) type {
+        return switch (self) {
+            .u8norm => u8,
+            .i8norm => i8,
+            .u8 => u8,
+            .i8 => i8,
+            .u16norm => u16,
+            .i16norm => i16,
+            .u16 => u16,
+            .i16 => i16,
+            .u32 => u32,
+            .i32 => i32,
+            .f32 => f32,
+        };
+    }
+
+    pub fn glType(comptime self: PixelComponent) c_uint {
+        return switch (self) {
+            .u8norm => c.GL_UNSIGNED_BYTE,
+            .i8norm => c.GL_BYTE,
+            .u8 => c.GL_UNSIGNED_BYTE,
+            .i8 => c.GL_BYTE,
+            .u16norm => c.GL_UNSIGNED_SHORT,
+            .i16norm => c.GL_SHORT,
+            .u16 => c.GL_UNSIGNED_SHORT,
+            .i16 => c.GL_SHORT,
+            .u32 => c.GL_UNSIGNED_INT,
+            .i32 => c.GL_INT,
+            .f32 => c.GL_FLOAT,
         };
     }
 };

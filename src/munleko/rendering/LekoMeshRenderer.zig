@@ -12,6 +12,7 @@ const AtomicFlag = util.AtomicFlag;
 
 const Client = @import("../Client.zig");
 const Engine = @import("../Engine.zig");
+const Assets = Engine.Assets;
 
 const Session = Engine.Session;
 const World = Engine.World;
@@ -52,6 +53,7 @@ world_model: *WorldModel,
 leko_mesh: LekoMesh,
 leko_face_index_buffer: LekoMesh.IndexBuffer,
 leko_face_shader: LekoFaceShader,
+leko_texture_atlas: LekoTextureAtlas,
 
 pub fn create(allocator: Allocator, scene: *Scene, world_model: *WorldModel) !*LekoMeshRenderer {
     const self = try allocator.create(LekoMeshRenderer);
@@ -62,9 +64,12 @@ pub fn create(allocator: Allocator, scene: *Scene, world_model: *WorldModel) !*L
         .leko_mesh = LekoMesh.create(),
         .leko_face_index_buffer = LekoMesh.IndexBuffer.create(),
         .leko_face_shader = try LekoFaceShader.create(.{}, @embedFile("leko_face.glsl")),
+        .leko_texture_atlas = LekoTextureAtlas.create(),
     };
     self.leko_face_index_buffer.data(&.{ 0, 1, 3, 2 }, .static_draw);
     self.leko_mesh.setIndexBuffer(self.leko_face_index_buffer);
+    self.leko_face_shader.setSampler(.texture_atlas, 3);
+    self.leko_texture_atlas.setFilter(.nearest, .nearest);
     return self;
 }
 
@@ -74,7 +79,20 @@ pub fn destroy(self: *LekoMeshRenderer) void {
     self.leko_mesh.destroy();
     self.leko_face_index_buffer.destroy();
     self.leko_face_shader.destroy();
+    self.leko_texture_atlas.destroy();
 }
+
+pub fn applyAssets(self: *LekoMeshRenderer, assets: *const Assets) !void {
+    const texture_size = assets.leko_texture_size;
+    const texture_count = assets.leko_texture_table.map.count();
+    self.leko_texture_atlas.alloc(texture_size, texture_size, texture_count);
+    var iter = assets.leko_texture_table.map.valueIterator();
+    while (iter.next()) |texture| {
+        self.leko_texture_atlas.upload(texture_size, texture_size, texture.index, texture.pixels);
+    }
+}
+
+const LekoTextureAtlas = gl.TextureRgba8(.array_2d);
 
 pub fn updateAndDrawLekoMeshes(self: *LekoMeshRenderer, draw_chunks: []const WorldRenderer.DrawChunk) void {
     self.leko_mesh.bind();
@@ -86,6 +104,7 @@ pub fn updateAndDrawLekoMeshes(self: *LekoMeshRenderer, draw_chunks: []const Wor
     self.leko_face_shader.setUniform(.fog_start, self.scene.fog_start);
     self.leko_face_shader.setUniform(.fog_end, self.scene.fog_end);
     self.leko_face_shader.setUniform(.fog_power, self.scene.fog_power);
+    self.leko_texture_atlas.bind(3);
     var update_count: usize = 0;
     for (draw_chunks) |draw_chunk| {
         
@@ -121,6 +140,9 @@ pub const LekoFaceShader = ls.Shader(.{
         ls.defUniform("fog_start", .float),
         ls.defUniform("fog_end", .float),
         ls.defUniform("fog_power", .float),
+    },
+    .samplers = &.{
+        ls.defSampler("texture_atlas", .sampler_2d_array),
     },
     .source_modules = &.{
         leko_face_shader_defs,

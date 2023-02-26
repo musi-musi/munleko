@@ -1,18 +1,19 @@
 local leko = {}
 
 leko.stone = {
-    color = {0.5, 0.5, 0.5}
+    -- color = {0.5, 0.5, 0.5},
 }
 leko.grass = {
-    color = {0.1, 0.7, 0.3}
+    -- color = {0.1, 0.7, 0.3},
 }
 leko.dirt = {
-    color = {0.5, 0.4, 0.1}
+    -- color = {0.5, 0.4, 0.1},
 }
-leko.sand = {
-    color = {0.7, 0.7, 0.6}
-}
+-- leko.sand = {
+--     -- color = {0.7, 0.7, 0.6},
+-- }
 
 return {
-    leko = leko
+    leko_texture_size = 128,
+    leko = leko,
 }

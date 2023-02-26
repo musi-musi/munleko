@@ -11,7 +11,7 @@ const Session = @This();
 const World = @import("World.zig");
 const WorldManager = World.Manager;
 
-const AssetDatabase = @import("AssetDatabase.zig");
+const Assets = @import("Assets.zig");
 
 const Thread = std.Thread;
 const AtomicFlag = util.AtomicFlag;
@@ -49,7 +49,7 @@ pub fn destroy(self: *Session) void {
     self.world_man.destroy();
 }
 
-pub fn applyAssets(self: *Session, assets: *const AssetDatabase) !void {
+pub fn applyAssets(self: *Session, assets: *const Assets) !void {
     try self.world.leko_data.leko_types.addLekoTypesFromAssetTable(assets.leko_table);
 }
 
