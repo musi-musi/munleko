@@ -105,7 +105,12 @@ pub fn start(self: *WorldRenderer, observer: Observer) !void {
     self.is_running.set(true);
     self.draw_list_update_thread = try Thread.spawn(.{}, drawListUpdateThreadMain, .{self});
     try self.world_model_manager.start(observer);
+
+    const observer_status = self.world.observers.zones.get(observer);
+    const distance = @intToFloat(f32, observer_status.load_radius) * World.chunk_width;
+    self.scene.setFogFromMaxDistance(distance, 0.6, 0.85);
 }
+
 
 pub fn stop(self: *WorldRenderer) void {
     if (self.is_running.get()) {

@@ -184,6 +184,8 @@ const SessionContext = struct {
     }
 
     fn onWorldUpdate(self: SessionContext, world: *World) !void {
+        // _ = self;
+        // _ = world;
         try self.session_renderer.onWorldUpdate(world);
     }
 };

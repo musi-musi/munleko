@@ -37,6 +37,11 @@ pub fn setupDebug(self: *Scene) *Debug {
     return &self.debug;
 }
 
+pub fn setFogFromMaxDistance(self: *Scene, distance: f32, start_factor: f32, end_factor: f32) void {
+    self.fog_start = distance * start_factor;
+    self.fog_end = distance * end_factor;
+}
+
 const Plane3 = nm.Plane3;
 const plane3 = nm.plane3;
 
