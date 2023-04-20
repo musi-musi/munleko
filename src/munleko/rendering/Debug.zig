@@ -13,9 +13,7 @@ const Vert = struct {
     normal: [3]f32,
 };
 
-const Mesh = ls.Mesh(.{
-    .buffers = &.{ ls.defVertexBuffer(Vert)}
-});
+const Mesh = ls.Mesh(.{ .buffers = &.{ls.defVertexBuffer(Vert)} });
 
 const Shader = ls.Shader(.{
     .vert_inputs = Mesh.vertex_in_defs,
@@ -29,17 +27,15 @@ const Shader = ls.Shader(.{
     },
 });
 
-
 shader: Shader,
 mesh: Mesh,
 cube_buffers: Buffers,
-
 
 pub fn init() !Debug {
     const shader = try Shader.create(.{}, @embedFile("debug.glsl"));
     const cube_buffers = generateCubeBuffers();
     const mesh = Mesh.create();
-    return Debug {
+    return Debug{
         .shader = shader,
         .mesh = mesh,
         .cube_buffers = cube_buffers,
@@ -91,7 +87,7 @@ pub const Buffers = struct {
     indices: gl.Buffer(u32),
 
     pub fn create() Buffers {
-        return Buffers {
+        return Buffers{
             .verts = gl.Buffer(Vert).create(),
             .indices = gl.Buffer(u32).create(),
         };
@@ -107,8 +103,7 @@ fn generateCubeBuffers() Buffers {
     const buffers = Buffers.create();
 
     @setEvalBranchQuota(1_000_000);
-    const verts = comptime
-        generateFace(.x_pos) ++
+    const verts = comptime generateFace(.x_pos) ++
         generateFace(.x_neg) ++
         generateFace(.y_pos) ++
         generateFace(.y_neg) ++

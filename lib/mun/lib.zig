@@ -10,19 +10,17 @@ const Integer = ziglua.Integer;
 pub fn toVector(lua: *Lua, comptime Scalar: type, comptime dimensions: comptime_int, index: i32) ![dimensions]Scalar {
     const is_float = comptime std.meta.trait.isFloat(Scalar);
     var vector: [dimensions]Scalar = undefined;
-    for (vector) |*v, i| {
+    for (&vector, 0..) |*v, i| {
         _ = lua.getIndex(index, @intCast(Integer, i + 1));
         defer lua.pop(1);
         if (is_float) {
             v.* = @floatCast(Scalar, try lua.toNumber(-1));
-        }
-        else {
+        } else {
             v.* = @intCast(Scalar, try lua.toInteger(-1));
         }
     }
     return vector;
 }
-
 
 pub fn toVec2(lua: *Lua, index: i32) ![2]f32 {
     return toVector(lua, f32, 2, index);

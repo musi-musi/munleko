@@ -164,7 +164,6 @@ const ChunkModels = struct {
     }
 };
 
-
 pub const Manager = struct {
     allocator: Allocator,
     world_model: *WorldModel,

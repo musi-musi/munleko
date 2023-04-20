@@ -1,14 +1,10 @@
 const std = @import("std");
 const nm = @import("lib.zig");
 
-
-
 fn Mixin(comptime Self: type, comptime dimensions_: comptime_int) type {
     return struct {
-
         pub const dimensions = dimensions_;
         pub const values = std.enums.values(Self);
-
     };
 }
 
@@ -22,19 +18,25 @@ pub fn Axis(comptime dimensions: comptime_int) type {
             pub usingnamespace mixin;
         },
         2 => enum {
-            x, y,
+            x,
+            y,
             const Self = @This();
             const mixin = Mixin(Self, dimensions);
             pub usingnamespace mixin;
         },
         3 => enum {
-            x, y, z,
+            x,
+            y,
+            z,
             const Self = @This();
             const mixin = Mixin(Self, dimensions);
             pub usingnamespace mixin;
         },
         4 => enum {
-            x, y, z, w,
+            x,
+            y,
+            z,
+            w,
             const Self = @This();
             const mixin = Mixin(Self, dimensions);
             pub usingnamespace mixin;

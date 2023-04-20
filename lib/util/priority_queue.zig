@@ -47,7 +47,6 @@ pub fn JobQueueUnmanaged(comptime T: type) type {
             self.queue.nodes.clearAndFree(allocator);
             self.cond.broadcast();
         }
-
     };
 }
 
@@ -126,20 +125,15 @@ pub fn PriorityQueueUnmanaged(comptime T: type) type {
                 if (len == 1) {
                     self.nodes.items.len = 0;
                     return node;
-                }
-                else {
+                } else {
                     self.swap(0, len - 1);
                     self.nodes.items.len -= 1;
                     self.down(0);
                     return node;
                 }
-            }
-            else {
+            } else {
                 return null;
             }
         }
-
-
-
     };
 }

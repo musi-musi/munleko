@@ -20,7 +20,7 @@ pub fn MaxHeapUnmanaged(comptime T: type) type {
     }).before);
 }
 
-pub fn HeapUnmanaged(comptime T: type, comptime before: fn(T, T) bool) type {
+pub fn HeapUnmanaged(comptime T: type, comptime before: fn (T, T) bool) type {
     return struct {
         const Self = @This();
 
@@ -82,7 +82,10 @@ pub fn HeapUnmanaged(comptime T: type, comptime before: fn(T, T) bool) type {
             self.up(len);
         }
 
-        pub fn pushAssumeCapacity(self: *Self, new: T,) void {
+        pub fn pushAssumeCapacity(
+            self: *Self,
+            new: T,
+        ) void {
             const len = self.items.items.len;
             self.items.appendAssumeCapacity(new);
             self.up(len);

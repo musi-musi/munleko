@@ -1,9 +1,7 @@
 const std = @import("std");
 const gl = @import("gl");
 
-
 pub const MeshConfig = struct {
-
     buffers: []const MeshBufferDef,
     index_type: gl.IndexType = .uint,
     primitive_type: gl.PrimitiveType = .triangles,
@@ -14,13 +12,7 @@ pub const MeshConfig = struct {
         for (self.buffers) |buffer| {
             const T = buffer.data_type;
             for (std.meta.fields(T)) |field| {
-                vert_inputs = vert_inputs ++ &[_]VertInDef{
-                    defVertIn(
-                        location,
-                        field.name,
-                        gl.GlslPrimitive.fromType(field.type)
-                    )
-                };
+                vert_inputs = vert_inputs ++ &[_]VertInDef{defVertIn(location, field.name, gl.GlslPrimitive.fromType(field.type))};
                 location += 1;
             }
         }
@@ -50,7 +42,6 @@ pub fn defInstanceBuffer(comptime data_type: type) MeshBufferDef {
 
 pub fn Mesh(comptime mesh_cfg: MeshConfig) type {
     return struct {
-
         array: gl.Array,
 
         pub const cfg = mesh_cfg;
@@ -61,7 +52,7 @@ pub fn Mesh(comptime mesh_cfg: MeshConfig) type {
         pub fn create() Self {
             const array = gl.Array.create();
             comptime var a: u32 = 0;
-            inline for (cfg.buffers) |buffer, b| {
+            inline for (cfg.buffers, 0..) |buffer, b| {
                 const T = buffer.data_type;
                 inline for (std.meta.fields(T)) |field| {
                     array.setAttributeFormat(
@@ -76,7 +67,7 @@ pub fn Mesh(comptime mesh_cfg: MeshConfig) type {
                     array.setBindingDivisor(@intCast(u32, b), buffer.divisor);
                 }
             }
-            return Self {
+            return Self{
                 .array = array,
             };
         }
@@ -115,7 +106,6 @@ pub fn Mesh(comptime mesh_cfg: MeshConfig) type {
     };
 }
 
-
 const GlslPrimitive = gl.GlslPrimitive;
 
 pub const VertInDef = struct {
@@ -153,7 +143,6 @@ pub const SamplerType = enum {
     }
 };
 
-
 pub fn defVertIn(location: u32, name: []const u8, attr_type: GlslPrimitive) VertInDef {
     return .{
         .location = location,
@@ -187,14 +176,14 @@ pub fn defUniformArray(name: []const u8, uniform_type: GlslPrimitive, array_len:
 
 pub fn defSampler(name: []const u8, sampler_type: SamplerType) SamplerDef {
     return .{
-        .name = name, 
+        .name = name,
         .sampler_type = sampler_type,
     };
 }
 
 pub const ShaderDefs = struct {
     vert_inputs: []const VertInDef = &.{},
-    frag_outputs: []const FragOutDef = &.{ defFragOut(0, "color", .vec4)},
+    frag_outputs: []const FragOutDef = &.{defFragOut(0, "color", .vec4)},
     uniforms: []const UniformDef = &.{},
     samplers: []const SamplerDef = &.{},
     source_modules: []const []const u8 = &.{},
@@ -204,7 +193,7 @@ pub const ShaderDefs = struct {
             return void;
         }
         var uniform_tag_fields: [self.uniforms.len]Type.EnumField = undefined;
-        for (self.uniforms) |uniform, i| {
+        for (self.uniforms, 0..) |uniform, i| {
             uniform_tag_fields[i] = .{
                 .name = uniform.name,
                 .value = i,
@@ -229,7 +218,7 @@ pub const ShaderDefs = struct {
             return void;
         }
         var sampler_tag_fields: [self.samplers.len]Type.EnumField = undefined;
-        for (self.samplers) |sampler, i| {
+        for (self.samplers, 0..) |sampler, i| {
             sampler_tag_fields[i] = .{
                 .name = sampler.name,
                 .value = i,
@@ -257,9 +246,7 @@ pub const ShaderDefs = struct {
             .samplers = self.samplers ++ other.samplers,
         };
     }
-
 };
-
 
 fn removeDupes(comptime T: type, comptime in: []const T) []const T {
     @setEvalBranchQuota(10000);
@@ -269,9 +256,8 @@ fn removeDupes(comptime T: type, comptime in: []const T) []const T {
             if (std.mem.eql(u8, a.name, b.name)) {
                 break;
             }
-        }
-        else {
-            out = out ++ &[1]T{ a };
+        } else {
+            out = out ++ &[1]T{a};
         }
     }
     return out;
@@ -282,7 +268,6 @@ pub const ShaderSourceConfig = struct {
 };
 
 pub const ShaderSourceVersion = struct {
-
     number: u32 = 330,
     profile: Profile = .core,
 
@@ -294,14 +279,12 @@ pub const ShaderSourceVersion = struct {
 
 const Type = std.builtin.Type;
 pub fn Shader(comptime shader_defs: ShaderDefs) type {
-
     return struct {
-
         program: gl.Program,
         uniform_locations: defs.UniformLocations(),
         sampler_locations: defs.SamplerLocations(),
 
-        pub const defs = ShaderDefs {
+        pub const defs = ShaderDefs{
             .vert_inputs = removeDupes(VertInDef, shader_defs.vert_inputs),
             .frag_outputs = removeDupes(FragOutDef, shader_defs.frag_outputs),
             .uniforms = removeDupes(UniformDef, shader_defs.uniforms),
@@ -317,8 +300,7 @@ pub fn Shader(comptime shader_defs: ShaderDefs) type {
             const U = u.uniform_type.Type();
             if (u.array_len == null) {
                 return U;
-            }
-            else {
+            } else {
                 return []const U;
             }
         }
@@ -351,16 +333,16 @@ pub fn Shader(comptime shader_defs: ShaderDefs) type {
             try program.link();
 
             var uniform_locations: defs.UniformLocations() = undefined;
-            inline for (defs.uniforms) |uniform, i| {
+            inline for (defs.uniforms, 0..) |uniform, i| {
                 uniform_locations[i] = program.getUniformLocation("u_" ++ uniform.name ++ "");
             }
 
             var sampler_locations: defs.SamplerLocations() = undefined;
-            inline for (defs.samplers) |sampler, i| {
+            inline for (defs.samplers, 0..) |sampler, i| {
                 sampler_locations[i] = program.getUniformLocation("s_" ++ sampler.name ++ "");
             }
 
-            return Self {
+            return Self{
                 .program = program,
                 .uniform_locations = uniform_locations,
                 .sampler_locations = sampler_locations,
@@ -376,27 +358,27 @@ pub fn Shader(comptime shader_defs: ShaderDefs) type {
             var source = std.ArrayListUnmanaged(u8){};
             errdefer source.deinit(allocator);
             const w = source.writer(allocator);
-            try w.print("#version {d} {s}\n", .{version.number, @tagName(version.profile)});
+            try w.print("#version {d} {s}\n", .{ version.number, @tagName(version.profile) });
             for (defs.uniforms) |u| {
-                try w.print("uniform {s} u_{s}", .{@tagName(u.uniform_type), u.name});
+                try w.print("uniform {s} u_{s}", .{ @tagName(u.uniform_type), u.name });
                 if (u.array_len) |len| {
                     try w.print("[{d}]", .{len});
                 }
                 try w.writeAll(";\n");
             }
             for (defs.samplers) |s| {
-                try w.print("uniform {s} s_{s};\n", .{s.sampler_type.glslKeyword(), s.name});
+                try w.print("uniform {s} s_{s};\n", .{ s.sampler_type.glslKeyword(), s.name });
             }
             if (stage == .vertex) {
                 for (defs.vert_inputs) |vi| {
-                    try w.print("layout (location = {d}) in {s} v_{s};\n", .{vi.location, @tagName(vi.attr_type), vi.name});
+                    try w.print("layout (location = {d}) in {s} v_{s};\n", .{ vi.location, @tagName(vi.attr_type), vi.name });
                 }
                 try w.writeAll("#define vf out\n");
                 try w.writeAll("#define STAGE_VERTEX\n");
             }
             if (stage == .fragment) {
                 for (defs.frag_outputs) |fo| {
-                    try w.print("layout (location = {d}) out {s} f_{s};\n", .{fo.location, @tagName(fo.attr_type), fo.name});
+                    try w.print("layout (location = {d}) out {s} f_{s};\n", .{ fo.location, @tagName(fo.attr_type), fo.name });
                 }
                 try w.writeAll("#define vf in\n");
                 try w.writeAll("#define STAGE_FRAGMENT\n");
@@ -413,8 +395,7 @@ pub fn Shader(comptime shader_defs: ShaderDefs) type {
             const u = defs.uniforms[@enumToInt(tag)];
             if (u.array_len == null) {
                 self.program.setUniform(self.uniform_locations[@enumToInt(tag)], u.uniform_type, value);
-            }
-            else {
+            } else {
                 self.program.setUniformArray(self.uniform_locations[@enumToInt(tag)], u.uniform_type, value);
             }
         }
@@ -426,6 +407,5 @@ pub fn Shader(comptime shader_defs: ShaderDefs) type {
         pub fn use(self: Self) void {
             self.program.use();
         }
-
     };
 }

@@ -1,12 +1,81 @@
 const std = @import("std");
 const ziglua = @import("lib/ziglua/build.zig");
 
-const Pkg = std.build.Pkg;
-const FileSource = std.build.FileSource;
+const Build = std.Build;
+const Step = Build.Step;
+const Module = Build.Module;
+const ModuleDependency = Build.ModuleDependency;
+// Although this function looks imperative, note that its job is to
+// declaratively construct a build graph that will be executed by an external
+// runner.
+pub fn build(b: *Build) void {
+    // Standard target options allows the person running `zig build` to choose
+    // what target to build for. Here we do not override the defaults, which
+    // means any target is allowed, and the default is native. Other options
+    // for restricting supported target set are available.
+    const target = b.standardTargetOptions(.{});
 
-const Allocator = std.mem.Allocator;
-const Step = std.build.Step;
-const Builder = std.build.Builder;
+    // Standard optimization options allow the person running `zig build` to select
+    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
+    // set a preferred release mode, allowing the user to decide how to optimize.
+    const optimize = b.standardOptimizeOption(.{});
+
+    const exe = b.addExecutable(.{
+        .name = "munleko",
+        // In this case the main source file is merely a path, however, in more
+        // complicated build scripts, this could be a generated file.
+        .root_source_file = .{ .path = "src/client_main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // This declares intent for the executable to be installed into the
+    // standard location when the user invokes the "install" step (the default
+    // step when running `zig build`).
+    b.installArtifact(exe);
+
+    addModules(b, exe);
+
+    // This *creates* a RunStep in the build graph, to be executed when another
+    // step is evaluated that depends on it. The next line below will establish
+    // such a dependency.
+    const run_cmd = b.addRunArtifact(exe);
+
+    // By making the run step depend on the install step, it will be run from the
+    // installation directory rather than directly from within the cache directory.
+    // This is not necessary, however, if the application depends on other installed
+    // files, this ensures they will be present and in the expected location.
+    run_cmd.step.dependOn(b.getInstallStep());
+
+    // This allows the user to pass arguments to the application in the build
+    // command itself, like this: `zig build run -- arg1 arg2 etc`
+    run_cmd.addArg("-datapath=./data");
+    if (b.args) |args| {
+        run_cmd.addArgs(args);
+    }
+
+    // This creates a build step. It will be visible in the `zig build --help` menu,
+    // and can be selected like this: `zig build run`
+    // This will evaluate the `run` step rather than the default, which is "install".
+    const run_step = b.step("run", "Run the app");
+    run_step.dependOn(&run_cmd.step);
+
+    // Creates a step for unit testing. This only builds the test executable
+    // but does not run it.
+    const unit_tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const run_unit_tests = b.addRunArtifact(unit_tests);
+
+    // Similar to creating the run step earlier, this exposes a `test` step to
+    // the `zig build --help` menu, providing a way for the user to request
+    // running the unit tests.
+    const test_step = b.step("test", "Run unit tests");
+    test_step.dependOn(&run_unit_tests.step);
+}
 
 pub fn sequence(steps: []const *Step) void {
     var i: usize = 1;
@@ -15,96 +84,51 @@ pub fn sequence(steps: []const *Step) void {
     }
 }
 
-pub fn build(b: *std.build.Builder) !void {
-    // Standard target options allows the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
-    const target = b.standardTargetOptions(.{});
+fn createLibModule(b: *Build, comptime name: []const u8, deps: []const ModuleDependency) *Module {
+    return b.createModule(.{
+        .source_file = .{ .path = "lib/" ++ name ++ "/lib.zig" },
+        .dependencies = deps,
+    });
+}
 
-    // Standard release options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
+fn addModules(b: *Build, exe: *Build.CompileStep) void {
+    const lua = ziglua.compileAndCreateModule(b, exe, .{ .version = .lua_54 });
+    exe.addModule("ziglua", lua);
 
-    const client = buildBase(b, "client");
-    client.linkLibC();
-    client.setBuildMode(mode);
-    client.setTarget(target);
+    exe.linkLibC();
+    const util = createLibModule(b, "util", &.{});
+    exe.addModule("util", util);
+    const window = createLibModule(b, "window", &.{
+        .{ .name = "util", .module = util },
+    });
+    exe.addModule("window", window);
+    const mun = createLibModule(b, "mun", &.{
+        .{ .name = "ziglua", .module = lua },
+    });
+    exe.addModule("mun", mun);
 
-    client.addPackage(pkgs.pkg("window", &.{pkgs.util}));
-
-    client.addIncludePath("lib/window/c");
-    client.addLibraryPath("lib/window/c/");
-    client.linkSystemLibrary("glfw3");
-
-    const gl = pkgs.pkg("gl", null);
-    client.addPackage(gl);
-    const ls = pkgs.pkg("ls", &.{gl});
-    client.addPackage(ls);
-
-    client.addIncludePath("lib/gl/c");
-    client.addCSourceFile("lib/gl/c/glad.c", &.{"-std=c99"});
-
-    client.addIncludePath("src/munleko/engine/c");
-    client.addCSourceFile("src/munleko/engine/c/stb_image.c", &.{"-std=c99"});
-    if (target.getOsTag() == .windows) {
-        client.step.dependOn(
+    exe.addIncludePath("lib/window/c");
+    exe.addLibraryPath("lib/window/c/");
+    exe.linkSystemLibrary("glfw3");
+    if (exe.target.getOsTag() == .windows) {
+        exe.step.dependOn(
             &b.addInstallBinFile(.{ .path = "lib/window/c/glfw3.dll" }, "glfw3.dll").step,
         );
     }
 
-    const install_client = &b.addInstallArtifact(client).step;
-    const run_cmd = client.run();
-    run_cmd.addArg("-datapath=./data");
+    const nm = createLibModule(b, "nm", &.{});
+    exe.addModule("nm", nm);
+    const gl = createLibModule(b, "gl", &.{});
+    exe.addModule("gl", gl);
+    exe.addIncludePath("lib/gl/c");
+    exe.addCSourceFile("lib/gl/c/glad.c", &.{"-std=c99"});
 
-    sequence(&[_]*Step{
-        install_client,
-        b.default_step,
+    const ls = createLibModule(b, "ls", &.{
+        .{ .name = "gl", .module = gl },
     });
+    exe.addModule("ls", ls);
 
-    sequence(&[_]*Step{
-        install_client,
-        &run_cmd.step,
-        b.step("run", "Run the app"),
-    });
 
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-}
-
-const fs = std.fs;
-
-const pkgs = struct {
-    const nm = pkg("nm", null);
-    const util = pkg("util", null);
-
-    fn pkg(comptime name: []const u8, deps: ?[]const Pkg) Pkg {
-        return Pkg{
-            .name = name,
-            .source = .{ .path = "lib/" ++ name ++ "/lib.zig" },
-            .dependencies = deps,
-        };
-    }
-};
-
-fn buildBase(b: *std.build.Builder, comptime frontend_id: []const u8) *std.build.LibExeObjStep {
-    const exe = b.addExecutable("munleko", "src/" ++ frontend_id ++ "_main.zig");
-    const lua = ziglua.linkAndPackage(b, exe, .{});
-    exe.addPackage(lua);
-    const mun = Pkg{
-        .name = "mun",
-        .source = .{ .path = "lib/mun/lib.zig" },
-        .dependencies = &.{lua},
-    };
-    exe.addPackage(mun);
-
-    inline for (comptime std.meta.declarations(pkgs)) |decl| {
-        const pkg = @field(pkgs, decl.name);
-        if (@TypeOf(pkg) == Pkg) {
-            exe.addPackage(pkg);
-        }
-    }
-
-    return exe;
+    exe.addIncludePath("src/munleko/engine/c");
+    exe.addCSourceFile("src/munleko/engine/c/stb_image.c", &.{"-std=c99"});
 }

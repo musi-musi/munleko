@@ -42,7 +42,6 @@ pub const Vsync = enum(c_int) {
 };
 
 pub const Window = struct {
-
     allocator: Allocator,
     handle: Handle = null,
     events: Events,
@@ -51,12 +50,11 @@ pub const Window = struct {
     vsync: Vsync = .disabled,
     mouse_mode: MouseMode = .visible,
 
-    pub const Events = util.Events(union (enum) {
+    pub const Events = util.Events(union(enum) {
         button_pressed: ButtonCode,
         button_released: ButtonCode,
         framebuffer_size: [2]u32,
     });
-
 
     pub const ButtonSet = std.AutoHashMapUnmanaged(ButtonCode, void);
 
@@ -84,9 +82,7 @@ pub const Window = struct {
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, @intCast(c_int, gl_options.version_minor));
         c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, @enumToInt(gl_options.profile));
         c.glfwWindowHint(c.GLFW_SAMPLES, 8);
-        const debug: c_int = (
-            if (builtin.mode == .Debug) c.GLFW_TRUE else c.GLFW_FALSE
-        );
+        const debug: c_int = (if (builtin.mode == .Debug) c.GLFW_TRUE else c.GLFW_FALSE);
         c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, debug);
 
         if (c.glfwCreateWindow(@intCast(c_int, self.size[0]), @intCast(c_int, self.size[1]), "window", null, null)) |handle| {
@@ -95,8 +91,7 @@ pub const Window = struct {
             _ = c.glfwSetKeyCallback(handle, keyCallback);
             _ = c.glfwSetMouseButtonCallback(handle, mouseButtonCallback);
             _ = c.glfwSetFramebufferSizeCallback(self.handle, framebufferSizeCallback);
-        }
-        else {
+        } else {
             return error.GlfwCreateWindowFailed;
         }
 
@@ -167,7 +162,6 @@ pub const Window = struct {
             },
             else => {},
         }
-
     }
 
     pub fn buttonPressed(self: Window, button: ButtonCode) bool {
@@ -196,7 +190,7 @@ pub const Window = struct {
         var x: f64 = undefined;
         var y: f64 = undefined;
         c.glfwGetCursorPos(self.handle, &x, &y);
-        return [2]f32 {
+        return [2]f32{
             @floatCast(f32, x),
             @floatCast(f32, y),
         };
@@ -211,10 +205,8 @@ pub const Window = struct {
         self.mouse_mode = mode;
         if (self.isRawMouseSupported()) {
             switch (mode) {
-                .disabled =>
-                    c.glfwSetInputMode(self.handle, c.GLFW_RAW_MOUSE_MOTION, c.GLFW_TRUE),
-                else =>
-                    c.glfwSetInputMode(self.handle, c.GLFW_RAW_MOUSE_MOTION, c.GLFW_FALSE),
+                .disabled => c.glfwSetInputMode(self.handle, c.GLFW_RAW_MOUSE_MOTION, c.GLFW_TRUE),
+                else => c.glfwSetInputMode(self.handle, c.GLFW_RAW_MOUSE_MOTION, c.GLFW_FALSE),
             }
         }
         c.glfwPollEvents();
@@ -223,7 +215,6 @@ pub const Window = struct {
     pub fn isRawMouseSupported(_: Window) bool {
         return c.glfwRawMouseMotionSupported() != c.GLFW_FALSE;
     }
-
 };
 
 pub const ButtonEvent = enum {
@@ -237,7 +228,6 @@ pub const ButtonState = enum(c_int) {
 };
 
 pub const ButtonCode = enum(c_int) {
-
     const Self = @This();
 
     fn fromButtonCode(key: ButtonCode) Self {
@@ -248,8 +238,7 @@ pub const ButtonCode = enum(c_int) {
         const mouse_start = @enumToInt(Self.mouse_1);
         if (@enumToInt(self) >= mouse_start) {
             return .mouse;
-        }
-        else {
+        } else {
             return .keyboard;
         }
     }

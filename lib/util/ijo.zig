@@ -17,7 +17,7 @@ pub fn Ijo(comptime ijo_type_name_: []const u8) type {
         const Self = @This();
 
         pub fn format(self: Self, comptime _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
-            try writer.print("[{s} {d}]", .{ijo_type_name, @enumToInt(self)});
+            try writer.print("[{s} {d}]", .{ ijo_type_name, @enumToInt(self) });
         }
 
         pub const HashContext = struct {
@@ -56,7 +56,7 @@ pub fn IjoPool(comptime IjoT_: type) type {
         const Self = @This();
 
         pub fn init(allocator: Allocator) Self {
-            return Self {
+            return Self{
                 .allocator = allocator,
                 .id_pool = .{},
             };
@@ -135,7 +135,6 @@ pub fn IjoDataStore(comptime IjoT_: type, comptime Data_: type, comptime Context
     assertIsIjo(IjoT_);
 
     return struct {
-
         allocator: Allocator,
         arena: ArenaAllocator,
         context: Context,
@@ -146,7 +145,7 @@ pub fn IjoDataStore(comptime IjoT_: type, comptime Data_: type, comptime Context
         pub const Data = Data_;
         pub const Segment = [segment_len]Data;
         pub const Context = Context_;
-        
+
         pub const segment_count_bits = 10;
         pub const segment_count = 1 << segment_count_bits;
 
@@ -158,7 +157,7 @@ pub fn IjoDataStore(comptime IjoT_: type, comptime Data_: type, comptime Context
         const Self = @This();
 
         pub fn initWithContext(allocator: Allocator, context: Context) Self {
-            return Self {
+            return Self{
                 .allocator = allocator,
                 .arena = ArenaAllocator.init(allocator),
                 .context = context,

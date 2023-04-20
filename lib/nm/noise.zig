@@ -14,13 +14,11 @@ pub fn Perlin(comptime Scalar_: type, comptime dimensions_: u32) type {
     comptime nm.assertFloat(Scalar_);
     comptime nm.assertValidDimensionCount(dimensions_);
     return struct {
-
         pub const Scalar = Scalar_;
         pub const dimensions = dimensions_;
 
         pub const Vector = nm.Vector(Scalar, dimensions);
         pub const IVector = nm.Vector(isize, dimensions);
-        
 
         const Self = @This();
 
@@ -47,7 +45,7 @@ pub fn Perlin(comptime Scalar_: type, comptime dimensions_: u32) type {
                     result[v] = g;
                 }
             }
-            break: blk result;
+            break :blk result;
         };
 
         pub fn sample(self: Self, value: Vector.Value) Scalar {
@@ -60,94 +58,16 @@ pub fn Perlin(comptime Scalar_: type, comptime dimensions_: u32) type {
             const s = v.sub(min.cast(Scalar)).v;
             switch (dimensions) {
                 1 => {
-                    return interpolate(
-                        dotGradient(.{a[0]}, v),
-                        dotGradient(.{b[0]}, v),
-                    s[0]);
+                    return interpolate(dotGradient(.{a[0]}, v), dotGradient(.{b[0]}, v), s[0]);
                 },
                 2 => {
-                    return interpolate(
-                        interpolate(
-                            dotGradient(.{a[0], a[1]}, v),
-                            dotGradient(.{b[0], a[1]}, v),
-                        s[0]),
-                        interpolate(
-                            dotGradient(.{a[0], b[1]}, v),
-                            dotGradient(.{b[0], b[1]}, v),
-                        s[0]),
-                    s[1]);
+                    return interpolate(interpolate(dotGradient(.{ a[0], a[1] }, v), dotGradient(.{ b[0], a[1] }, v), s[0]), interpolate(dotGradient(.{ a[0], b[1] }, v), dotGradient(.{ b[0], b[1] }, v), s[0]), s[1]);
                 },
                 3 => {
-                    return interpolate(
-                        interpolate(
-                            interpolate(
-                                dotGradient(.{a[0], a[1], a[2]}, v),
-                                dotGradient(.{b[0], a[1], a[2]}, v),
-                            s[0]),
-                            interpolate(
-                                dotGradient(.{a[0], b[1], a[2]}, v),
-                                dotGradient(.{b[0], b[1], a[2]}, v),
-                            s[0]),
-                        s[1]),
-                        interpolate(
-                            interpolate(
-                                dotGradient(.{a[0], a[1], b[2]}, v),
-                                dotGradient(.{b[0], a[1], b[2]}, v),
-                            s[0]),
-                            interpolate(
-                                dotGradient(.{a[0], b[1], b[2]}, v),
-                                dotGradient(.{b[0], b[1], b[2]}, v),
-                            s[0]),
-                        s[1]),
-                    s[2]);
+                    return interpolate(interpolate(interpolate(dotGradient(.{ a[0], a[1], a[2] }, v), dotGradient(.{ b[0], a[1], a[2] }, v), s[0]), interpolate(dotGradient(.{ a[0], b[1], a[2] }, v), dotGradient(.{ b[0], b[1], a[2] }, v), s[0]), s[1]), interpolate(interpolate(dotGradient(.{ a[0], a[1], b[2] }, v), dotGradient(.{ b[0], a[1], b[2] }, v), s[0]), interpolate(dotGradient(.{ a[0], b[1], b[2] }, v), dotGradient(.{ b[0], b[1], b[2] }, v), s[0]), s[1]), s[2]);
                 },
                 4 => {
-                    return interpolate(
-                        interpolate(
-                            interpolate(
-                                interpolate(
-                                    dotGradient(.{a[0], a[1], a[2], a[3]}, v),
-                                    dotGradient(.{b[0], a[1], a[2], a[3]}, v),
-                                s[0]),
-                                interpolate(
-                                    dotGradient(.{a[0], b[1], a[2], a[3]}, v),
-                                    dotGradient(.{b[0], b[1], a[2], a[3]}, v),
-                                s[0]),
-                            s[1]),
-                            interpolate(
-                                interpolate(
-                                    dotGradient(.{a[0], a[1], b[2], a[3]}, v),
-                                    dotGradient(.{b[0], a[1], b[2], a[3]}, v),
-                                s[0]),
-                                interpolate(
-                                    dotGradient(.{a[0], b[1], b[2], a[3]}, v),
-                                    dotGradient(.{b[0], b[1], b[2], a[3]}, v),
-                                s[0]),
-                            s[1]),
-                        s[2]),
-                        interpolate(
-                            interpolate(
-                                interpolate(
-                                    dotGradient(.{a[0], a[1], a[2], b[3]}, v),
-                                    dotGradient(.{b[0], a[1], a[2], b[3]}, v),
-                                s[0]),
-                                interpolate(
-                                    dotGradient(.{a[0], b[1], a[2], b[3]}, v),
-                                    dotGradient(.{b[0], b[1], a[2], b[3]}, v),
-                                s[0]),
-                            s[1]),
-                            interpolate(
-                                interpolate(
-                                    dotGradient(.{a[0], a[1], b[2], b[3]}, v),
-                                    dotGradient(.{b[0], a[1], b[2], b[3]}, v),
-                                s[0]),
-                                interpolate(
-                                    dotGradient(.{a[0], b[1], b[2], b[3]}, v),
-                                    dotGradient(.{b[0], b[1], b[2], b[3]}, v),
-                                s[0]),
-                            s[1]),
-                        s[2]),
-                    s[3]);
+                    return interpolate(interpolate(interpolate(interpolate(dotGradient(.{ a[0], a[1], a[2], a[3] }, v), dotGradient(.{ b[0], a[1], a[2], a[3] }, v), s[0]), interpolate(dotGradient(.{ a[0], b[1], a[2], a[3] }, v), dotGradient(.{ b[0], b[1], a[2], a[3] }, v), s[0]), s[1]), interpolate(interpolate(dotGradient(.{ a[0], a[1], b[2], a[3] }, v), dotGradient(.{ b[0], a[1], b[2], a[3] }, v), s[0]), interpolate(dotGradient(.{ a[0], b[1], b[2], a[3] }, v), dotGradient(.{ b[0], b[1], b[2], a[3] }, v), s[0]), s[1]), s[2]), interpolate(interpolate(interpolate(dotGradient(.{ a[0], a[1], a[2], b[3] }, v), dotGradient(.{ b[0], a[1], a[2], b[3] }, v), s[0]), interpolate(dotGradient(.{ a[0], b[1], a[2], b[3] }, v), dotGradient(.{ b[0], b[1], a[2], b[3] }, v), s[0]), s[1]), interpolate(interpolate(dotGradient(.{ a[0], a[1], b[2], b[3] }, v), dotGradient(.{ b[0], a[1], b[2], b[3] }, v), s[0]), interpolate(dotGradient(.{ a[0], b[1], b[2], b[3] }, v), dotGradient(.{ b[0], b[1], b[2], b[3] }, v), s[0]), s[1]), s[2]), s[3]);
                 },
                 else => unreachable,
             }
@@ -160,7 +80,7 @@ pub fn Perlin(comptime Scalar_: type, comptime dimensions_: u32) type {
         fn dotGradient(value: [dimensions]isize, position: Vector) Scalar {
             const grad = gradient(value);
             var dist: Vector = undefined;
-            inline for(Vector.indices) |i| {
+            inline for (Vector.indices) |i| {
                 dist.v[i] = @intToFloat(Scalar, value[i]) - position.v[i];
             }
             return dist.dot(grad);
@@ -172,13 +92,11 @@ pub fn Perlin(comptime Scalar_: type, comptime dimensions_: u32) type {
             var hash = comptime r.int(usize);
             comptime var i = 0;
             inline while (i < dimensions) : (i += 1) {
-                hash ^= (@bitCast(usize, value[i]) << 5 * i ) ^ comptime r.int(usize) +% r.int(usize);
-                hash ^= (@bitCast(usize, value[i]) << 2 * i + 3 ) ^ comptime r.int(usize) +% r.int(usize);
-                hash ^= (@bitCast(usize, value[i]) << i + 6 ) ^ comptime r.int(usize) +% r.int(usize);
+                hash ^= (@bitCast(usize, value[i]) << 5 * i) ^ comptime r.int(usize) +% r.int(usize);
+                hash ^= (@bitCast(usize, value[i]) << 2 * i + 3) ^ comptime r.int(usize) +% r.int(usize);
+                hash ^= (@bitCast(usize, value[i]) << i + 6) ^ comptime r.int(usize) +% r.int(usize);
             }
             return gradient_table[hash % gradient_table.len];
         }
-
-
     };
 }

@@ -1,8 +1,6 @@
 const std = @import("std");
 const nm = @import("lib.zig");
 
-
-
 pub const Cardinal2 = Cardinal(2);
 pub const Cardinal3 = Cardinal(3);
 pub const Cardinal4 = Cardinal(4);
@@ -60,7 +58,6 @@ pub fn Cardinal(comptime dimensions_: comptime_int) type {
 
 fn Mixin(comptime Self: type, comptime dimensions_: comptime_int) type {
     return struct {
-
         pub const dimensions = dimensions_;
         pub const Axis = nm.Axis(dimensions);
         const AxisTag = std.meta.Tag(Axis);
@@ -80,18 +77,17 @@ fn Mixin(comptime Self: type, comptime dimensions_: comptime_int) type {
         pub fn negate(self: Self) Self {
             return @intToEnum(Self, @enumToInt(self) ^ 1);
         }
-
     };
 }
 
 pub const Sign = enum(u1) {
-    positive, negative,
+    positive,
+    negative,
 
     pub fn ofScalar(comptime T: type, value: T) Sign {
         if (value > 0) {
             return .positive;
-        }
-        else {
+        } else {
             return .negative;
         }
     }

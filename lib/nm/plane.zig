@@ -1,7 +1,6 @@
 const std = @import("std");
 const nm = @import("lib.zig");
 
-
 pub const Plane2 = Plane(f32, 2);
 pub const Plane3 = Plane(f32, 3);
 pub const Plane4 = Plane(f32, 4);
@@ -33,7 +32,7 @@ pub fn Plane(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         const Self = @This();
 
         pub fn init(normal: Vector, distance: Scalar) Self {
-            return Self {
+            return Self{
                 .normal = normal,
                 .distance = distance,
             };

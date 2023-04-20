@@ -2,9 +2,6 @@ const std = @import("std");
 
 const nm = @import("lib.zig");
 
-
-
-
 pub const Vec2 = Vector(f32, 2);
 pub const Vec3 = Vector(f32, 3);
 pub const Vec4 = Vector(f32, 4);
@@ -65,7 +62,6 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
     comptime nm.assertFloatOrInt(Scalar_);
     comptime nm.assertValidDimensionCount(dimensions_);
     return extern struct {
-        
         v: Value,
 
         pub const Value = [dimensions]Scalar;
@@ -76,25 +72,25 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         pub const Cardinal = nm.Cardinal(dimensions);
 
         pub const axes = Axis.values;
-        pub const indices = ([4]u32{0, 1, 2, 3})[0..dimensions];
+        pub const indices = ([4]u32{ 0, 1, 2, 3 })[0..dimensions];
 
         pub const Comp = switch (dimensions) {
-            1 => extern struct { 
+            1 => extern struct {
                 x: Scalar,
             },
-            2 => extern struct { 
-                x: Scalar, 
+            2 => extern struct {
+                x: Scalar,
                 y: Scalar,
             },
-            3 => extern struct { 
-                x: Scalar, 
-                y: Scalar, 
+            3 => extern struct {
+                x: Scalar,
+                y: Scalar,
                 z: Scalar,
             },
-            4 => extern struct { 
-                x: Scalar, 
-                y: Scalar, 
-                z: Scalar, 
+            4 => extern struct {
+                x: Scalar,
+                y: Scalar,
+                z: Scalar,
                 w: Scalar,
             },
             else => unreachable,
@@ -106,7 +102,7 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         pub const one = fill(1);
 
         pub fn init(v: Value) Self {
-            return .{ .v = v};
+            return .{ .v = v };
         }
 
         pub fn get(self: Self, a: Axis) Scalar {
@@ -124,7 +120,7 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
 
         pub fn cast(self: Self, comptime S: type) Vector(S, dimensions) {
             var result: Vector(S, dimensions) = undefined;
-            inline for(indices) |i| {
+            inline for (indices) |i| {
                 switch (@typeInfo(Scalar)) {
                     .Float => switch (@typeInfo(S)) {
                         .Float => result.v[i] = @floatCast(S, self.v[i]),
@@ -146,12 +142,12 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         pub fn removeDimension(self: Self) Vector(Scalar, dimensions - 1) {
             return Vector(Scalar, dimensions - 1).init(self.v[0..(dimensions - 1)].*);
         }
-        
+
         /// raise this vector by one dimension, appending v as the value for the last component
         pub fn addDimension(self: Self, v: Scalar) Vector(Scalar, dimensions + 1) {
             const Target = Vector(Scalar, dimensions + 1);
             var res: Target = undefined;
-            inline for(indices) |i| {
+            inline for (indices) |i| {
                 res.v[i] = self.v[i];
             }
             res.v[dimensions] = v;
@@ -167,27 +163,27 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
 
         pub fn fill(v: Scalar) Self {
             var res: Self = undefined;
-            inline for(indices) |i| {
+            inline for (indices) |i| {
                 res.v[i] = v;
             }
             return res;
         }
 
         pub fn unit(comptime a: Axis) Self {
-            comptime {
+            return comptime blk: {
                 var res = fill(0);
                 res.set(a, 1);
-                return res;
-            }
+                break :blk res;
+            };
         }
 
         pub fn unitSigned(comptime c: Cardinal) Self {
-            comptime {
-                return switch (c.sign()) {
+            return comptime blk: {
+                break :blk switch (c.sign()) {
                     .positive => unit(c.axis()),
                     .negative => unit(c.axis()).neg(),
                 };
-            }
+            };
         }
 
         pub const Component = struct {
@@ -196,7 +192,7 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         };
 
         pub fn minComponent(self: Self) Component {
-            var component = Component {
+            var component = Component{
                 .value = self.v[0],
                 .axis = Axis.x,
             };
@@ -211,7 +207,7 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         }
 
         pub fn maxComponent(self: Self) Component {
-            var component = Component {
+            var component = Component{
                 .value = self.v[0],
                 .axis = Axis.x,
             };
@@ -341,7 +337,7 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             }
             return res;
         }
-        
+
         /// scalar floor division
         /// only valid for signed integers
         pub fn divFloorScalar(a: Self, b: Scalar) Self {
@@ -391,8 +387,7 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             const m = self.mag();
             if (m == 0) {
                 return null;
-            }
-            else {
+            } else {
                 return self.divScalar(self.mag());
             }
         }
@@ -417,7 +412,6 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             return res;
         }
 
-
         pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, w: anytype) !void {
             try w.writeAll("(");
             inline for (indices) |i| {
@@ -438,7 +432,5 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             comptime nm.assertFloat(Scalar);
             return self.dot(target) / target.mag();
         }
-
-
     };
 }

@@ -107,7 +107,6 @@ pub fn updateAndDrawLekoMeshes(self: *LekoMeshRenderer, draw_chunks: []const Wor
     self.leko_texture_atlas.bind(3);
     var update_count: usize = 0;
     for (draw_chunks) |draw_chunk| {
-        
         if (!self.scene.camera.sphereInInFrustum(draw_chunk.bounds_center, WorldModel.chunk_model_bounds_radius)) {
             continue;
         }
@@ -156,7 +155,7 @@ const leko_face_shader_defs: []const u8 = blk: {
             try w.print("#define CHUNK_WIDTH {d}\n", .{World.chunk_width});
             try w.print("#define CHUNK_WIDTH_BITS {d}\n", .{World.chunk_width_bits});
             try w.writeAll("const vec3 cube_normals[6] = vec3[6](");
-            for (std.enums.values(Cardinal3)) |card_n, i| {
+            for (std.enums.values(Cardinal3), 0..) |card_n, i| {
                 if (i != 0) {
                     try w.writeAll(", ");
                 }
@@ -172,7 +171,7 @@ const leko_face_shader_defs: []const u8 = blk: {
             try w.writeAll("vec2(0, 1), vec2(1, 1), vec2(0, 0), vec2(1, 0)");
             try w.writeAll(");\n");
             try w.writeAll("const vec3 cube_umat_texture[6] = vec3[6](");
-            for (std.enums.values(Cardinal3)) |card_n, i| {
+            for (std.enums.values(Cardinal3), 0..) |card_n, i| {
                 if (i != 0) {
                     try w.writeAll(", ");
                 }
@@ -181,7 +180,7 @@ const leko_face_shader_defs: []const u8 = blk: {
             }
             try w.writeAll(");\n");
             try w.writeAll("const vec3 cube_vmat_texture[6] = vec3[6](");
-            for (std.enums.values(Cardinal3)) |card_n, i| {
+            for (std.enums.values(Cardinal3), 0..) |card_n, i| {
                 if (i != 0) {
                     try w.writeAll(", ");
                 }

@@ -30,7 +30,6 @@ pub fn IdPool(comptime Id_: type) type {
         pub fn release(self: *Self, id: Id) void {
             self.pool.release(id);
         }
-
     };
 }
 
@@ -50,8 +49,7 @@ pub fn IdPoolUnmanaged(comptime Id_: type) type {
         pub fn acquire(self: *Self, allocator: Allocator) Allocator.Error!Id {
             if (self.unused.pop()) |id| {
                 return id;
-            }
-            else {
+            } else {
                 const id = @intCast(Id, self.capacity);
                 self.capacity += 1;
                 try self.unused.items.ensureTotalCapacity(allocator, self.capacity);
@@ -62,6 +60,5 @@ pub fn IdPoolUnmanaged(comptime Id_: type) type {
         pub fn release(self: *Self, id: Id) void {
             self.unused.pushAssumeCapacity(id);
         }
-
     };
 }

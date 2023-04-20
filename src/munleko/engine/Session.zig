@@ -3,7 +3,6 @@ const util = @import("util");
 
 const Allocator = std.mem.Allocator;
 
-
 const time = std.time;
 const Timer = time.Timer;
 const Session = @This();
@@ -63,7 +62,7 @@ pub fn start(self: *Session, ctx: anytype, comptime hooks: Hooks(@TypeOf(ctx))) 
         };
         self.timer = try Timer.start();
         self.tick_count = 0;
-        self.thread = try Thread.spawn(.{}, S.tMain, .{self, ctx});
+        self.thread = try Thread.spawn(.{}, S.tMain, .{ self, ctx });
     }
 }
 
@@ -75,9 +74,8 @@ pub fn Hooks(comptime Ctx: type) type {
 }
 
 pub fn HookFunction(comptime Ctx: type) type {
-    return fn(Ctx, *Session) anyerror!void;
+    return fn (Ctx, *Session) anyerror!void;
 }
-
 
 pub fn stop(self: *Session) void {
     if (self.isRunning()) {
@@ -87,15 +85,10 @@ pub fn stop(self: *Session) void {
 }
 
 /// session main loop
-pub fn threadMain(
-    self: *Session,
-    ctx: anytype,
-    comptime hooks: Hooks(@TypeOf(ctx))
-) !void {
+pub fn threadMain(self: *Session, ctx: anytype, comptime hooks: Hooks(@TypeOf(ctx))) !void {
     if (hooks.on_world_update) |on_world_update| {
         try self.world_man.start(ctx, on_world_update);
-    }
-    else {
+    } else {
         try self.world_man.start();
     }
     while (self.isRunning()) : (self.nextTick()) {
@@ -116,12 +109,11 @@ fn nextTick(self: *Session) void {
     const quota = self.nsPerTick();
     if (elapsed < quota) {
         time.sleep(quota - elapsed);
-    }
-    else {
-        const extra = elapsed - quota; 
+    } else {
+        const extra = elapsed - quota;
         const elapsed_ms = @divFloor(elapsed, time.ns_per_ms);
         const extra_ms = @divFloor(extra, time.ns_per_ms);
-        std.log.warn("tick {d} took {d}ms too long ({d}ms total)", .{self.tick_count, extra_ms, elapsed_ms});
+        std.log.warn("tick {d} took {d}ms too long ({d}ms total)", .{ self.tick_count, extra_ms, elapsed_ms });
     }
     self.tick_count += 1;
     self.timer.reset();
@@ -130,4 +122,3 @@ fn nextTick(self: *Session) void {
 pub fn nsPerTick(self: Session) u64 {
     return @floatToInt(u64, 1_000_000_000 / self.tick_rate);
 }
-

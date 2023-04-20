@@ -99,12 +99,9 @@ pub fn run(self: *Client) !void {
     var fly_cam = FlyCam.init(self.window);
     fly_cam.move_speed = 32;
 
-
     const cam_obs = try session.world.observers.create(fly_cam.position.cast(i32));
     defer session.world.observers.delete(cam_obs);
     self.observer = cam_obs;
-
-
 
     try session_renderer.start(cam_obs);
     defer session_renderer.stop();
@@ -119,7 +116,6 @@ pub fn run(self: *Client) !void {
     defer session.stop();
 
     self.window.setMouseMode(.disabled);
-
 
     gl.clearDepth(.float, 1);
 

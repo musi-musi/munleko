@@ -90,7 +90,7 @@ pub const ChunkLoader = struct {
         const leko = world.leko_data.chunk_leko.get(chunk);
         const types = &world.leko_data.leko_types;
 
-        const pallete = [_]LekoValue {
+        const pallete = [_]LekoValue{
             types.getValueForName("stone") orelse .empty,
             types.getValueForName("stone") orelse .empty,
             types.getValueForName("stone") orelse .empty,
@@ -112,17 +112,17 @@ pub const ChunkLoader = struct {
         };
 
         // const seed: u64 = (
-        //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[0]))) << 32 | 
-        //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[1]))) << 16 | 
+        //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[0]))) << 32 |
+        //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[1]))) << 16 |
         //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[2])))
-        // ); 
+        // );
         // var rng = std.rand.DefaultPrng.init(seed);
         // const r = rng.random();
         var i: usize = 0;
         while (i < chunk_leko_count) : (i += 1) {
             const address = Address.initI(i);
             const leko_position = address.localPosition().add(chunk_origin);
-            const sample_position = leko_position.cast(f32).mul(vec3(.{0.5, 1, 0.5}));
+            const sample_position = leko_position.cast(f32).mul(vec3(.{ 0.5, 1, 0.5 }));
             const noise = perlin.sample(sample_position.mulScalar(0.025).v);
             // _ = noise;
             // const leko_value: u16 = if (r.float(f32) > 0.95) 1 else 0;
@@ -132,7 +132,6 @@ pub const ChunkLoader = struct {
             }
             leko[i] = pallete[@intCast(usize, @mod(leko_position.v[1], @intCast(i32, pallete.len)))];
         }
-
     }
 };
 
@@ -177,7 +176,7 @@ pub const LekoTypeTable = struct {
         const index = @intCast(u16, self.list.items.len);
         const leko_value = @intToEnum(LekoValue, index);
         const owned_name = try self.arena.allocator().dupe(u8, name);
-        const leko_type = LekoType {
+        const leko_type = LekoType{
             .value = leko_value,
             .name = owned_name,
             .properties = properties,
@@ -215,12 +214,10 @@ pub const LekoTypeTable = struct {
     pub fn getValueForName(self: LekoTypeTable, name: []const u8) ?LekoValue {
         if (self.getForName(name)) |leko_type| {
             return leko_type.value;
-        }
-        else {
+        } else {
             return null;
         }
     }
-
 };
 
 pub const UAddress = std.meta.Int(.unsigned, chunk_width_bits * 3);

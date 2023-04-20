@@ -45,7 +45,6 @@ pub fn Events(comptime channels_def: type) type {
         pub fn get(self: Self, comptime tag: ChannelTag) []const Event(tag) {
             return @field(self.channels, @tagName(tag)).items;
         }
- 
     };
 }
 
@@ -53,14 +52,13 @@ pub fn EventsUnmanaged(comptime channels_def: type) type {
     return struct {
         channels: Channels = .{},
 
-
         pub const channel_tags = std.enums.values(ChannelTag);
 
         pub const ChannelTag = std.meta.Tag(channels_def);
         pub const Channels = blk: {
             const fields = std.meta.fields(channels_def);
             var channels_fields: [fields.len]std.builtin.Type.StructField = undefined;
-            for (fields) |field, i| {
+            for (fields, 0..) |field, i| {
                 const List = std.ArrayListUnmanaged(field.type);
                 const default_value: List = .{};
                 channels_fields[i] = .{
@@ -116,7 +114,6 @@ pub fn EventsUnmanaged(comptime channels_def: type) type {
         pub fn get(self: Self, comptime tag: ChannelTag) []const Event(tag) {
             return @field(self.channels, @tagName(tag)).items;
         }
-
     };
 }
 
@@ -140,10 +137,10 @@ test "post and get" {
 
     try e.post(.c, 3.14);
 
-    try std.testing.expectEqualSlices(u8, &[_]u8 { 'a', 'b', 'c', 'd'}, e.get(.a));
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 'a', 'b', 'c', 'd' }, e.get(.a));
     try std.testing.expectEqualStrings("hello", e.get(.b)[0]);
     try std.testing.expectEqualStrings("world", e.get(.b)[1]);
-    try std.testing.expectEqualSlices(f32, &[_]f32 { 3.14 }, e.get(.c));
+    try std.testing.expectEqualSlices(f32, &[_]f32{3.14}, e.get(.c));
 
     e.clearAll();
 

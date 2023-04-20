@@ -45,8 +45,6 @@ const vec3i = nm.vec3i;
 const Cardinal3 = nm.Cardinal3;
 const Axis3 = nm.Axis3;
 
-
-
 /// ```
 ///     0 --- 1
 ///     | \   |   ^
@@ -63,8 +61,6 @@ pub const LekoFace = struct {
     color: [3]f32,
     texture_index: u32,
 };
-
-
 
 pub fn faceNormalToU(normal: Cardinal3) Cardinal3 {
     return switch (normal) {
@@ -248,7 +244,7 @@ pub const LekoMeshSystem = struct {
         mesh_data.border_faces.clearRetainingCapacity();
         const range = comptime blk: {
             var result: [chunk_width]u32 = undefined;
-            for (result) |*x, i| {
+            for (&result, 0..) |*x, i| {
                 x.* = i;
             }
             break :blk result;
@@ -312,7 +308,6 @@ pub const LekoMeshSystem = struct {
     }
 };
 
-
 pub const FaceMaterial = struct {
     color: Vec3,
     texture_index: u32,
@@ -343,15 +338,8 @@ pub const FaceMaterialTable = struct {
                 try self.list.append(self.allocator, null);
                 continue;
             }
-            const texture_index = (
-                if (assets.leko_texture_table.getByName(leko_asset.texture_name)) |leko_texture_asset| (
-                    leko_texture_asset.index
-                )
-                else (
-                    0
-                )
-            );
-            try self.list.append(self.allocator, FaceMaterial {
+            const texture_index = (if (assets.leko_texture_table.getByName(leko_asset.texture_name)) |leko_texture_asset| (leko_texture_asset.index) else (0));
+            try self.list.append(self.allocator, FaceMaterial{
                 .color = leko_asset.color,
                 .texture_index = @intCast(u32, texture_index),
             });
@@ -365,5 +353,4 @@ pub const FaceMaterialTable = struct {
         }
         return self.list.items[index];
     }
-
 };

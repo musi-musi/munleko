@@ -2,8 +2,6 @@ const std = @import("std");
 
 const nm = @import("lib.zig");
 
-
-
 pub const Bounds2 = Bounds(f32, 2);
 pub const Bounds3 = Bounds(f32, 3);
 pub const Bounds4 = Bounds(f32, 4);
@@ -16,7 +14,6 @@ pub fn Bounds(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         center: Vector,
         radius: Vector,
 
-
         pub const Scalar = Scalar_;
         pub const dimensions = dimensions_;
         pub const Vector = nm.Vector(Scalar, dimensions);
@@ -24,7 +21,7 @@ pub fn Bounds(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         const Self = @This();
 
         pub fn init(center: Vector.Value, radius: Vector.Value) Self {
-            return Self {
+            return Self{
                 .center = Vector.init(center),
                 .radius = Vector.init(radius),
             };
@@ -37,9 +34,7 @@ pub fn Bounds(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         pub fn max(self: Self) Vector {
             return self.center.add(self.radius);
         }
-
     };
-
 }
 
 pub const Range2 = Range(f32, 2);
@@ -59,7 +54,6 @@ pub fn Range(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
     comptime nm.assertValidDimensionCount(dimensions_);
 
     return extern struct {
-
         min: Vector,
         max: Vector,
 
@@ -101,7 +95,6 @@ pub fn Range(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             return true;
         }
         pub usingnamespace if (std.meta.trait.isIntegral(Scalar)) struct {
-
             pub fn iterate(self: Self) Iterator {
                 return Iterator.init(self);
             }
@@ -138,9 +131,6 @@ pub fn Range(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
                     return i;
                 }
             };
-
-        }
-        else struct {};
-
-    };  
+        } else struct {};
+    };
 }

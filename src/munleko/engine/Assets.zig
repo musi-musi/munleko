@@ -13,10 +13,7 @@ const vec3 = nm.vec3;
 
 const Assets = @This();
 
-
-const stb_image = @cImport(
-    @cInclude("stb_image.h")
-);
+const stb_image = @cImport(@cInclude("stb_image.h"));
 
 allocator: Allocator,
 
@@ -42,7 +39,6 @@ pub fn destroy(self: *Assets) void {
     self.leko_texture_table.deinit();
 }
 
-
 pub const ImageData = struct {
     width: usize,
     height: usize,
@@ -57,8 +53,8 @@ pub fn decodePng(allocator: Allocator, data: []const u8) !ImageData {
         defer stb_image.stbi_image_free(bytes);
         const w = @intCast(usize, width);
         const h = @intCast(usize, height);
-        const pixels = @ptrCast([*][4]u8, bytes)[0..w*h];
-        return ImageData {
+        const pixels = @ptrCast([*][4]u8, bytes)[0 .. w * h];
+        return ImageData{
             .width = w,
             .height = h,
             .pixels = try allocator.dupe([4]u8, pixels),
@@ -96,7 +92,7 @@ pub fn AssetTable(comptime Asset_: type) type {
             return self.map.get(name);
         }
 
-        pub const LuaAssetLoader = fn(*Lua, []const u8) anyerror!?Asset;
+        pub const LuaAssetLoader = fn (*Lua, []const u8) anyerror!?Asset;
 
         /// add assets from the assets table loaded by lua
         /// the `asset` table provided by main.lua must be on the top of the stack
@@ -115,7 +111,7 @@ pub fn AssetTable(comptime Asset_: type) type {
             while (lua.next(-2)) {
                 const key_type = lua.typeOf(-2);
                 if (key_type != .string) {
-                    std.log.err("asset name in {s} table is of type {s}. only string names are allowed", .{table_name, @tagName(key_type)});
+                    std.log.err("asset name in {s} table is of type {s}. only string names are allowed", .{ table_name, @tagName(key_type) });
                     error_count += 1;
                     lua.pop(1);
                     continue;
@@ -124,15 +120,13 @@ pub fn AssetTable(comptime Asset_: type) type {
                 if (try loader(lua, name)) |asset| {
                     try self.addAsset(name, asset);
                     // std.log.info("loaded {s} asset '{s}'", .{table_name, name});
-                }
-                else {
+                } else {
                     error_count += 1;
                 }
                 lua.pop(1);
             }
             return error_count;
         }
-
     };
 }
 
@@ -140,7 +134,7 @@ pub fn load(self: *Assets, lua: *Lua, data_root_path: []const u8) !void {
     var data_dir = try std.fs.openDirAbsolute(data_root_path, .{});
     defer data_dir.close();
     var error_count: usize = 0;
-    lua.getGlobal("assets") catch {
+    _ = lua.getGlobal("assets") catch {
         std.log.err("missing 'assets' table in global lua state", .{});
         return error.LuaAssetTableMissing;
     };
@@ -153,8 +147,7 @@ pub fn load(self: *Assets, lua: *Lua, data_root_path: []const u8) !void {
     }
     if (lua.toInteger(-1)) |texture_size| {
         self.leko_texture_size = @intCast(usize, texture_size);
-    }
-    else |_| {
+    } else |_| {
         std.log.err("assets table field 'leko_texture_size' is not an be integer number", .{});
     }
     lua.pop(1);
@@ -190,8 +183,7 @@ fn loadLekoLuaAsset(l: *Lua, name: []const u8) !?LekoAsset {
     if (l.getField(-1, "color") != .nil) {
         if (mun.toVec3(l, -1)) |color| {
             asset.color = vec3(color);
-        }
-        else |_| {
+        } else |_| {
             std.log.err("leko asset {s} 'color' field could not be read", .{name});
             l.pop(1);
             return null;
@@ -202,10 +194,10 @@ fn loadLekoLuaAsset(l: *Lua, name: []const u8) !?LekoAsset {
         .nil => asset.texture_name = name,
         .string => asset.texture_name = try l.toBytes(-1),
         else => |t| {
-            std.log.err("leko asset {s} 'texture' field must be string, not {s}", .{name, @tagName(t)});
+            std.log.err("leko asset {s} 'texture' field must be string, not {s}", .{ name, @tagName(t) });
             l.pop(1);
             return null;
-        }
+        },
     }
     l.pop(1);
     return asset;
@@ -230,11 +222,10 @@ fn loadLekoTextures(self: *Assets, texture_dir: std.fs.Dir) !usize {
         .index = 0,
         .pixels = blk: {
             const pixels = try self.leko_texture_table.arena.allocator().alloc([4]u8, texture_size * texture_size);
-            std.mem.set([4]u8, pixels, .{255, 0, 255, 255});
+            std.mem.set([4]u8, pixels, .{ 255, 0, 255, 255 });
             break :blk pixels;
         },
     });
-
 
     var error_count: usize = 0;
     var leko_iter = self.leko_table.map.valueIterator();
@@ -245,8 +236,8 @@ fn loadLekoTextures(self: *Assets, texture_dir: std.fs.Dir) !usize {
         }
         const file_name = try std.fmt.bufPrint(&file_name_buffer, "{s}.png", .{name});
         var file = leko_textures_dir.openFile(file_name, .{}) catch |e| {
-            std.log.err("error opening leko texture file '{s}': {s}", .{file_name, @errorName(e)});
-            error_count +=1;
+            std.log.err("error opening leko texture file '{s}': {s}", .{ file_name, @errorName(e) });
+            error_count += 1;
             continue;
         };
         defer file.close();
@@ -269,12 +260,11 @@ fn loadLekoTextures(self: *Assets, texture_dir: std.fs.Dir) !usize {
             error_count += 1;
             continue;
         }
-        const texture_asset = LekoTextureAsset {
+        const texture_asset = LekoTextureAsset{
             .index = self.leko_texture_table.map.count(),
             .pixels = texture_data.pixels,
         };
         try self.leko_texture_table.addAsset(name, texture_asset);
-
     }
 
     return error_count;

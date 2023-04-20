@@ -3,12 +3,9 @@ const math = std.math;
 
 const nm = @import("lib.zig");
 
-
-
 fn transformGeneric(comptime Scalar: type) type {
     comptime nm.assertFloat(Scalar);
     return struct {
-
         pub const Vec3 = nm.Vector(Scalar, 3);
         pub const Vec4 = nm.Vector(Scalar, 4);
         pub const Mat4 = nm.Matrix(Scalar, 4, 4);
@@ -64,12 +61,7 @@ fn transformGeneric(comptime Scalar: type) type {
             const s2 = sin(x);
             const c3 = cos(y);
             const s3 = sin(y);
-            return Mat4.init(.{
-                .{c1*c3 - s1*s2*s3, -c2*s1, c1*s3 + c3*s1*s2, 0},
-                .{c3*s1 + c1*s2*s3, c1*c2, s1*s3 - c1*c3*s2, 0},
-                .{-c2*s3, s2, c2*c3, 0},
-                .{ 0, 0, 0, 1 }
-            }).transpose();
+            return Mat4.init(.{ .{ c1 * c3 - s1 * s2 * s3, -c2 * s1, c1 * s3 + c3 * s1 * s2, 0 }, .{ c3 * s1 + c1 * s2 * s3, c1 * c2, s1 * s3 - c1 * c3 * s2, 0 }, .{ -c2 * s3, s2, c2 * c3, 0 }, .{ 0, 0, 0, 1 } }).transpose();
         }
 
         pub fn createLook(eye: Vec3, direction: Vec3, up: Vec3) Mat4 {
@@ -120,7 +112,6 @@ fn transformGeneric(comptime Scalar: type) type {
             result.v[3][2] = -near / (far - near);
             return result;
         }
-
     };
 }
 
