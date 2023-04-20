@@ -14,7 +14,7 @@ debug: Debug,
 directional_light: Vec3 = Vec3.zero,
 camera: *Camera,
 
-fog_color: Vec3 = vec3(.{0.7, 0.7, 0.7}),
+fog_color: Vec3 = vec3(.{ 0.7, 0.7, 0.7 }),
 fog_start: f32 = 32,
 fog_end: f32 = 100,
 fog_power: f32 = 1.5,
@@ -147,12 +147,12 @@ pub const Camera = struct {
         pub fn toFrustum(self: Projection) Frustum {
             switch (self) {
                 .perspective => |p| {
-                    const fov_v = std.math.degreesToRadians(f32, p.fov);
-                    const fov_h = fov_v * p.aspect_ratio;
-                    const sin_v = std.math.sin(fov_v / 2);
-                    const cos_v = std.math.cos(fov_v / 2);
-                    const sin_h = std.math.sin(fov_h / 2);
-                    const cos_h = std.math.cos(fov_h / 2);
+                    const fov_v = std.math.degreesToRadians(f32, p.fov) / 2;
+                    const fov_h = std.math.atan(std.math.tan(fov_v) * p.aspect_ratio);
+                    const sin_v = std.math.sin(fov_v);
+                    const cos_v = std.math.cos(fov_v);
+                    const sin_h = std.math.sin(fov_h);
+                    const cos_h = std.math.cos(fov_h);
                     return Frustum{
                         .planes = .{
                             // near

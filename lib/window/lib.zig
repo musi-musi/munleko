@@ -83,6 +83,7 @@ pub const Window = struct {
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, @intCast(c_int, gl_options.version_major));
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, @intCast(c_int, gl_options.version_minor));
         c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, @enumToInt(gl_options.profile));
+        c.glfwWindowHint(c.GLFW_SAMPLES, 8);
         const debug: c_int = (
             if (builtin.mode == .Debug) c.GLFW_TRUE else c.GLFW_FALSE
         );

@@ -30,7 +30,7 @@ void main() {
 
     uv_texture.x = dot(world_position.xyz, cube_umat_texture[n]);
     uv_texture.y = dot(world_position.xyz, cube_vmat_texture[n]);
-    uv_texture *= 8.0/128.0;
+    uv_texture *= 8.0/256.0;
 
     // texture_w = (float(v_texture_index) + 0.5) / float(textureSize(s_texture_atlas, 1).z);
     texture_w = float(v_texture_index);
