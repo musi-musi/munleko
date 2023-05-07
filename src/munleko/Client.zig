@@ -5,6 +5,7 @@ const ls = @import("ls");
 const nm = @import("nm");
 const util = @import("util");
 const zlua = @import("ziglua");
+const oko = @import("oko");
 
 const Allocator = std.mem.Allocator;
 
@@ -34,7 +35,10 @@ pub const main_decls = struct {
     pub fn main() !void {
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         defer _ = gpa.deinit();
+        // try oko.start();
+        // defer oko.stop();
 
+        // const allocator = oko.wrapAllocator("gpa", gpa.allocator());
         const allocator = gpa.allocator();
 
         try window.init();
@@ -45,6 +49,8 @@ pub const main_decls = struct {
         defer client.deinit();
 
         try client.run();
+
+        // try oko.dumpAllocHistoryCsvFile("oko.csv");
     }
 };
 
@@ -124,6 +130,7 @@ pub fn run(self: *Client) !void {
     session_renderer.scene.directional_light = nm.vec3(.{ 1, 3, 2 }).norm() orelse unreachable;
 
     while (self.window.nextFrame()) {
+        oko.tick();
         for (self.window.events.get(.framebuffer_size)) |size| {
             gl.viewport(size);
         }

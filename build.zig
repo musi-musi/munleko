@@ -98,6 +98,8 @@ fn addModules(b: *Build, exe: *Build.CompileStep) void {
     exe.linkLibC();
     const util = createLibModule(b, "util", &.{});
     exe.addModule("util", util);
+    const oko = createLibModule(b, "oko", &.{});
+    exe.addModule("oko", oko);
     const window = createLibModule(b, "window", &.{
         .{ .name = "util", .module = util },
     });
