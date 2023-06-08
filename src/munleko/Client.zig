@@ -62,7 +62,8 @@ engine: *Engine,
 observer: World.Observer = undefined,
 
 pub fn init(self: *Client, allocator: Allocator) !void {
-    const args = try Engine.Arguments.initFromCommandLineArgs();
+    const args = try Engine.Arguments.initFromCommandLineArgs(allocator);
+    defer args.deinit(allocator);
     self.* = .{
         .allocator = allocator,
         .window = Window.init(allocator),

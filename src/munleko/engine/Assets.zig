@@ -222,7 +222,7 @@ fn loadLekoTextures(self: *Assets, texture_dir: std.fs.Dir) !usize {
         .index = 0,
         .pixels = blk: {
             const pixels = try self.leko_texture_table.arena.allocator().alloc([4]u8, texture_size * texture_size);
-            std.mem.set([4]u8, pixels, .{ 255, 0, 255, 255 });
+            @memset(pixels, [4]u8{ 255, 0, 255, 255 });
             break :blk pixels;
         },
     });

@@ -87,9 +87,8 @@ pub fn createSession(self: *Engine) !*Session {
 pub const Arguments = struct {
     data_root_path: ?[]const u8 = null,
 
-    pub fn initFromCommandLineArgs() !Arguments {
+    pub fn initFromCommandLineArgs(allocator: Allocator) !Arguments {
         var self = Arguments{};
-        const allocator = std.heap.page_allocator;
         var args = try std.process.argsWithAllocator(allocator);
         defer args.deinit();
         _ = args.next();
@@ -102,9 +101,15 @@ pub const Arguments = struct {
                     std.log.err("option {s} requires argument", .{opt_dataroot});
                     return error.MissingParameter;
                 }
-                self.data_root_path = arg[opt_dataroot.len..];
+                self.data_root_path = try allocator.dupe(u8, arg[opt_dataroot.len..]);
             }
         }
         return self;
+    }
+
+    pub fn deinit(self: Arguments, allocator: Allocator) void {
+        if (self.data_root_path) |path| {
+            allocator.free(path);
+        }
     }
 };

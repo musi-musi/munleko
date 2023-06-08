@@ -49,7 +49,7 @@ pub fn build(b: *Build) void {
 
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`
-    run_cmd.addArg("-datapath=./data");
+    run_cmd.addArg("-datapath=data");
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
