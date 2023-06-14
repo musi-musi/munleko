@@ -3,6 +3,7 @@ const util = @import("util");
 const nm = @import("nm");
 const gl = @import("gl");
 const ls = @import("ls");
+const oko = @import("oko");
 
 const Atomic = std.atomic.Atomic;
 const Thread = std.Thread;

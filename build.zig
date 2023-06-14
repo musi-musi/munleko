@@ -96,10 +96,12 @@ fn addModules(b: *Build, exe: *Build.CompileStep) void {
     exe.addModule("ziglua", lua);
 
     exe.linkLibC();
-    const util = createLibModule(b, "util", &.{});
-    exe.addModule("util", util);
     const oko = createLibModule(b, "oko", &.{});
     exe.addModule("oko", oko);
+    const util = createLibModule(b, "util", &.{
+        .{ .name = "oko", .module = oko },
+    });
+    exe.addModule("util", util);
     const window = createLibModule(b, "window", &.{
         .{ .name = "util", .module = util },
     });

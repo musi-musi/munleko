@@ -35,7 +35,7 @@ pub const main_decls = struct {
     pub fn main() !void {
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
         defer _ = gpa.deinit();
-        // try oko.start();
+        // try oko.start(1.0 / 15.0);
         // defer oko.stop();
 
         // const allocator = oko.wrapAllocator("gpa", gpa.allocator());
@@ -131,7 +131,7 @@ pub fn run(self: *Client) !void {
     session_renderer.scene.directional_light = nm.vec3(.{ 1, 3, 2 }).norm() orelse unreachable;
 
     while (self.window.nextFrame()) {
-        oko.tick();
+        // oko.tick();
         for (self.window.events.get(.framebuffer_size)) |size| {
             gl.viewport(size);
         }
@@ -176,8 +176,8 @@ pub fn run(self: *Client) !void {
         session_renderer.draw();
 
         if (fps_counter.frame()) |frames| {
-            // _ = frames;
-            std.log.info("fps: {d}", .{frames});
+            _ = frames;
+            // std.log.info("fps: {d}", .{frames});
         }
     }
 }

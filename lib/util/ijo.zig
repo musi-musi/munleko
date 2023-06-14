@@ -1,4 +1,5 @@
 const std = @import("std");
+const oko = @import("oko");
 const idpool = @import("idpool.zig");
 
 const Events = @import("event.zig").Events;
@@ -157,9 +158,12 @@ pub fn IjoDataStore(comptime IjoT_: type, comptime Data_: type, comptime Context
         const Self = @This();
 
         pub fn initWithContext(allocator: Allocator, context: Context) Self {
+            // const oko_trace = comptime std.fmt.comptimePrint("{s} {s}", .{IjoT_.ijo_type_name, @typeName(Data)});
+            // const alloc = oko.wrapAllocator(oko_trace, allocator);
+            const alloc = allocator;
             return Self{
-                .allocator = allocator,
-                .arena = ArenaAllocator.init(allocator),
+                .allocator = alloc,
+                .arena = ArenaAllocator.init(alloc),
                 .context = context,
             };
         }

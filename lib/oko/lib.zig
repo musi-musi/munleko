@@ -11,10 +11,25 @@ var history_end: usize = 0;
 
 var history_head: ?*AllocHistory = null;
 
-pub fn start() !void {
+var is_running: std.atomic.Atomic(bool) = .{ .value = false };
+var tick_thread: std.Thread = undefined;
+
+pub fn start(comptime tick_time: comptime_float) !void {
+    const S = struct {
+        fn thread_main() void {
+            while (is_running.load(.Monotonic)) {
+                tick();
+                std.time.sleep(comptime @floatToInt(u64, tick_time * std.time.ns_per_s));
+            }
+        }
+    };
+    is_running.store(true, .Monotonic);
+    tick_thread = try std.Thread.spawn(.{}, S.thread_main, .{});
 }
 
 pub fn stop() void {
+    is_running.store(false, .Monotonic);
+    tick_thread.join();
 }
 
 pub fn wrapAllocator(comptime tag: []const u8, allocator: Allocator) Allocator {
@@ -59,7 +74,7 @@ pub fn dumpAllocHistoryCsv(writer: anytype) !void {
             try writer.writeByte(',');
         }
         history_opt = history.next;
-        try writer.print("{s}", .{ history.tag });
+        try writer.print("\"{s}\"", .{ history.tag });
     }
     try writer.writeByte('\n');
     var i: usize = history_start;
@@ -70,7 +85,7 @@ pub fn dumpAllocHistoryCsv(writer: anytype) !void {
                 try writer.writeByte(',');
             }
             history_opt = history.next;
-            try writer.print("{d}", .{ history.size });
+            try writer.print("{d}", .{ history.history[i] });
         }
         try writer.writeByte('\n');
     }
@@ -154,7 +169,8 @@ fn OkoAllocator(comptime tag: []const u8) type {
         }
 
         fn log(delta: isize) void {
-            history.size = @intCast(usize, @intCast(isize, history.size) + delta);
+            const new_size = @intCast(isize, history.size) + delta;
+            history.size = @intCast(usize, if (new_size < 0) 0 else new_size);
 
             // if (out) |o| {
             //     out_mutex.lock();

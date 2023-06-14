@@ -1,6 +1,7 @@
 const std = @import("std");
 const util = @import("util");
 const nm = @import("nm");
+const oko = @import("oko");
 
 const Atomic = std.atomic.Atomic;
 const Thread = std.Thread;
