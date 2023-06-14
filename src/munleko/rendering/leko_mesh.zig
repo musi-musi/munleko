@@ -208,6 +208,7 @@ pub const LekoMeshSystem = struct {
     }
 
     pub fn processChunkModelJob(self: *LekoMeshSystem, job: WorldModel.Manager.ChunkModelJob) !void {
+        @setRuntimeSafety(false);
         const chunk = job.chunk;
         const chunk_model = job.chunk_model;
         const mesh_data = self.world_model.chunk_leko_meshes.mesh_data.getPtr(chunk_model);
@@ -229,7 +230,7 @@ pub const LekoMeshSystem = struct {
     }
 
     fn generateMiddleFaces(self: *LekoMeshSystem, world: *World, chunk: Chunk, mesh_data: *LekoMeshData) !void {
-        mesh_data.middle_faces.clearRetainingCapacity();
+        mesh_data.middle_faces.clearAndFree();
         var x: u32 = 1;
         while (x < chunk_width - 1) : (x += 1) {
             var y: u32 = 1;
@@ -243,7 +244,7 @@ pub const LekoMeshSystem = struct {
     }
 
     fn generateBorderFaces(self: *LekoMeshSystem, world: *World, chunk: Chunk, mesh_data: *LekoMeshData) !void {
-        mesh_data.border_faces.clearRetainingCapacity();
+        mesh_data.border_faces.clearAndFree();
         const range = comptime blk: {
             var result: [chunk_width]u32 = undefined;
             for (&result, 0..) |*x, i| {
