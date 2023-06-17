@@ -28,6 +28,7 @@ const WorldModel = @import("WorldModel.zig");
 const ChunkModel = WorldModel.ChunkModel;
 const leko_mesh = @import("leko_mesh.zig");
 const LekoMeshRenderer = @import("LekoMeshRenderer.zig");
+const SelectionBox = @import("SelectionBox.zig");
 
 const Debug = @import("Debug.zig");
 
@@ -61,19 +62,33 @@ chunk_map_mutex: Mutex = .{},
 
 leko_mesh_renderer: *LekoMeshRenderer,
 
+selection_box: SelectionBox,
+
 const ChunkMap = std.HashMapUnmanaged(Chunk, World.ChunkLoadState, Chunk.HashContext, std.hash_map.default_max_load_percentage);
 
 pub fn create(allocator: Allocator, scene: *Scene, world: *World) !*WorldRenderer {
     const self = try allocator.create(WorldRenderer);
+    errdefer allocator.destroy(self);
     const world_model = try WorldModel.create(allocator, world);
+    errdefer world_model.destroy();
     const world_model_manager = try WorldModel.Manager.create(allocator, world_model);
+    errdefer world_model_manager.destroy();
+    const leko_mesh_renderer = try LekoMeshRenderer.create(allocator, scene, world_model);
+    errdefer leko_mesh_renderer.destroy();
+    const selection_box = try SelectionBox.init();
+    errdefer selection_box.deinit();
+
+    selection_box.setColor(.{ 1, 1, 1 });
+    selection_box.setPadding(0.05);
+
     self.* = WorldRenderer{
         .allocator = allocator,
         .scene = scene,
         .world = world,
         .world_model = world_model,
         .world_model_manager = world_model_manager,
-        .leko_mesh_renderer = try LekoMeshRenderer.create(allocator, scene, world_model),
+        .leko_mesh_renderer = leko_mesh_renderer,
+        .selection_box = selection_box,
     };
     return self;
 }
@@ -90,6 +105,8 @@ pub fn destroy(self: *WorldRenderer) void {
     self.draw_list.deinit(allocator);
     self.back_draw_list.deinit(allocator);
     self.chunk_map.deinit(allocator);
+
+    self.selection_box.deinit();
 }
 
 pub fn applyAssets(self: *WorldRenderer, assets: *const Assets) !void {
@@ -110,7 +127,6 @@ pub fn start(self: *WorldRenderer, observer: Observer) !void {
     const distance = @intToFloat(f32, observer_status.load_radius) * World.chunk_width;
     self.scene.setFogFromMaxDistance(distance, 0.6, 0.85);
 }
-
 
 pub fn stop(self: *WorldRenderer) void {
     if (self.is_running.get()) {
@@ -182,4 +198,6 @@ pub fn draw(self: *WorldRenderer) void {
     //     debug.drawCubeAssumeBound(position, 1, vec3(.{ 1, 1, 1 }));
     // }
     self.leko_mesh_renderer.updateAndDrawLekoMeshes(self.draw_list.items);
+    self.selection_box.setCamera(self.scene.camera);
+    self.selection_box.draw(.{ 0, 0, 0 }, .{ 1, 1, 1 });
 }

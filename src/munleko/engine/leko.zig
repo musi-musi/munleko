@@ -22,6 +22,10 @@ const vec3 = nm.vec3;
 const Vec3i = nm.Vec3i;
 const vec3i = nm.vec3i;
 
+const Axis3 = nm.Axis3;
+const Sign = nm.Sign;
+const Cardinal3 = nm.Cardinal3;
+
 const chunk_width_bits = World.chunk_width_bits;
 const chunk_width = World.chunk_width;
 const chunk_leko_count = 1 << chunk_width_bits * 3;
@@ -345,5 +349,95 @@ pub const Reference = struct {
 
     pub fn decr(self: Reference, world: *World, direction: nm.Cardinal3) ?Reference {
         return self.incr(world, direction.negate());
+    }
+};
+
+pub fn raycastGeneric(
+    world: *World,
+    origin: Vec3,
+    direction: Vec3,
+    comptime Return: type,
+    context: anytype,
+    comptime condition: fn (@TypeOf(context), *World, Reference, GridRaycastIterator) ?Return,
+) ?Return {
+    var iter = GridRaycastIterator.init(origin, direction);
+    var reference = Reference.initGlobalPosition(world, iter.cell) orelse return null;
+    while (true) {
+        if (condition(context, world, reference, iter)) |ret| {
+            return ret;
+        }
+        iter.next();
+        reference = reference.incr(World, iter.move) orelse return null;
+    }
+}
+
+pub const GridRaycastIterator = struct {
+    /// starting position of the ray
+    origin: Vec3,
+    /// normalized direction of the ray
+    direction: Vec3,
+    /// the last cell we hit
+    cell: Vec3i,
+    /// the total distance the raycast has travelled from `origin`
+    distance: f32 = 0,
+    /// the direction the raycast moved to get to the current cell from the previous cell
+    /// undefined until next is called for the first time
+    /// negate this direction to get the normal of the face we just hit
+    move: Cardinal3 = undefined,
+    // i really dont remember what these two values are exactly but they're part of the state
+    // that determines what the next move is
+    t_max: Vec3,
+    t_delta: Vec3,
+
+    pub fn init(origin: Vec3, direction: Vec3) GridRaycastIterator {
+        const dir = direction.norm() orelse Vec3.zero;
+        const dx2 = dir.v[0] * dir.v[0];
+        const dy2 = dir.v[1] * dir.v[1];
+        const dz2 = dir.v[2] * dir.v[2];
+        var t_delta = Vec3.zero;
+        if (dx2 != 0) t_delta.v[0] = std.math.sqrt(1 + (dy2 + dz2) / dx2);
+        if (dy2 != 0) t_delta.v[0] = std.math.sqrt(1 + (dx2 + dy2) / dy2);
+        if (dz2 != 0) t_delta.v[0] = std.math.sqrt(1 + (dx2 + dy2) / dz2);
+        const origin_floor = origin.floor();
+        var t_max = Vec3.init(.{
+            (if (dir.v[0] > 0) (origin_floor.v[0] + 1 - origin.v[0]) else origin.v[0] - origin_floor.v[0]) * t_delta.v[0],
+            (if (dir.v[1] > 0) (origin_floor.v[1] + 1 - origin.v[1]) else origin.v[1] - origin_floor.v[1]) * t_delta.v[1],
+            (if (dir.v[2] > 0) (origin_floor.v[2] + 1 - origin.v[2]) else origin.v[2] - origin_floor.v[2]) * t_delta.v[2],
+        });
+        if (dir.v[0] == 0) t_max.v[0] = std.math.inf(f32);
+        if (dir.v[1] == 0) t_max.v[1] = std.math.inf(f32);
+        if (dir.v[2] == 0) t_max.v[2] = std.math.inf(f32);
+        return GridRaycastIterator{
+            .origin = origin,
+            .cell = origin_floor.cast(i32),
+            .direction = dir,
+            .t_max = t_max,
+            .t_delta = t_delta,
+        };
+    }
+
+    pub fn next(self: *GridRaycastIterator) void {
+        const min = self.t_max.minComponent();
+        const axis = min.axis;
+        self.t_max.ptrMut(axis).* += self.t_delta.get(axis);
+        if (self.direction.get(axis) < 0) {
+            self.cell.ptrMut(axis).* -= 1;
+            self.updateDistance(axis, .negative);
+            switch (axis) {
+                inline else => |a| self.move = comptime Cardinal3.init(a, .negative),
+            }
+        } else {
+            self.cell.ptrMut(axis).* += 1;
+            self.updateDistance(axis, .positive);
+            switch (axis) {
+                inline else => |a| self.move = comptime Cardinal3.init(a, .positive),
+            }
+        }
+    }
+
+    fn updateDistance(self: *GridRaycastIterator, axis: nm.Axis3, comptime sign: nm.Sign) void {
+        var distance = @intToFloat(f32, self.cell.get(axis)) - self.origin.get(axis);
+        distance += (1 - sign.scalar(f32)) / 2;
+        self.distance = distance / self.direction.get(axis);
     }
 };

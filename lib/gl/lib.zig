@@ -127,6 +127,10 @@ pub fn clear(flags: ClearFlags) void {
     c.glClear(@enumToInt(flags));
 }
 
+pub fn lineWidth(width: f32) void {
+    c.glLineWidth(width);
+}
+
 pub const PrimitiveType = enum(c_uint) {
     points = c.GL_POINTS,
     line_strip = c.GL_LINE_STRIP,
