@@ -6,6 +6,7 @@ const nm = @import("nm");
 pub const Session = @import("engine/Session.zig");
 pub const Assets = @import("engine/Assets.zig");
 pub const World = @import("engine/World.zig");
+pub const Player = @import("engine/Player.zig");
 pub const leko = @import("engine/leko.zig");
 
 const Allocator = std.mem.Allocator;

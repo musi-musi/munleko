@@ -41,7 +41,7 @@ void main() {
 void main() {
     vec3 texture_color = texture(s_texture_atlas, vec3(uv_texture, texture_w)).xyz;
     // vec3 color = mix(face_color * light, u_fog_color, fog_strength);
-    vec3 color = mix(texture_color * face_color * light, u_fog_color, fog_strength);
+    vec3 color = mix(texture_color * face_color * mix(1, light, 0.5), u_fog_color, fog_strength);
     // f_color.xyz = texture_color;
     f_color.xyz = color;
     f_color.w = 1;

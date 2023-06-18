@@ -17,6 +17,7 @@ const vec3 = nm.vec3;
 const Engine = @import("Engine.zig");
 const Session = Engine.Session;
 const World = Engine.World;
+const Player = Engine.Player;
 
 const Mutex = std.Thread.Mutex;
 
@@ -54,12 +55,9 @@ pub const main_decls = struct {
     }
 };
 
-const FlyCam = @import("client/FlyCam.zig");
-
 allocator: Allocator,
 window: Window,
 engine: *Engine,
-observer: World.Observer = undefined,
 
 pub fn init(self: *Client, allocator: Allocator) !void {
     const args = try Engine.Arguments.initFromCommandLineArgs(allocator);
@@ -103,19 +101,16 @@ pub fn run(self: *Client) !void {
 
     try session_renderer.applyAssets(self.engine.assets);
 
-    var fly_cam = FlyCam.init(self.window);
-    fly_cam.move_speed = 32;
+    var player = try Player.init(session.world, Vec3.zero);
+    defer player.deinit();
 
-    const cam_obs = try session.world.observers.create(fly_cam.position.cast(i32));
-    defer session.world.observers.delete(cam_obs);
-    self.observer = cam_obs;
-
-    try session_renderer.start(cam_obs);
+    try session_renderer.start(player.observer);
     defer session_renderer.stop();
 
     try session.start(SessionContext{
         .client = self,
         .session_renderer = session_renderer,
+        .player = &player,
     }, .{
         .on_tick = SessionContext.onTick,
         .on_world_update = SessionContext.onWorldUpdate,
@@ -127,10 +122,15 @@ pub fn run(self: *Client) !void {
     gl.clearDepth(.float, 1);
 
     var fps_counter = try util.FpsCounter.start(1);
+    var frame_time = try util.FrameTime.start();
+
+    var player_view = player.position;
 
     session_renderer.scene.directional_light = nm.vec3(.{ 1, 3, 2 }).norm() orelse unreachable;
+    var prev_mouse = nm.vec2(self.window.mousePosition());
 
     while (self.window.nextFrame()) {
+        frame_time.frame();
         // oko.tick();
         for (self.window.events.get(.framebuffer_size)) |size| {
             gl.viewport(size);
@@ -148,26 +148,34 @@ pub fn run(self: *Client) !void {
             });
         }
 
-        fly_cam.update(self.window);
-        session.world.observers.setPosition(cam_obs, fly_cam.position.cast(i32));
+        const mouse_sensitivity = 0.1;
+        const mouse_position = nm.vec2(self.window.mousePosition());
+        if (self.window.mouse_mode == .disabled) {
+            const mouse_delta = mouse_position.sub(prev_mouse).mulScalar(mouse_sensitivity);
+            player.updateLookFromMouse(mouse_delta);
+        }
+        prev_mouse = mouse_position;
 
-        camera.setViewMatrix(fly_cam.viewMatrix());
+        var player_move = Vec3.zero;
+        if (self.window.buttonHeld(.d)) player_move.v[0] += 1;
+        if (self.window.buttonHeld(.a)) player_move.v[0] -= 1;
+        if (self.window.buttonHeld(.space)) player_move.v[1] += 1;
+        if (self.window.buttonHeld(.left_shift)) player_move.v[1] -= 1;
+        if (self.window.buttonHeld(.w)) player_move.v[2] += 1;
+        if (self.window.buttonHeld(.s)) player_move.v[2] -= 1;
+        player.input.move = player_move;
+
+        const smooth_rate = 0.1;
+
+        player_view = player.position.lerpTo(player_view, std.math.exp2(-smooth_rate * frame_time.delta_s));
+
+        camera.setViewMatrix(nm.transform.createTranslate(player_view.neg()).mul(player.lookMatrix()));
         camera.setProjectionPerspective(.{
             .fov = 90,
             .aspect_ratio = @intToFloat(f32, self.window.size[0]) / @intToFloat(f32, self.window.size[1]),
             .near_plane = 0.001,
             .far_plane = 1000,
         });
-
-        // session_renderer.scene.camera_view = fly_cam.viewMatrix();
-        // session_renderer.scene.camera_projection = (
-        //     nm.transform.createPerspective(
-        //         90.0 * std.math.pi / 180.0,
-        //         @intToFloat(f32, self.window.size[0]) / @intToFloat(f32, self.window.size[1]),
-        //         0.001,
-        //         1000,
-        //     )
-        // );
 
         gl.clearColor(session_renderer.scene.fog_color.addDimension(1).v);
         gl.clear(.color_depth);
@@ -185,10 +193,10 @@ pub fn run(self: *Client) !void {
 const SessionContext = struct {
     client: *Client,
     session_renderer: *SessionRenderer,
+    player: *Player,
 
     fn onTick(self: SessionContext, session: *Session) !void {
-        _ = self;
-        _ = session;
+        self.player.onTick(session);
     }
 
     fn onWorldUpdate(self: SessionContext, world: *World) !void {

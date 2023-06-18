@@ -26,7 +26,7 @@ is_running: AtomicFlag = .{},
 timer: Timer = undefined,
 tick_count: u64 = 0,
 
-tick_rate: f32 = 40,
+tick_rate: f32 = 60,
 
 pub fn create(allocator: Allocator) !*Session {
     const self = try allocator.create(Session);
