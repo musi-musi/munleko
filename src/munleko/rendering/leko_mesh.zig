@@ -136,7 +136,6 @@ pub const ChunkLekoMeshes = struct {
     face_material_table: FaceMaterialTable,
 
     pub fn init(self: *ChunkLekoMeshes, allocator: Allocator) !void {
-
         self.* = .{
             .allocator = allocator,
             .mesh_data = LekoMeshDataStore.initWithContext(allocator, .{ .allocator = allocator }),
@@ -294,7 +293,10 @@ pub const LekoMeshSystem = struct {
         if (self.getMaterial(neighbor_reference) != null) {
             return null;
         }
-        const base = encodeLekoFaceBase(reference.address, normal, 0);
+        const ao = switch (normal) {
+            inline else => |n| self.computeAO(world, traverse_edges, reference, n),
+        };
+        const base = encodeLekoFaceBase(reference.address, normal, ao);
         return base;
     }
 
@@ -308,6 +310,91 @@ pub const LekoMeshSystem = struct {
     fn getMaterial(self: LekoMeshSystem, reference: Reference) ?FaceMaterial {
         const leko_value = self.world_model.world.leko_data.lekoValueAt(reference);
         return self.world_model.chunk_leko_meshes.face_material_table.getForLekoValue(leko_value);
+    }
+
+    fn computeAO(self: LekoMeshSystem, world: *World, comptime traverse_edges: bool, reference: Reference, comptime normal: Cardinal3) u8 {
+        _ = self;
+        const u = comptime faceNormalToU(normal);
+        const v = comptime faceNormalToV(normal);
+
+        var r: Reference = undefined;
+        if (traverse_edges) {
+            r = reference.incr(world, normal) orelse return 0;
+        } else {
+            r = reference.incrUnchecked(normal);
+        }
+
+        const Move = struct {
+            sign: enum { incr, decr },
+            direction: Cardinal3,
+        };
+
+        const moves = [8]Move{
+            .{ .sign = .decr, .direction = u },
+            .{ .sign = .incr, .direction = v },
+            .{ .sign = .incr, .direction = u },
+            .{ .sign = .incr, .direction = u },
+            .{ .sign = .decr, .direction = v },
+            .{ .sign = .decr, .direction = v },
+            .{ .sign = .decr, .direction = u },
+            .{ .sign = .decr, .direction = u },
+        };
+
+        var neighbors: u8 = 0;
+        inline for (moves, 0..) |move, i| {
+            if (traverse_edges) {
+                switch (move.sign) {
+                    .incr => r = r.incr(world, move.direction) orelse return 0,
+                    .decr => r = r.decr(world, move.direction) orelse return 0,
+                }
+            } else {
+                switch (move.sign) {
+                    .incr => r = r.incrUnchecked(move.direction),
+                    .decr => r = r.decrUnchecked(move.direction),
+                }
+            }
+            neighbors |= @as(u8, @boolToInt(isOpaque(world, r))) << i;
+        }
+        return ao_table[neighbors];
+    }
+
+    /// ```
+    ///  | 1 |  2  | 3 |
+    ///  | - 0 --- 1 - |
+    ///  |   | \   |   |    ^
+    ///  | 0 |  \  | 4 |    |
+    ///  |   |   \ |   |    v
+    ///  | - 2 --- 3 - |    + u ->
+    ///  | 7 |  6  | 5 |
+    /// ```
+    const ao_table: [256]u8 = blk: {
+        @setEvalBranchQuota(1_000_000);
+        var table = std.mem.zeroes([256]u8);
+        var i: u32 = 0;
+        while (i < 256) : (i += 1) {
+            var neighbors = @intCast(u8, i);
+            for ([4]u3{ 0, 1, 3, 2 }) |vert| {
+                var vert_neighbors = neighbors & 0b111;
+                neighbors = std.math.rotr(u8, neighbors, 2);
+                const ao: u8 = switch (vert_neighbors) {
+                    0b000 => 0,
+                    0b010 => 1,
+                    0b001 => 1,
+                    0b100 => 1,
+                    0b011 => 2,
+                    0b110 => 2,
+                    0b101 => 3,
+                    0b111 => 3,
+                    else => unreachable,
+                };
+                table[i] |= ao << 2 * vert;
+            }
+        }
+        break :blk table;
+    };
+
+    fn isOpaque(world: *World, reference: Reference) bool {
+        return world.leko_data.lekoValueAt(reference) != .empty;
     }
 };
 

@@ -26,7 +26,8 @@ is_running: AtomicFlag = .{},
 timer: Timer = undefined,
 tick_count: u64 = 0,
 
-tick_rate: f32 = 20,
+tick_rate: f32 = 60,
+tick_compensation_factor: f32 = 1,
 
 pub fn create(allocator: Allocator) !*Session {
     const self = try allocator.create(Session);
@@ -116,13 +117,19 @@ fn nextTick(self: *Session) void {
         std.log.warn("tick {d} took {d}ms too long ({d}ms total)", .{ self.tick_count, extra_ms, elapsed_ms });
     }
     self.tick_count += 1;
+    self.tick_compensation_factor = 1 / self.tickProgressEstimate();
+    if (self.tick_count % 30 == 0) std.log.info("tick_compensation_factor = {d}", .{self.tick_compensation_factor});
     self.timer.reset();
 }
 
 pub fn nsPerTick(self: Session) u64 {
-    return @floatToInt(u64, 1_000_000_000 / self.tick_rate);
+    return @floatToInt(u64, 1_000_000_000 / @floatCast(f64, self.tick_rate));
 }
 
 pub fn tickProgress(self: *Session) f32 {
-    return @intToFloat(f32, self.timer.read()) / @intToFloat(f32, self.nsPerTick());
+    return self.tickProgressEstimate() * self.tick_compensation_factor;
+}
+
+fn tickProgressEstimate(self: *Session) f32 {
+    return @intToFloat(f32, self.timer.read() >> 10) / @intToFloat(f32, self.nsPerTick() >> 10);
 }

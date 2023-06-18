@@ -166,7 +166,7 @@ pub fn run(self: *Client) !void {
         if (self.window.buttonHeld(.s)) player_move.v[2] -= 1;
         player.input.move = player_move;
 
-        const interpolated_player_position = session_context.prev_player_position.lerpTo(player.position, session.tickProgress() * 0.5);
+        const interpolated_player_position = session_context.prev_player_position.lerpTo(player.position, session.tickProgress());
 
         camera.setViewMatrix(nm.transform.createTranslate(interpolated_player_position.neg()).mul(player.lookMatrix()));
         camera.setProjectionPerspective(.{
