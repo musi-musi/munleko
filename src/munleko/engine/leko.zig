@@ -94,26 +94,27 @@ pub const ChunkLoader = struct {
         const leko = world.leko_data.chunk_leko.get(chunk);
         const types = &world.leko_data.leko_types;
 
-        const pallete = [_]LekoValue{
-            types.getValueForName("stone") orelse .empty,
-            types.getValueForName("stone") orelse .empty,
-            types.getValueForName("stone") orelse .empty,
-            types.getValueForName("stone") orelse .empty,
-            types.getValueForName("stone") orelse .empty,
-            types.getValueForName("stone") orelse .empty,
-            types.getValueForName("stone") orelse .empty,
-            types.getValueForName("stone") orelse .empty,
-            types.getValueForName("stone") orelse .empty,
-            types.getValueForName("stone") orelse .empty,
-            types.getValueForName("dirt") orelse .empty,
-            types.getValueForName("dirt") orelse .empty,
-            types.getValueForName("dirt") orelse .empty,
-            types.getValueForName("dirt") orelse .empty,
-            types.getValueForName("dirt") orelse .empty,
-            types.getValueForName("grass") orelse .empty,
-            types.getValueForName("grass") orelse .empty,
-            // types.getValueForName("sand") orelse .empty,
-        };
+        const stone = types.getValueForName("stone") orelse .empty;
+        // const pallete = [_]LekoValue{
+        //     types.getValueForName("stone") orelse .empty,
+        //     types.getValueForName("stone") orelse .empty,
+        //     types.getValueForName("stone") orelse .empty,
+        //     types.getValueForName("stone") orelse .empty,
+        //     types.getValueForName("stone") orelse .empty,
+        //     types.getValueForName("stone") orelse .empty,
+        //     types.getValueForName("stone") orelse .empty,
+        //     types.getValueForName("stone") orelse .empty,
+        //     types.getValueForName("stone") orelse .empty,
+        //     types.getValueForName("stone") orelse .empty,
+        //     types.getValueForName("dirt") orelse .empty,
+        //     types.getValueForName("dirt") orelse .empty,
+        //     types.getValueForName("dirt") orelse .empty,
+        //     types.getValueForName("dirt") orelse .empty,
+        //     types.getValueForName("dirt") orelse .empty,
+        //     types.getValueForName("grass") orelse .empty,
+        //     types.getValueForName("grass") orelse .empty,
+        //     // types.getValueForName("sand") orelse .empty,
+        // };
 
         // const seed: u64 = (
         //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[0]))) << 32 |
@@ -134,7 +135,8 @@ pub const ChunkLoader = struct {
                 leko[i] = .empty;
                 continue;
             }
-            leko[i] = pallete[@intCast(usize, @mod(leko_position.v[1], @intCast(i32, pallete.len)))];
+            leko[i] = stone;
+            // leko[i] = pallete[@intCast(usize, @mod(leko_position.v[1], @intCast(i32, pallete.len)))];
         }
     }
 };

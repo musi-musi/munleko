@@ -107,11 +107,14 @@ pub fn run(self: *Client) !void {
     try session_renderer.start(player.observer);
     defer session_renderer.stop();
 
-    try session.start(SessionContext{
+    var session_context = SessionContext{
         .client = self,
         .session_renderer = session_renderer,
         .player = &player,
-    }, .{
+        .prev_player_position = player.position,
+    };
+
+    try session.start(&session_context, .{
         .on_tick = SessionContext.onTick,
         .on_world_update = SessionContext.onWorldUpdate,
     });
@@ -123,8 +126,6 @@ pub fn run(self: *Client) !void {
 
     var fps_counter = try util.FpsCounter.start(1);
     var frame_time = try util.FrameTime.start();
-
-    var player_view = player.position;
 
     session_renderer.scene.directional_light = nm.vec3(.{ 1, 3, 2 }).norm() orelse unreachable;
     var prev_mouse = nm.vec2(self.window.mousePosition());
@@ -165,11 +166,9 @@ pub fn run(self: *Client) !void {
         if (self.window.buttonHeld(.s)) player_move.v[2] -= 1;
         player.input.move = player_move;
 
-        const smooth_rate = 0.1;
+        const interpolated_player_position = session_context.prev_player_position.lerpTo(player.position, session.tickProgress() * 0.5);
 
-        player_view = player.position.lerpTo(player_view, std.math.exp2(-smooth_rate * frame_time.delta_s));
-
-        camera.setViewMatrix(nm.transform.createTranslate(player_view.neg()).mul(player.lookMatrix()));
+        camera.setViewMatrix(nm.transform.createTranslate(interpolated_player_position.neg()).mul(player.lookMatrix()));
         camera.setProjectionPerspective(.{
             .fov = 90,
             .aspect_ratio = @intToFloat(f32, self.window.size[0]) / @intToFloat(f32, self.window.size[1]),
@@ -184,8 +183,7 @@ pub fn run(self: *Client) !void {
         session_renderer.draw();
 
         if (fps_counter.frame()) |frames| {
-            _ = frames;
-            // std.log.info("fps: {d}", .{frames});
+            std.log.info("fps: {d}", .{frames});
         }
     }
 }
@@ -194,12 +192,14 @@ const SessionContext = struct {
     client: *Client,
     session_renderer: *SessionRenderer,
     player: *Player,
+    prev_player_position: Vec3,
 
-    fn onTick(self: SessionContext, session: *Session) !void {
+    fn onTick(self: *SessionContext, session: *Session) !void {
+        self.prev_player_position = self.player.position;
         self.player.onTick(session);
     }
 
-    fn onWorldUpdate(self: SessionContext, world: *World) !void {
+    fn onWorldUpdate(self: *SessionContext, world: *World) !void {
         // _ = self;
         // _ = world;
         try self.session_renderer.onWorldUpdate(world);

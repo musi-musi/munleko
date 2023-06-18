@@ -26,7 +26,7 @@ is_running: AtomicFlag = .{},
 timer: Timer = undefined,
 tick_count: u64 = 0,
 
-tick_rate: f32 = 60,
+tick_rate: f32 = 20,
 
 pub fn create(allocator: Allocator) !*Session {
     const self = try allocator.create(Session);
@@ -121,4 +121,8 @@ fn nextTick(self: *Session) void {
 
 pub fn nsPerTick(self: Session) u64 {
     return @floatToInt(u64, 1_000_000_000 / self.tick_rate);
+}
+
+pub fn tickProgress(self: *Session) f32 {
+    return @intToFloat(f32, self.timer.read()) / @intToFloat(f32, self.nsPerTick());
 }
