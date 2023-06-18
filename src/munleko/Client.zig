@@ -104,18 +104,18 @@ pub fn run(self: *Client) !void {
     var player = try Player.init(session.world, Vec3.zero);
     defer player.deinit();
 
+    var prev_player_position = player.position;
+
     try session_renderer.start(player.observer);
     defer session_renderer.stop();
 
     var session_context = SessionContext{
         .client = self,
         .session_renderer = session_renderer,
-        .player = &player,
-        .prev_player_position = player.position,
     };
 
     try session.start(&session_context, .{
-        .on_tick = SessionContext.onTick,
+        // .on_tick = SessionContext.onTick,
         .on_world_update = SessionContext.onWorldUpdate,
     });
     defer session.stop();
@@ -166,7 +166,12 @@ pub fn run(self: *Client) !void {
         if (self.window.buttonHeld(.s)) player_move.v[2] -= 1;
         player.input.move = player_move;
 
-        const interpolated_player_position = session_context.prev_player_position.lerpTo(player.position, session.tickProgress());
+        for (0..try session.frameTicks()) |_| {
+            prev_player_position = player.position;
+            player.onTick(session);
+        }
+
+        const interpolated_player_position = prev_player_position.lerpTo(player.position, session.tickProgress());
 
         camera.setViewMatrix(nm.transform.createTranslate(interpolated_player_position.neg()).mul(player.lookMatrix()));
         camera.setProjectionPerspective(.{
@@ -191,8 +196,6 @@ pub fn run(self: *Client) !void {
 const SessionContext = struct {
     client: *Client,
     session_renderer: *SessionRenderer,
-    player: *Player,
-    prev_player_position: Vec3,
 
     fn onTick(self: *SessionContext, session: *Session) !void {
         self.prev_player_position = self.player.position;
