@@ -259,7 +259,7 @@ const ObserverZone = struct {
     mutex: Mutex = .{},
     position: Vec3i = Vec3i.zero,
     center_chunk_position: Vec3i = Vec3i.zero,
-    load_radius: u32 = 4,
+    load_radius: u32 = 6,
 
     fn getPosition(self: *ObserverZone) Vec3i {
         self.mutex.lock();
@@ -793,7 +793,7 @@ const Loader = struct {
             @panic("world loader is already running");
         }
         self.is_running.set(true);
-        self.thread_group = try ThreadGroup.spawnCpuCount(self.allocator, 0.75, .{}, threadGroupMain, .{self});
+        self.thread_group = try ThreadGroup.spawnCpuCount(self.allocator, 1, .{}, threadGroupMain, .{self});
     }
 
     fn stop(self: *Loader) void {

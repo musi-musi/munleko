@@ -220,7 +220,7 @@ pub const Manager = struct {
         }
         self.observer = observer;
         self.is_running.set(true);
-        self.generate_group = try ThreadGroup.spawnCpuCount(self.allocator, 0.75, .{}, generateThreadMain, .{self});
+        self.generate_group = try ThreadGroup.spawnCpuCount(self.allocator, 1, .{}, generateThreadMain, .{self});
     }
 
     pub fn stop(self: *Manager) void {

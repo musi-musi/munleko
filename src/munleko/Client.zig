@@ -177,7 +177,7 @@ pub fn run(self: *Client) !void {
         camera.setProjectionPerspective(.{
             .fov = 90,
             .aspect_ratio = @intToFloat(f32, self.window.size[0]) / @intToFloat(f32, self.window.size[1]),
-            .near_plane = 0.001,
+            .near_plane = 0.01,
             .far_plane = 1000,
         });
 
