@@ -8,7 +8,7 @@ leko.grass = {
     -- color = {0.1, 0.7, 0.3},
 }
 leko.dirt = {
-    texture = "stone",
+    -- texture = "stone",
     -- color = {0.5, 0.4, 0.1},
 }
 -- leko.sand = {

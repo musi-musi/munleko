@@ -64,8 +64,17 @@ pub const LekoData = struct {
     }
 
     pub fn isSolid(self: *LekoData, value: LekoValue) bool {
-        _ = self;
-        return @enumToInt(value) != 0;
+        if (self.leko_types.getForValue(value)) |leko_type| {
+            return leko_type.properties.is_solid;
+        }
+        return true;
+    }
+
+    pub fn lekoValueAtPosition(self: *LekoData, position: Vec3i) ?LekoValue {
+        if (Reference.initGlobalPosition(self.world, position)) |reference| {
+            return self.lekoValueAt(reference);
+        }
+        return null;
     }
 };
 
@@ -88,6 +97,7 @@ pub const ChunkLoader = struct {
     }
 
     pub fn loadChunk(self: *ChunkLoader, chunk: Chunk) !void {
+        @setRuntimeSafety(false);
         const perlin = nm.Perlin3{};
         const world = self.world;
         const chunk_origin = world.graph.positions.get(chunk).mulScalar(chunk_width);
@@ -95,6 +105,7 @@ pub const ChunkLoader = struct {
         const types = &world.leko_data.leko_types;
 
         const stone = types.getValueForName("stone") orelse .empty;
+        const dirt = types.getValueForName("dirt") orelse .empty;
         // const pallete = [_]LekoValue{
         //     types.getValueForName("stone") orelse .empty,
         //     types.getValueForName("stone") orelse .empty,
@@ -116,26 +127,29 @@ pub const ChunkLoader = struct {
         //     // types.getValueForName("sand") orelse .empty,
         // };
 
-        // const seed: u64 = (
-        //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[0]))) << 32 |
-        //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[1]))) << 16 |
-        //     @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[2])))
-        // );
-        // var rng = std.rand.DefaultPrng.init(seed);
-        // const r = rng.random();
+        const seed: u64 = (@intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[0]))) << 32 |
+            @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[1]))) << 16 |
+            @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[2]))));
+        var rng = std.rand.DefaultPrng.init(seed);
+        const r = rng.random();
         var i: usize = 0;
         while (i < chunk_leko_count) : (i += 1) {
             const address = Address.initI(i);
             const leko_position = address.localPosition().add(chunk_origin);
             const sample_position = leko_position.cast(f32).mul(vec3(.{ 0.5, 1, 0.5 }));
             const noise = perlin.sample(sample_position.mulScalar(0.025).v);
+            const material_noise = perlin.sample(sample_position.addScalar(7439).mulScalar(0.025).v);
             // _ = noise;
             // const leko_value: u16 = if (r.float(f32) > 0.95) 1 else 0;
             if (noise > 0.15) {
                 leko[i] = .empty;
                 continue;
             }
-            leko[i] = stone;
+            if ((material_noise + r.float(f32) / 20) < 0.1) {
+                leko[i] = stone;
+            } else {
+                leko[i] = dirt;
+            }
             // leko[i] = pallete[@intCast(usize, @mod(leko_position.v[1], @intCast(i32, pallete.len)))];
         }
     }
@@ -441,5 +455,40 @@ pub const GridRaycastIterator = struct {
         var distance = @intToFloat(f32, self.cell.get(axis)) - self.origin.get(axis);
         distance += (1 - sign.scalar(f32)) / 2;
         self.distance = distance / self.direction.get(axis);
+    }
+};
+
+const Range3i = nm.Range3i;
+
+pub const physics = struct {
+    pub const LekoTypeTest = fn (?LekoType) bool;
+
+    pub fn lekoTypeIsSolid(leko_type: LekoType) bool {
+        return leko_type.properties.is_solid;
+    }
+
+    pub fn testPosition(world: *World, position: Vec3i, comptime test_fn: LekoTypeTest) ?bool {
+        const leko_value = world.leko_data.lekoValueAtPosition(position) orelse return null;
+        const leko_type = world.leko_data.leko_types.getForValue(leko_value) orelse return null;
+        return test_fn(leko_type);
+    }
+
+    pub fn testRangeAny(world: *World, range: Range3i, comptime test_fn: LekoTypeTest) ?bool {
+        var iter = range.iterate();
+        while (iter.next()) |position| {
+            if (testPosition(world, position, test_fn) orelse return null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    pub fn testRangeAll(world: *World, range: Range3i, comptime test_fn: LekoTypeTest) ?bool {
+        const inverted_test_fn = (struct {
+            fn f(leko_type: LekoType) bool {
+                return !test_fn(leko_type);
+            }
+        }.f);
+        return !(testRangeAny(world, range, inverted_test_fn) orelse return null);
     }
 };
