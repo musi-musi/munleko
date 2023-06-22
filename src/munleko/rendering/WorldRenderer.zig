@@ -125,7 +125,7 @@ pub fn start(self: *WorldRenderer, observer: Observer) !void {
 
     const observer_status = self.world.observers.zones.get(observer);
     const distance = @intToFloat(f32, observer_status.load_radius) * World.chunk_width;
-    self.scene.setFogFromMaxDistance(distance, 0.6, 0.85);
+    self.scene.setFogFromMaxDistance(distance, 0.25, 0.85);
 }
 
 pub fn stop(self: *WorldRenderer) void {

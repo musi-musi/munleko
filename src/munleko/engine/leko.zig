@@ -341,7 +341,7 @@ pub const Reference = struct {
     }
 
     pub fn initGlobalPosition(world: *World, position: Vec3i) ?Reference {
-        const chunk_position = position.divScalar(chunk_width);
+        const chunk_position = position.divFloorScalar(chunk_width);
         const chunk = world.graph.chunkAt(chunk_position) orelse return null;
         const local_position = position.sub(chunk_position.mulScalar(chunk_width));
         return init(chunk, Address.init(i32, local_position.v));
@@ -458,37 +458,144 @@ pub const GridRaycastIterator = struct {
     }
 };
 
+const Bounds3 = nm.Bounds3;
 const Range3i = nm.Range3i;
 
 pub const physics = struct {
     pub const LekoTypeTest = fn (?LekoType) bool;
 
-    pub fn lekoTypeIsSolid(leko_type: LekoType) bool {
-        return leko_type.properties.is_solid;
+    pub fn lekoTypeIsSolid(leko_type: ?LekoType) bool {
+        if (leko_type) |lt| {
+            return lt.properties.is_solid;
+        }
+        return true;
     }
 
-    pub fn testPosition(world: *World, position: Vec3i, comptime test_fn: LekoTypeTest) ?bool {
-        const leko_value = world.leko_data.lekoValueAtPosition(position) orelse return null;
-        const leko_type = world.leko_data.leko_types.getForValue(leko_value) orelse return null;
+    fn invertLekoTypeTest(comptime test_fn: LekoTypeTest) LekoTypeTest {
+        return (struct {
+            fn f(leko_type: LekoType) bool {
+                return !test_fn(leko_type);
+            }
+        }.f);
+    }
+
+    pub fn testPosition(world: *World, position: Vec3i, comptime test_fn: LekoTypeTest) bool {
+        const leko_value = world.leko_data.lekoValueAtPosition(position) orelse return test_fn(null);
+        const leko_type = world.leko_data.leko_types.getForValue(leko_value);
         return test_fn(leko_type);
     }
 
-    pub fn testRangeAny(world: *World, range: Range3i, comptime test_fn: LekoTypeTest) ?bool {
+    pub fn testRangeAny(world: *World, range: Range3i, comptime test_fn: LekoTypeTest) bool {
         var iter = range.iterate();
         while (iter.next()) |position| {
-            if (testPosition(world, position, test_fn) orelse return null) {
+            if (testPosition(world, position, test_fn)) {
                 return true;
             }
         }
         return false;
     }
 
-    pub fn testRangeAll(world: *World, range: Range3i, comptime test_fn: LekoTypeTest) ?bool {
-        const inverted_test_fn = (struct {
-            fn f(leko_type: LekoType) bool {
-                return !test_fn(leko_type);
+    pub fn testRangeAll(world: *World, range: Range3i, comptime test_fn: LekoTypeTest) bool {
+        return !testRangeAny(world, range, invertLekoTypeTest(test_fn));
+    }
+
+    /// return the distance `bounds` would need to move along `direction` to snap the leading edge to the grid in `direction`
+    /// distance returned is never negative
+    pub fn boundsSnapDistance(bounds: Bounds3, comptime direction: Cardinal3) f32 {
+        const axis = comptime direction.axis();
+        const center = bounds.center.get(axis);
+        const radius = bounds.radius.get(axis);
+        switch (comptime direction.sign()) {
+            .positive => {
+                const x = center + radius;
+                return @ceil(x) - x;
+            },
+            .negative => {
+                const x = center - radius;
+                return x - @floor(x);
+            },
+        }
+    }
+
+    pub fn moveBoundsAxis(world: *World, bounds: *Bounds3, move: f32, comptime axis: Axis3, comptime is_solid: LekoTypeTest) ?f32 {
+        if (move < 0) {
+            return moveBoundsDirection(world, bounds, -move, comptime Cardinal3.init(axis, .negative), is_solid);
+        } else {
+            return moveBoundsDirection(world, bounds, move, comptime Cardinal3.init(axis, .positive), is_solid);
+        }
+    }
+
+    const skin_width = 1e-3;
+
+    fn moveBoundsDirection(world: *World, bounds: *Bounds3, move: f32, comptime direction: Cardinal3, comptime is_solid: LekoTypeTest) ?f32 {
+        std.debug.assert(move >= 0);
+        var distance_moved: f32 = 0;
+        const axis = comptime direction.axis();
+        const sign = comptime direction.sign();
+        const initial_snap = boundsSnapDistance(bounds.*, direction);
+        if (initial_snap > move) {
+            bounds.center.ptrMut(axis).* += sign.scalar(f32) * move;
+            return null;
+        }
+        bounds.center.ptrMut(axis).* += sign.scalar(f32) * initial_snap;
+        distance_moved += initial_snap;
+        while (distance_moved < move) {
+            if (testBoundsDirection(world, bounds.*, direction, is_solid)) {
+                bounds.center.ptrMut(axis).* -= sign.scalar(f32) * skin_width;
+                return distance_moved;
             }
-        }.f);
-        return !(testRangeAny(world, range, inverted_test_fn) orelse return null);
+            if (move - distance_moved > 1) {
+                distance_moved += 1;
+                switch (sign) {
+                    .positive => bounds.center.ptrMut(axis).* += 1,
+                    .negative => bounds.center.ptrMut(axis).* -= 1,
+                }
+            } else {
+                switch (sign) {
+                    .positive => bounds.center.ptrMut(axis).* += (move - distance_moved),
+                    .negative => bounds.center.ptrMut(axis).* -= (move - distance_moved),
+                }
+                break;
+            }
+        }
+        return null;
+    }
+
+    fn testBoundsDirection(world: *World, bounds: Bounds3, comptime direction: Cardinal3, comptime test_fn: LekoTypeTest) bool {
+        const range = boundsFaceRange(bounds, direction);
+        return testRangeAny(world, range, test_fn);
+    }
+
+    fn boundsFaceRange(bounds: Bounds3, comptime direction: Cardinal3) Range3i {
+        const axis = comptime direction.axis();
+        const sign = comptime direction.sign();
+        const u: Axis3 = switch (axis) {
+            .x => .y,
+            .y => .x,
+            .z => .x,
+        };
+        const v: Axis3 = switch (axis) {
+            .x => .z,
+            .y => .z,
+            .z => .y,
+        };
+        var range: Range3i = undefined;
+        range.min.ptrMut(u).* = @floatToInt(i32, @floor(bounds.center.get(u) - bounds.radius.get(u)));
+        range.min.ptrMut(v).* = @floatToInt(i32, @floor(bounds.center.get(v) - bounds.radius.get(v)));
+        range.max.ptrMut(u).* = @floatToInt(i32, @ceil(bounds.center.get(u) + bounds.radius.get(u)));
+        range.max.ptrMut(v).* = @floatToInt(i32, @ceil(bounds.center.get(v) + bounds.radius.get(v)));
+        switch (sign) {
+            .positive => {
+                const x = @floatToInt(i32, @ceil(bounds.center.get(axis) + bounds.radius.get(axis)));
+                range.min.ptrMut(axis).* = x;
+                range.max.ptrMut(axis).* = x + 1;
+            },
+            .negative => {
+                const x = @floatToInt(i32, @floor(bounds.center.get(axis) - bounds.radius.get(axis)));
+                range.min.ptrMut(axis).* = x - 1;
+                range.max.ptrMut(axis).* = x;
+            },
+        }
+        return range;
     }
 };

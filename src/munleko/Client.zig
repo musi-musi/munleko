@@ -104,7 +104,7 @@ pub fn run(self: *Client) !void {
     var player = try Player.init(session.world, Vec3.zero);
     defer player.deinit();
 
-    var prev_player_position = player.position;
+    var prev_player_eye = player.eyePosition();
 
     try session_renderer.start(player.observer);
     defer session_renderer.stop();
@@ -148,6 +148,9 @@ pub fn run(self: *Client) !void {
                 .disabled => .enabled,
             });
         }
+        if (self.window.buttonPressed(.z)) {
+            player.settings.move_mode = util.cycleEnum(player.settings.move_mode);
+        }
 
         const mouse_sensitivity = 0.1;
         const mouse_position = nm.vec2(self.window.mousePosition());
@@ -166,12 +169,13 @@ pub fn run(self: *Client) !void {
         if (self.window.buttonHeld(.s)) player_move.v[2] -= 1;
         player.input.move = player_move;
 
-        for (0..try session.frameTicks()) |_| {
-            prev_player_position = player.position;
+        // for (0..try session.frameTicks()) |_| {
+        if ((try session.frameTicks()) > 0) {
+            prev_player_eye = player.eyePosition();
             player.onTick(session);
         }
 
-        const interpolated_player_position = prev_player_position.lerpTo(player.position, session.tickProgress());
+        const interpolated_player_position = prev_player_eye.lerpTo(player.eyePosition(), session.tickProgress());
 
         camera.setViewMatrix(nm.transform.createTranslate(interpolated_player_position.neg()).mul(player.lookMatrix()));
         camera.setProjectionPerspective(.{
@@ -198,7 +202,7 @@ const SessionContext = struct {
     session_renderer: *SessionRenderer,
 
     fn onTick(self: *SessionContext, session: *Session) !void {
-        self.prev_player_position = self.player.position;
+        self.prev_player_eye = self.player.position;
         self.player.onTick(session);
     }
 
