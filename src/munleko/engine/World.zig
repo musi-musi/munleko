@@ -5,6 +5,7 @@ const nm = @import("nm");
 const Engine = @import("../Engine.zig");
 const Session = @import("Session.zig");
 const leko = @import("leko.zig");
+const Physics = @import("Physics.zig");
 
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
@@ -44,6 +45,7 @@ chunks: Chunks = undefined,
 graph: Graph = undefined,
 leko_data: LekoData = undefined,
 observers: Observers = undefined,
+physics: Physics = undefined,
 
 pub fn create(allocator: Allocator) !*World {
     const self = try allocator.create(World);
@@ -54,6 +56,7 @@ pub fn create(allocator: Allocator) !*World {
     try self.graph.init(self);
     try self.observers.init(self);
     try self.leko_data.init(self);
+    self.physics.init(self);
     return self;
 }
 
@@ -64,6 +67,7 @@ pub fn destroy(self: *World) void {
     self.graph.deinit();
     self.observers.deinit();
     self.leko_data.deinit();
+    self.physics.deinit();
 }
 
 fn createChunk(self: *World) !Chunk {

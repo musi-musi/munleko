@@ -5,7 +5,7 @@ const Session = @import("Session.zig");
 const World = @import("World.zig");
 
 const leko = @import("leko.zig");
-
+const Physics = @import("Physics.zig");
 const Observer = World.Observer;
 
 const Vec2 = nm.Vec2;
@@ -24,19 +24,23 @@ hull: Bounds3 = .{
     .center = undefined,
     .radius = vec3(.{ 1.5 / 2.0, 3.5 / 2.0, 1.5 / 2.0 }),
 },
+is_grounded: bool = false,
+velocity_y: f32 = 0,
+
 eye_height: f32 = 1.5,
 look_angles: Vec2 = Vec2.zero,
 observer: Observer,
-
 input: Input = .{},
 settings: Settings = .{},
 
 pub const Input = struct {
     move: Vec3 = Vec3.zero,
+    trigger_jump: bool = false,
 };
 
 pub const Settings = struct {
-    move_speed: f32 = 10,
+    move_speed: f32 = 15,
+    jump_height: f32 = 2.25,
     noclip_move_speed: f32 = 32,
     move_mode: MoveMode = .normal,
 };
@@ -62,6 +66,7 @@ pub fn deinit(self: Player) void {
 }
 
 pub fn onTick(self: *Player, session: *Session) void {
+    defer self.input.trigger_jump = false;
     switch (self.settings.move_mode) {
         .normal => self.moveNormal(session),
         .noclip => self.moveNoclip(session),
@@ -76,16 +81,28 @@ fn moveNoclip(self: *Player, session: *Session) void {
     self.hull.center.v[1] += self.input.move.v[1] * dt * self.settings.noclip_move_speed;
     self.hull.center.v[2] += move_xz.v[1] * dt * self.settings.noclip_move_speed;
     self.position = self.hull.center;
+    self.velocity_y = 0;
+    self.is_grounded = false;
 }
 
 fn moveNormal(self: *Player, session: *Session) void {
     const world = session.world;
     const dt = 1 / session.tick_rate;
+    self.velocity_y -= world.physics.settings.gravity * dt;
+    if (world.physics.moveLekoBoundsAxis(&self.hull, self.velocity_y * dt, .y)) |_| {
+        defer self.velocity_y = 0;
+        if (self.velocity_y < 0) {
+            self.is_grounded = true;
+        }
+    } else {
+        self.is_grounded = false;
+    }
+    if (self.is_grounded and self.input.trigger_jump) {
+        self.velocity_y = world.physics.jumpSpeedFromHeight(self.settings.jump_height);
+    }
     const move_xz = self.getMoveXZ().mulScalar(dt * self.settings.move_speed);
-    const move_y = self.input.move.v[1] * dt * self.settings.move_speed;
-    _ = leko.physics.moveBoundsAxis(world, &self.hull, move_xz.v[0], .x, leko.physics.lekoTypeIsSolid);
-    _ = leko.physics.moveBoundsAxis(world, &self.hull, move_y, .y, leko.physics.lekoTypeIsSolid);
-    _ = leko.physics.moveBoundsAxis(world, &self.hull, move_xz.v[1], .z, leko.physics.lekoTypeIsSolid);
+    _ = world.physics.moveLekoBoundsAxis(&self.hull, move_xz.v[0], .x);
+    _ = world.physics.moveLekoBoundsAxis(&self.hull, move_xz.v[1], .z);
     self.position = self.hull.center;
     // self.position.v[0] += move_xz.v[0] * dt * self.settings.move_speed;
     // self.position.v[1] += self.input.move.v[1] * dt * self.settings.move_speed;

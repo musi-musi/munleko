@@ -169,6 +169,10 @@ pub fn run(self: *Client) !void {
         if (self.window.buttonHeld(.s)) player_move.v[2] -= 1;
         player.input.move = player_move;
 
+        if (self.window.buttonHeld(.space)) {
+            player.input.trigger_jump = true;
+        }
+
         // for (0..try session.frameTicks()) |_| {
         if ((try session.frameTicks()) > 0) {
             prev_player_eye = player.eyePosition();
