@@ -28,6 +28,8 @@ is_grounded: bool = false,
 velocity_y: f32 = 0,
 
 eye_height: f32 = 1.5,
+eye_height_offset: f32 = 0,
+
 look_angles: Vec2 = Vec2.zero,
 observer: Observer,
 input: Input = .{},
@@ -71,6 +73,7 @@ pub fn onTick(self: *Player, session: *Session) void {
         .normal => self.moveNormal(session),
         .noclip => self.moveNoclip(session),
     }
+    self.position = self.hull.center;
     self.world.observers.setPosition(self.observer, self.position.cast(i32));
 }
 
@@ -101,14 +104,75 @@ fn moveNormal(self: *Player, session: *Session) void {
         self.velocity_y = world.physics.jumpSpeedFromHeight(self.settings.jump_height);
     }
     const move_xz = self.getMoveXZ().mulScalar(dt * self.settings.move_speed);
-    _ = world.physics.moveLekoBoundsAxis(&self.hull, move_xz.v[0], .x);
-    _ = world.physics.moveLekoBoundsAxis(&self.hull, move_xz.v[1], .z);
-    self.position = self.hull.center;
+    self.moveXZ(world, move_xz);
+    self.moveStepOffset(dt);
+    // self.position = self.hull.center;
     // self.position.v[0] += move_xz.v[0] * dt * self.settings.move_speed;
     // self.position.v[1] += self.input.move.v[1] * dt * self.settings.move_speed;
     // self.position.v[2] += move_xz.v[1] * dt * self.settings.move_speed;
 }
 
+fn moveXZ(self: *Player, world: *World, move: Vec2) void {
+    const physics = &world.physics;
+    var step_hull = self.hull; // a temporary hull to use for checking for empty space to step up through
+    // move forward, if a collision occurs, see if we can step upwards
+    if (moveLekoBoundsXZ(physics, &self.hull, move)) |move_actual| {
+        // if we are on the ground, or the ledge we just hit has ground right in front of it,
+        // we might be able to step up if there is space.
+        // if we are in the air, this will also snap the temporary step hull to that ground
+        // right in front of the step
+        if (self.is_grounded or physics.moveLekoBoundsAxis(&step_hull, -1, .y) != null) {
+            if (physics.moveLekoBoundsAxis(&step_hull, 1, .y) == null) {
+                const move_step = moveLekoBoundsXZ(physics, &step_hull, move);
+                // zig fmt: off
+                if (
+                    move_step == null
+                    or std.math.fabs(move_step.?.v[0]) > std.math.fabs(move_actual.v[0])
+                    or std.math.fabs(move_step.?.v[1]) > std.math.fabs(move_actual.v[1])
+                ) {
+                // zig fmt: on
+                    self.eye_height_offset += self.hull.center.get(.y) - step_hull.center.get(.y);
+                    self.hull.center = step_hull.center;
+                }
+            }
+        }
+    }
+    if (self.is_grounded) {
+        step_hull = self.hull;
+        if (physics.moveLekoBoundsAxis(&step_hull, -1.1, .y) != null) {
+            self.eye_height_offset += self.hull.center.get(.y) - step_hull.center.get(.y);
+            self.hull.center = step_hull.center;
+        }
+    }
+}
+
+fn moveLekoBoundsXZ(physics: *Physics, bounds: *Bounds3, move: Vec2) ?Vec2 {
+    const x = physics.moveLekoBoundsAxis(bounds, move.v[0], .x);
+    const z = physics.moveLekoBoundsAxis(bounds, move.v[1], .z);
+    if (x == null and z == null) {
+        return null;
+    }
+    return vec2(.{ x orelse move.v[0], z orelse move.v[1] });
+}
+
+fn moveStepOffset(self: *Player, dt: f32) void {
+    var offset = self.eye_height_offset;
+    if (offset != 0) {
+        const offset_delta = self.settings.move_speed * dt * std.math.max(1, std.math.fabs(offset));
+        if (offset > 0) {
+            offset -= offset_delta;
+            if (offset < 0) {
+                offset = 0;
+            }
+        } else {
+            offset += offset_delta;
+            if (offset > 0) {
+                offset = 0;
+            }
+        }
+        self.eye_height_offset = offset;
+    }
+}
 fn getMoveXZ(self: Player) Vec2 {
     const face_angle = std.math.degreesToRadians(f32, self.look_angles.v[0]);
     const sin = @sin(-face_angle);
@@ -129,7 +193,7 @@ pub fn updateLookFromMouse(self: *Player, mouse_delta: Vec2) void {
 
 pub fn eyePosition(self: Player) Vec3 {
     var position = self.position;
-    position.ptrMut(.y).* += self.eye_height;
+    position.ptrMut(.y).* += self.eye_height + self.eye_height_offset;
     return position;
 }
 
