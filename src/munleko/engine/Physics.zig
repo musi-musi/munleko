@@ -159,18 +159,18 @@ fn boundsLekoFaceRange(bounds: Bounds3, comptime direction: Cardinal3) Range3i {
         .z => .y,
     };
     var range: Range3i = undefined;
-    range.min.ptrMut(u).* = @floatToInt(i32, @floor(bounds.center.get(u) - bounds.radius.get(u)));
-    range.min.ptrMut(v).* = @floatToInt(i32, @floor(bounds.center.get(v) - bounds.radius.get(v)));
-    range.max.ptrMut(u).* = @floatToInt(i32, @ceil(bounds.center.get(u) + bounds.radius.get(u)));
-    range.max.ptrMut(v).* = @floatToInt(i32, @ceil(bounds.center.get(v) + bounds.radius.get(v)));
+    range.min.ptrMut(u).* = @intFromFloat(i32, @floor(bounds.center.get(u) - bounds.radius.get(u)));
+    range.min.ptrMut(v).* = @intFromFloat(i32, @floor(bounds.center.get(v) - bounds.radius.get(v)));
+    range.max.ptrMut(u).* = @intFromFloat(i32, @ceil(bounds.center.get(u) + bounds.radius.get(u)));
+    range.max.ptrMut(v).* = @intFromFloat(i32, @ceil(bounds.center.get(v) + bounds.radius.get(v)));
     switch (sign) {
         .positive => {
-            const x = @floatToInt(i32, @ceil(bounds.center.get(axis) + bounds.radius.get(axis)));
+            const x = @intFromFloat(i32, @ceil(bounds.center.get(axis) + bounds.radius.get(axis)));
             range.min.ptrMut(axis).* = x;
             range.max.ptrMut(axis).* = x + 1;
         },
         .negative => {
-            const x = @floatToInt(i32, @floor(bounds.center.get(axis) - bounds.radius.get(axis)));
+            const x = @intFromFloat(i32, @floor(bounds.center.get(axis) - bounds.radius.get(axis)));
             range.min.ptrMut(axis).* = x - 1;
             range.max.ptrMut(axis).* = x;
         },

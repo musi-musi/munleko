@@ -125,9 +125,9 @@ fn tick(self: *Session) !void {
 // }
 
 pub fn nsPerTick(self: Session) u64 {
-    return @floatToInt(u64, std.time.ns_per_s / @floatCast(f64, self.tick_rate));
+    return @intFromFloat(u64, std.time.ns_per_s / @floatCast(f64, self.tick_rate));
 }
 
 pub fn tickProgress(self: *Session) f32 {
-    return @intToFloat(f32, self.timer.read() >> 10) / @intToFloat(f32, self.nsPerTick() >> 10);
+    return @floatFromInt(f32, self.timer.read() >> 10) / @floatFromInt(f32, self.nsPerTick() >> 10);
 }

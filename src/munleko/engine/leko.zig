@@ -198,7 +198,7 @@ pub const LekoTypeTable = struct {
 
     pub fn addLekoType(self: *LekoTypeTable, name: []const u8, properties: LekoType.Properties) !void {
         const index = @intCast(u16, self.list.items.len);
-        const leko_value = @intToEnum(LekoValue, index);
+        const leko_value = @enumFromInt(LekoValue, index);
         const owned_name = try self.arena.allocator().dupe(u8, name);
         const leko_type = LekoType{
             .value = leko_value,
@@ -221,7 +221,7 @@ pub const LekoTypeTable = struct {
     }
 
     pub fn getForValue(self: LekoTypeTable, value: LekoValue) ?LekoType {
-        const index = @enumToInt(value);
+        const index = @intFromEnum(value);
         if (index >= self.list.items.len) {
             return null;
         }
@@ -269,7 +269,7 @@ pub const Address = struct {
     }
 
     pub fn get(self: Address, axis: nm.Axis3) UChunkWidth {
-        return @truncate(UChunkWidth, shr(UAddress, self.v, chunk_width_bits * @as(u32, 2 - @enumToInt(axis))));
+        return @truncate(UChunkWidth, shr(UAddress, self.v, chunk_width_bits * @as(u32, 2 - @intFromEnum(axis))));
     }
 
     pub fn isEdge(self: Address, direction: nm.Cardinal3) bool {
@@ -299,7 +299,7 @@ pub const Address = struct {
 
     pub fn single(comptime T: type, value: T, axis: nm.Axis3) Address {
         return Address{
-            .v = shl(UAddress, @intCast(UAddress, value), (chunk_width_bits * @as(u32, 2 - @enumToInt(axis)))),
+            .v = shl(UAddress, @intCast(UAddress, value), (chunk_width_bits * @as(u32, 2 - @intFromEnum(axis)))),
         };
     }
 
@@ -456,7 +456,7 @@ pub const GridRaycastIterator = struct {
     }
 
     fn updateDistance(self: *GridRaycastIterator, axis: nm.Axis3, comptime sign: nm.Sign) void {
-        var distance = @intToFloat(f32, self.cell.get(axis)) - self.origin.get(axis);
+        var distance = @floatFromInt(f32, self.cell.get(axis)) - self.origin.get(axis);
         distance += (1 - sign.scalar(f32)) / 2;
         self.distance = distance / self.direction.get(axis);
     }

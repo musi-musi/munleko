@@ -106,16 +106,16 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         }
 
         pub fn get(self: Self, a: Axis) Scalar {
-            return self.v[@enumToInt(a)];
+            return self.v[@intFromEnum(a)];
         }
         pub fn set(self: *Self, a: Axis, v: Scalar) void {
-            self.v[@enumToInt(a)] = v;
+            self.v[@intFromEnum(a)] = v;
         }
         pub fn ptr(self: *const Self, a: Axis) *const Scalar {
-            return &(self.v[@enumToInt(a)]);
+            return &(self.v[@intFromEnum(a)]);
         }
         pub fn ptrMut(self: *Self, a: Axis) *Scalar {
-            return &(self.v[@enumToInt(a)]);
+            return &(self.v[@intFromEnum(a)]);
         }
 
         pub fn cast(self: Self, comptime S: type) Vector(S, dimensions) {
@@ -124,11 +124,11 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
                 switch (@typeInfo(Scalar)) {
                     .Float => switch (@typeInfo(S)) {
                         .Float => result.v[i] = @floatCast(S, self.v[i]),
-                        .Int => result.v[i] = @floatToInt(S, self.v[i]),
+                        .Int => result.v[i] = @intFromFloat(S, self.v[i]),
                         else => unreachable,
                     },
                     .Int => switch (@typeInfo(S)) {
-                        .Float => result.v[i] = @intToFloat(S, self.v[i]),
+                        .Float => result.v[i] = @floatFromInt(S, self.v[i]),
                         .Int => result.v[i] = @intCast(S, self.v[i]),
                         else => unreachable,
                     },

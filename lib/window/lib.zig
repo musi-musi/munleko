@@ -80,7 +80,7 @@ pub const Window = struct {
     pub fn create(self: *Window, gl_options: GlContextOptions) !void {
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, @intCast(c_int, gl_options.version_major));
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, @intCast(c_int, gl_options.version_minor));
-        c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, @enumToInt(gl_options.profile));
+        c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, @intFromEnum(gl_options.profile));
         c.glfwWindowHint(c.GLFW_SAMPLES, 8);
         const debug: c_int = (if (builtin.mode == .Debug) c.GLFW_TRUE else c.GLFW_FALSE);
         c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, debug);
@@ -109,7 +109,7 @@ pub const Window = struct {
 
     pub fn setVsync(self: *Window, vsync: Vsync) void {
         self.vsync = vsync;
-        c.glfwSwapInterval(@enumToInt(vsync));
+        c.glfwSwapInterval(@intFromEnum(vsync));
     }
 
     pub fn nextFrame(self: *Window) bool {
@@ -125,7 +125,7 @@ pub const Window = struct {
 
     fn keyCallback(handle: Handle, key: c_int, _: c_int, action: c_int, _: c_int) callconv(.C) void {
         const self = fromUserPtr(handle);
-        const code = @intToEnum(ButtonCode, key);
+        const code = @enumFromInt(ButtonCode, key);
         self.buttonCallback(code, action) catch |err| {
             @panic(@errorName(err));
         };
@@ -133,7 +133,7 @@ pub const Window = struct {
 
     fn mouseButtonCallback(handle: Handle, button: c_int, action: c_int, _: c_int) callconv(.C) void {
         const self = fromUserPtr(handle);
-        const code = @intToEnum(ButtonCode, button + c.GLFW_KEY_LAST + 1);
+        const code = @enumFromInt(ButtonCode, button + c.GLFW_KEY_LAST + 1);
         self.buttonCallback(code, action) catch |err| {
             @panic(@errorName(err));
         };
@@ -201,7 +201,7 @@ pub const Window = struct {
     }
 
     pub fn setMouseMode(self: *Window, mode: MouseMode) void {
-        c.glfwSetInputMode(self.handle, c.GLFW_CURSOR, @enumToInt(mode));
+        c.glfwSetInputMode(self.handle, c.GLFW_CURSOR, @intFromEnum(mode));
         self.mouse_mode = mode;
         if (self.isRawMouseSupported()) {
             switch (mode) {
@@ -231,12 +231,12 @@ pub const ButtonCode = enum(c_int) {
     const Self = @This();
 
     fn fromButtonCode(key: ButtonCode) Self {
-        return std.enums.values(Self)[@enumToInt(key)];
+        return std.enums.values(Self)[@intFromEnum(key)];
     }
 
     fn keyType(self: Self) ButtonType {
-        const mouse_start = @enumToInt(Self.mouse_1);
-        if (@enumToInt(self) >= mouse_start) {
+        const mouse_start = @intFromEnum(Self.mouse_1);
+        if (@intFromEnum(self) >= mouse_start) {
             return .mouse;
         } else {
             return .keyboard;
@@ -245,8 +245,8 @@ pub const ButtonCode = enum(c_int) {
 
     fn glfwCode(self: Self) c_int {
         switch (self.keyType()) {
-            .keyboard => return @enumToInt(self),
-            .mouse => return @enumToInt(self) - (c.GLFW_KEY_LAST + 1),
+            .keyboard => return @intFromEnum(self),
+            .mouse => return @intFromEnum(self) - (c.GLFW_KEY_LAST + 1),
         }
     }
 

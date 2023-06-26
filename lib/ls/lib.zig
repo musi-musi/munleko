@@ -296,7 +296,7 @@ pub fn Shader(comptime shader_defs: ShaderDefs) type {
         pub const SamplerTag = defs.SamplerTag();
 
         pub fn UniformValue(comptime tag: UniformTag) type {
-            const u = defs.uniforms[@enumToInt(tag)];
+            const u = defs.uniforms[@intFromEnum(tag)];
             const U = u.uniform_type.Type();
             if (u.array_len == null) {
                 return U;
@@ -392,16 +392,16 @@ pub fn Shader(comptime shader_defs: ShaderDefs) type {
         }
 
         pub fn setUniform(self: Self, comptime tag: UniformTag, value: UniformValue(tag)) void {
-            const u = defs.uniforms[@enumToInt(tag)];
+            const u = defs.uniforms[@intFromEnum(tag)];
             if (u.array_len == null) {
-                self.program.setUniform(self.uniform_locations[@enumToInt(tag)], u.uniform_type, value);
+                self.program.setUniform(self.uniform_locations[@intFromEnum(tag)], u.uniform_type, value);
             } else {
-                self.program.setUniformArray(self.uniform_locations[@enumToInt(tag)], u.uniform_type, value);
+                self.program.setUniformArray(self.uniform_locations[@intFromEnum(tag)], u.uniform_type, value);
             }
         }
 
         pub fn setSampler(self: Self, comptime tag: SamplerTag, value: u32) void {
-            self.program.setUniform(self.sampler_locations[@enumToInt(tag)], .int, @intCast(c_int, value));
+            self.program.setUniform(self.sampler_locations[@intFromEnum(tag)], .int, @intCast(c_int, value));
         }
 
         pub fn use(self: Self) void {

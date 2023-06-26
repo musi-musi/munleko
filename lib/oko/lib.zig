@@ -19,7 +19,7 @@ pub fn start(comptime tick_time: comptime_float) !void {
         fn thread_main() void {
             while (is_running.load(.Monotonic)) {
                 tick();
-                std.time.sleep(comptime @floatToInt(u64, tick_time * std.time.ns_per_s));
+                std.time.sleep(comptime @intFromFloat(u64, tick_time * std.time.ns_per_s));
             }
         }
     };
@@ -65,7 +65,6 @@ pub fn dumpAllocHistoryCsvFile(relative_path: []const u8) !void {
     });
     defer out.close();
     try dumpAllocHistoryCsv(out.writer());
-
 }
 pub fn dumpAllocHistoryCsv(writer: anytype) !void {
     var history_opt = history_head;
@@ -74,7 +73,7 @@ pub fn dumpAllocHistoryCsv(writer: anytype) !void {
             try writer.writeByte(',');
         }
         history_opt = history.next;
-        try writer.print("\"{s}\"", .{ history.tag });
+        try writer.print("\"{s}\"", .{history.tag});
     }
     try writer.writeByte('\n');
     var i: usize = history_start;
@@ -85,7 +84,7 @@ pub fn dumpAllocHistoryCsv(writer: anytype) !void {
                 try writer.writeByte(',');
             }
             history_opt = history.next;
-            try writer.print("{d}", .{ history.history[i] });
+            try writer.print("{d}", .{history.history[i]});
         }
         try writer.writeByte('\n');
     }

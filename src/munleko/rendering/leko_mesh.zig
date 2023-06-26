@@ -302,7 +302,7 @@ pub const LekoMeshSystem = struct {
 
     fn encodeLekoFaceBase(address: leko.Address, normal: Cardinal3, ao: u8) u32 {
         var base: u32 = address.v;
-        base = (base << 3) | @as(u32, @enumToInt(normal));
+        base = (base << 3) | @as(u32, @intFromEnum(normal));
         base = (base << 8) | ao;
         return base;
     }
@@ -353,7 +353,7 @@ pub const LekoMeshSystem = struct {
                     .decr => r = r.decrUnchecked(move.direction),
                 }
             }
-            neighbors |= @as(u8, @boolToInt(isOpaque(world, r))) << i;
+            neighbors |= @as(u8, @intFromBool(isOpaque(world, r))) << i;
         }
         return ao_table[neighbors];
     }
@@ -437,7 +437,7 @@ pub const FaceMaterialTable = struct {
     }
 
     pub fn getForLekoValue(self: *FaceMaterialTable, value: LekoValue) ?FaceMaterial {
-        const index = @enumToInt(value);
+        const index = @intFromEnum(value);
         if (index >= self.list.items.len) {
             return null;
         }

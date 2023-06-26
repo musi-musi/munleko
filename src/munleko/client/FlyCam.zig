@@ -39,7 +39,7 @@ pub fn update(self: *Self, window: Window) void {
         if (look_y < -90) look_y = -90;
         look_x = @mod(look_x, 360);
         self.look_angles.v = .{ look_x, look_y };
-        const dt = @floatCast(f32, @intToFloat(f64, dt_ns) / std.time.ns_per_s);
+        const dt = @floatCast(f32, @floatFromInt(f64, dt_ns) / std.time.ns_per_s);
         var move = Vec3.zero;
         if (window.buttonHeld(.d)) move.v[0] += 1;
         if (window.buttonHeld(.a)) move.v[0] -= 1;

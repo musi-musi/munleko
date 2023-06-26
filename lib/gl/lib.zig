@@ -44,11 +44,11 @@ pub const Capability = enum(UInt) {
 };
 
 pub fn enable(cap: Capability) void {
-    c.glEnable(@enumToInt(cap));
+    c.glEnable(@intFromEnum(cap));
 }
 
 pub fn disable(cap: Capability) void {
-    c.glDisable(@enumToInt(cap));
+    c.glDisable(@intFromEnum(cap));
 }
 
 pub fn setEnabled(cap: Capability, enabled: Enabled) void {
@@ -70,7 +70,7 @@ pub const DepthFunc = enum(c_uint) {
 };
 
 pub fn setDepthFunction(func: DepthFunc) void {
-    c.glDepthFunc(@enumToInt(func));
+    c.glDepthFunc(@intFromEnum(func));
 }
 
 pub const Name = UInt;
@@ -124,7 +124,7 @@ pub const ClearFlags = enum(u32) {
 };
 
 pub fn clear(flags: ClearFlags) void {
-    c.glClear(@enumToInt(flags));
+    c.glClear(@intFromEnum(flags));
 }
 
 pub fn lineWidth(width: f32) void {
@@ -142,14 +142,14 @@ pub const PrimitiveType = enum(c_uint) {
 };
 
 pub fn drawElements(primitive_type: PrimitiveType, index_count: usize, comptime index_type: IndexType) void {
-    c.glDrawElements(@enumToInt(primitive_type), @intCast(c_int, index_count), @enumToInt(index_type), null);
+    c.glDrawElements(@intFromEnum(primitive_type), @intCast(c_int, index_count), @intFromEnum(index_type), null);
 }
 
 pub fn drawElementsInstanced(primitive_type: PrimitiveType, index_count: usize, comptime index_type: IndexType, instance_count: usize) void {
     c.glDrawElementsInstanced(
-        @enumToInt(primitive_type),
+        @intFromEnum(primitive_type),
         @intCast(c_int, index_count),
-        @enumToInt(index_type),
+        @intFromEnum(index_type),
         null,
         @intCast(c_int, instance_count),
     );
@@ -193,13 +193,13 @@ pub fn Buffer(comptime T: type) type {
         }
 
         pub fn alloc(self: Self, size: usize, usage: BufferUsage) void {
-            c.glNamedBufferData(self.name, iptrCast(size * stride), null, @enumToInt(usage));
+            c.glNamedBufferData(self.name, iptrCast(size * stride), null, @intFromEnum(usage));
         }
 
         pub fn data(self: Self, slice: []const T, usage: BufferUsage) void {
             const ptr = vptrCast(slice.ptr);
             const size = iptrCast(slice.len * stride);
-            c.glNamedBufferData(self.name, size, ptr, @enumToInt(usage));
+            c.glNamedBufferData(self.name, size, ptr, @intFromEnum(usage));
         }
 
         pub fn subData(self: Self, slice: []const T, offset: usize) void {
@@ -228,9 +228,9 @@ pub const Array = struct {
         switch (attr_type.primitive) {
             .half,
             .float,
-            => c.glVertexArrayAttribFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @enumToInt(attr_type.primitive), 0, @intCast(UInt, stride)),
-            .double => c.glVertexArrayAttribLFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @enumToInt(attr_type.primitive), @intCast(UInt, stride)),
-            else => c.glVertexArrayAttribIFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @enumToInt(attr_type.primitive), @intCast(UInt, stride)),
+            => c.glVertexArrayAttribFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @intFromEnum(attr_type.primitive), 0, @intCast(UInt, stride)),
+            .double => c.glVertexArrayAttribLFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @intFromEnum(attr_type.primitive), @intCast(UInt, stride)),
+            else => c.glVertexArrayAttribIFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @intFromEnum(attr_type.primitive), @intCast(UInt, stride)),
         }
         c.glVertexArrayAttribBinding(
             self.name,
@@ -367,7 +367,7 @@ pub fn Stage(comptime stage: StageType) type {
 
         pub fn create() Self {
             return .{
-                .name = c.glCreateShader(@enumToInt(stage_type)),
+                .name = c.glCreateShader(@intFromEnum(stage_type)),
             };
         }
 
@@ -589,7 +589,7 @@ pub fn Texture(comptime target_: TextureTarget, comptime format_: PixelFormat) t
 
         pub fn create() Self {
             var name: Name = undefined;
-            c.glCreateTextures(@enumToInt(target), 1, &name);
+            c.glCreateTextures(@intFromEnum(target), 1, &name);
             return .{
                 .name = name,
             };
@@ -604,8 +604,8 @@ pub fn Texture(comptime target_: TextureTarget, comptime format_: PixelFormat) t
         }
 
         pub fn setFilter(self: Self, min_filter: TextureFilter, mag_filter: TextureFilter) void {
-            c.glTextureParameteri(self.name, c.GL_TEXTURE_MIN_FILTER, @intCast(c_int, @enumToInt(min_filter)));
-            c.glTextureParameteri(self.name, c.GL_TEXTURE_MAG_FILTER, @intCast(c_int, @enumToInt(mag_filter)));
+            c.glTextureParameteri(self.name, c.GL_TEXTURE_MIN_FILTER, @intCast(c_int, @intFromEnum(min_filter)));
+            c.glTextureParameteri(self.name, c.GL_TEXTURE_MAG_FILTER, @intCast(c_int, @intFromEnum(mag_filter)));
         }
 
         pub usingnamespace switch (target) {

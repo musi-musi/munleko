@@ -204,7 +204,7 @@ pub const Graph = struct {
     }
 
     pub fn neighborChunk(self: *Graph, chunk: Chunk, direction: nm.Cardinal3) ?Chunk {
-        return self.neighbors.get(chunk)[@enumToInt(direction)];
+        return self.neighbors.get(chunk)[@intFromEnum(direction)];
     }
 
     fn matchDataCapacity(self: *Graph) !void {
@@ -222,9 +222,9 @@ pub const Graph = struct {
         inline for (comptime std.enums.values(nm.Cardinal3)) |direction| {
             const neighbor_position = position.add(Vec3i.unitSigned(direction));
             const neighbor_opt = self.position_map.get(neighbor_position);
-            neighbors.*[@enumToInt(direction)] = neighbor_opt;
+            neighbors.*[@intFromEnum(direction)] = neighbor_opt;
             if (neighbor_opt) |neighbor| {
-                self.neighbors.getPtr(neighbor).*[@enumToInt(direction.negate())] = chunk;
+                self.neighbors.getPtr(neighbor).*[@intFromEnum(direction.negate())] = chunk;
             }
         }
     }
@@ -236,7 +236,7 @@ pub const Graph = struct {
         inline for (comptime std.enums.values(nm.Cardinal3)) |direction| {
             const neighbor_position = position.add(Vec3i.unitSigned(direction));
             if (self.position_map.get(neighbor_position)) |neighbor| {
-                self.neighbors.getPtr(neighbor).*[@enumToInt(direction.negate())] = null;
+                self.neighbors.getPtr(neighbor).*[@intFromEnum(direction.negate())] = null;
             }
         }
     }

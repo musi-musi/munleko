@@ -18,6 +18,6 @@ pub const FrameTime = struct {
     pub fn frame(self: *FrameTime) void {
         const time = self.timer.read();
         self.delta_ns = time - self.last_frame;
-        self.delta_s = @intToFloat(f32, self.delta_ns) / std.time.ns_per_s;
+        self.delta_s = @floatFromInt(f32, self.delta_ns) / std.time.ns_per_s;
     }
 };

@@ -158,7 +158,7 @@ fn moveLekoBoundsXZ(physics: *Physics, bounds: *Bounds3, move: Vec2) ?Vec2 {
 fn moveStepOffset(self: *Player, dt: f32) void {
     var offset = self.eye_height_offset;
     if (offset != 0) {
-        const offset_delta = self.settings.move_speed * dt * std.math.max(1, std.math.fabs(offset));
+        const offset_delta = self.settings.move_speed * dt * @max(1, std.math.fabs(offset));
         if (offset > 0) {
             offset -= offset_delta;
             if (offset < 0) {

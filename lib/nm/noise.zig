@@ -81,7 +81,7 @@ pub fn Perlin(comptime Scalar_: type, comptime dimensions_: u32) type {
             const grad = gradient(value);
             var dist: Vector = undefined;
             inline for (Vector.indices) |i| {
-                dist.v[i] = @intToFloat(Scalar, value[i]) - position.v[i];
+                dist.v[i] = @floatFromInt(Scalar, value[i]) - position.v[i];
             }
             return dist.dot(grad);
         }

@@ -9,7 +9,7 @@ allocator: Allocator,
 threads: []Thread,
 
 pub fn countFromCpuCount(factor: f32) usize {
-    const count = @floatToInt(usize, @floor(@intToFloat(f32, Thread.getCpuCount() catch 1) * factor));
+    const count = @intFromFloat(usize, @floor(@floatFromInt(f32, Thread.getCpuCount() catch 1) * factor));
     if (count == 0) return 1;
     return count;
 }
