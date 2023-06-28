@@ -83,6 +83,7 @@ pub fn run(self: *Client) !void {
     defer self.window.destroy();
     self.window.makeContextCurrent();
     self.window.setVsync(.disabled);
+    // self.window.setDisplayMode(.borderless);
 
     try gl.init(window.getGlProcAddress);
     gl.viewport(self.window.size);
@@ -132,10 +133,7 @@ pub fn run(self: *Client) !void {
 
     while (self.window.nextFrame()) {
         frame_time.frame();
-        // oko.tick();
-        for (self.window.events.get(.framebuffer_size)) |size| {
-            gl.viewport(size);
-        }
+        gl.viewport(self.window.size);
         if (self.window.buttonPressed(.grave)) {
             switch (self.window.mouse_mode) {
                 .disabled => self.window.setMouseMode(.visible),
@@ -147,6 +145,9 @@ pub fn run(self: *Client) !void {
                 .enabled => .disabled,
                 .disabled => .enabled,
             });
+        }
+        if (self.window.buttonPressed(.f_4)) {
+            self.window.setDisplayMode(util.cycleEnum(self.window.display_mode));
         }
         if (self.window.buttonPressed(.z)) {
             player.settings.move_mode = util.cycleEnum(player.settings.move_mode);

@@ -10,8 +10,6 @@ const c = @cImport({
 
 const Allocator = std.mem.Allocator;
 
-pub const Handle = ?*c.GLFWwindow;
-
 pub fn init() !void {
     if (c.glfwInit() == 0) {
         return error.GlfwInitFailed;
@@ -41,6 +39,11 @@ pub const Vsync = enum(c_int) {
     enabled = 1,
 };
 
+pub const DisplayMode = enum {
+    windowed,
+    borderless,
+};
+
 pub const Window = struct {
     allocator: Allocator,
     handle: Handle = null,
@@ -49,6 +52,11 @@ pub const Window = struct {
     size: [2]u32 = .{ 1280, 720 },
     vsync: Vsync = .disabled,
     mouse_mode: MouseMode = .visible,
+    display_mode: DisplayMode = .windowed,
+    windowed_position: [2]u32 = .{ 0, 0 },
+    windowed_size: [2]u32 = .{ 0, 0 },
+
+    pub const Handle = ?*c.GLFWwindow;
 
     pub const Events = util.Events(union(enum) {
         button_pressed: ButtonCode,
@@ -81,7 +89,7 @@ pub const Window = struct {
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, @intCast(c_int, gl_options.version_major));
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, @intCast(c_int, gl_options.version_minor));
         c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, @intFromEnum(gl_options.profile));
-        c.glfwWindowHint(c.GLFW_SAMPLES, 8);
+        // c.glfwWindowHint(c.GLFW_SAMPLES, 8);
         const debug: c_int = (if (builtin.mode == .Debug) c.GLFW_TRUE else c.GLFW_FALSE);
         c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, debug);
 
@@ -94,7 +102,6 @@ pub const Window = struct {
         } else {
             return error.GlfwCreateWindowFailed;
         }
-
         self.setVsync(self.vsync);
     }
 
@@ -121,6 +128,37 @@ pub const Window = struct {
 
     pub fn setShouldClose(self: Window) void {
         c.glfwSetWindowShouldClose(self.handle, c.GLFW_TRUE);
+    }
+
+    pub fn setDisplayMode(self: *Window, mode: DisplayMode) void {
+        if (mode == self.display_mode) return;
+        self.display_mode = mode;
+        switch (mode) {
+            .windowed => {
+                c.glfwSetWindowMonitor(
+                    self.handle,
+                    null,
+                    @intCast(c_int, self.windowed_position[0]),
+                    @intCast(c_int, self.windowed_position[1]),
+                    @intCast(c_int, self.windowed_size[0]),
+                    @intCast(c_int, self.windowed_size[1]),
+                    0,
+                );
+            },
+            .borderless => {
+                var x: c_int = 0;
+                var y: c_int = 0;
+                c.glfwGetWindowPos(self.handle, &x, &y);
+                self.windowed_position = .{
+                    @intCast(u32, x),
+                    @intCast(u32, y),
+                };
+                self.windowed_size = self.size;
+                const monitor = c.glfwGetPrimaryMonitor();
+                const monitor_mode = c.glfwGetVideoMode(monitor).*;
+                c.glfwSetWindowMonitor(self.handle, monitor, 0, 0, monitor_mode.width, monitor_mode.height, monitor_mode.refreshRate);
+            },
+        }
     }
 
     fn keyCallback(handle: Handle, key: c_int, _: c_int, action: c_int, _: c_int) callconv(.C) void {
@@ -391,4 +429,21 @@ pub const MouseMode = enum(c_int) {
     visible = c.GLFW_CURSOR_NORMAL,
     hidden = c.GLFW_CURSOR_HIDDEN,
     disabled = c.GLFW_CURSOR_DISABLED,
+};
+
+pub const Monitor = extern struct {
+    handle: Handle,
+
+    pub const Handle = ?*c.GLFWmonitor;
+
+    pub fn getPrimary() Monitor {
+        const handle = c.glfwGetPrimaryMonitor();
+        return .{ .handle = handle };
+    }
+
+    pub fn getAll() []const Monitor {
+        var count: c_int = 0;
+        const ptr = c.glfwGetMonitors(&count);
+        return @ptrCast([*]Monitor, ptr)[0..@intCast(usize, count)];
+    }
 };

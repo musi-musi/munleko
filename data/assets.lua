@@ -1,7 +1,7 @@
 local leko = {}
 
 leko.stone = {}
--- leko.grass = {}
+leko.grass = {}
 leko.dirt = {}
 leko.brick = {}
 

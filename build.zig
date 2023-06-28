@@ -1,5 +1,6 @@
 const std = @import("std");
 const ziglua = @import("lib/ziglua/build.zig");
+const zgui = @import("lib/zig-gamedev/libs/zgui/build.zig");
 
 const Build = std.Build;
 const Step = Build.Step;
@@ -35,6 +36,9 @@ pub fn build(b: *Build) void {
     b.installArtifact(exe);
 
     addModules(b, exe);
+
+    const zgui_pkg = zgui.package(b, target, optimize, .{ .options = .{ .backend = .no_backend } });
+    zgui_pkg.link(exe);
 
     // This *creates* a RunStep in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
