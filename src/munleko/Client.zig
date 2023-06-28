@@ -23,7 +23,7 @@ const Mutex = std.Thread.Mutex;
 
 const Window = window.Window;
 
-pub const rendering = @import("rendering.zig");
+pub const rendering = @import("client/rendering.zig");
 const SessionRenderer = rendering.SessionRenderer;
 const Scene = rendering.Scene;
 const Camera = Scene.Camera;

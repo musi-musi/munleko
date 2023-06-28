@@ -14,8 +14,8 @@ const vec3 = nm.vec3;
 const Vec3i = nm.Vec3i;
 const vec3i = nm.vec3i;
 
-const Client = @import("../Client.zig");
-const Engine = @import("../Engine.zig");
+const Client = @import("../../Client.zig");
+const Engine = @import("../../Engine.zig");
 
 const Session = Engine.Session;
 const World = Engine.World;

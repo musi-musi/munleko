@@ -11,8 +11,8 @@ const Mutex = Thread.Mutex;
 const ThreadGroup = util.ThreadGroup;
 const AtomicFlag = util.AtomicFlag;
 
-const Client = @import("../Client.zig");
-const Engine = @import("../Engine.zig");
+const Client = @import("../../Client.zig");
+const Engine = @import("../../Engine.zig");
 
 const Session = Engine.Session;
 const World = Engine.World;

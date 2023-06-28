@@ -10,8 +10,8 @@ const ThreadGroup = util.ThreadGroup;
 const AtomicFlag = util.AtomicFlag;
 const ResetEvent = Thread.ResetEvent;
 
-const Client = @import("../Client.zig");
-const Engine = @import("../Engine.zig");
+const Client = @import("../../Client.zig");
+const Engine = @import("../../Engine.zig");
 
 const Assets = Engine.Assets;
 

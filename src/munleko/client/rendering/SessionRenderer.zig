@@ -10,8 +10,8 @@ const vec3i = nm.vec3i;
 
 const Scene = @import("Scene.zig");
 const WorldRenderer = @import("WorldRenderer.zig");
-const Client = @import("../Client.zig");
-const Engine = @import("../Engine.zig");
+const Client = @import("../../Client.zig");
+const Engine = @import("../../Engine.zig");
 
 const Camera = Scene.Camera;
 
