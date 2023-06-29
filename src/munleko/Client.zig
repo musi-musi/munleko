@@ -131,7 +131,7 @@ pub fn run(self: *Client) !void {
 
     gl.clearDepth(.float, 1);
 
-    var fps_counter = try util.FpsCounter.start(1);
+    var fps_counter = try util.FpsCounter.start(0.25);
     var frame_time = try util.FrameTime.start();
 
     session_renderer.scene.directional_light = nm.vec3(.{ 1, 3, 2 }).norm() orelse unreachable;
@@ -203,12 +203,10 @@ pub fn run(self: *Client) !void {
         try session_renderer.update();
         session_renderer.draw();
 
-        if (fps_counter.frame()) |frames| {
-            std.log.info("fps: {d}", .{frames});
-        }
+        _ = fps_counter.frame();
 
-        zgui.showDemoWindow(null);
-
+        // zgui.showDemoWindow(null);
+        gui.showFrameRate(fps_counter.fps);
         gui.render();
     }
 }

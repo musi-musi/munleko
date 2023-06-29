@@ -7,6 +7,7 @@ pub const FpsCounter = struct {
     frame_count: u32 = 0,
     /// time between updates, in s
     read_delay: f32 = 1,
+    fps: f32 = 0,
 
     pub fn start(read_delay: f32) !FpsCounter {
         return FpsCounter{
@@ -22,6 +23,7 @@ pub const FpsCounter = struct {
             self.timer.reset();
             const fps = @floatFromInt(f32, self.frame_count) / self.read_delay;
             self.frame_count = 1;
+            self.fps = fps;
             return fps;
         } else {
             self.frame_count += 1;

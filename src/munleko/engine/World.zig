@@ -797,7 +797,7 @@ const Loader = struct {
             @panic("world loader is already running");
         }
         self.is_running.set(true);
-        self.thread_group = try ThreadGroup.spawnCpuCount(self.allocator, 1, .{}, threadGroupMain, .{self});
+        self.thread_group = try ThreadGroup.spawnCpuCount(self.allocator, 0.5, .{}, threadGroupMain, .{self});
     }
 
     fn stop(self: *Loader) void {
