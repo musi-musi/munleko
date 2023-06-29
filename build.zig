@@ -138,4 +138,9 @@ fn addModules(b: *Build, exe: *Build.CompileStep) void {
 
     exe.addIncludePath("src/munleko/engine/c");
     exe.addCSourceFile("src/munleko/engine/c/stb_image.c", &.{"-std=c99"});
+    exe.addIncludePath("src/munleko/client/gui/c");
+    exe.addIncludePath("lib/zig-gamedev/libs/zgui/libs/imgui");
+    exe.addCSourceFile("src/munleko/client/gui/c/imgui_impl_opengl3.cpp", &.{"-fno-sanitize=undefined"});
+    exe.addCSourceFile("src/munleko/client/gui/c/imgui_impl_glfw.cpp", &.{"-fno-sanitize=undefined"});
+    exe.addCSourceFile("src/munleko/client/gui/c/imgui_backend.cpp", &.{"-fno-sanitize=undefined"});
 }

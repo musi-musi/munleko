@@ -94,11 +94,8 @@ pub fn run(self: *Client) !void {
     gl.setDepthFunction(.less);
     gl.enable(.cull_face);
 
-    zgui.init(self.allocator);
-    defer zgui.deinit();
-
-    var gui_platform = gui.backend.Platform.init(&self.window);
-    defer gui_platform.deinit();
+    gui.init(self.allocator, self.window);
+    defer gui.deinit();
 
     var session = try self.engine.createSession();
     defer session.destroy();
@@ -142,7 +139,7 @@ pub fn run(self: *Client) !void {
 
     while (self.window.nextFrame()) {
         frame_time.frame();
-        gui_platform.startFrame();
+        gui.newFrame();
         gl.viewport(self.window.size);
         if (self.window.buttonPressed(.grave)) {
             switch (self.window.mouse_mode) {
@@ -209,6 +206,10 @@ pub fn run(self: *Client) !void {
         if (fps_counter.frame()) |frames| {
             std.log.info("fps: {d}", .{frames});
         }
+
+        zgui.showDemoWindow(null);
+
+        gui.render();
     }
 }
 

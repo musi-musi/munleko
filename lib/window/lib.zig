@@ -5,7 +5,7 @@ const builtin = @import("builtin");
 
 const c = @cImport({
     @cDefine("GLFW_INCLUDE_NONE", {});
-    @cInclude("glfw3.h");
+    @cInclude("GLFW/glfw3.h");
 });
 
 const Allocator = std.mem.Allocator;
