@@ -6,6 +6,7 @@ const nm = @import("nm");
 const util = @import("util");
 const zlua = @import("ziglua");
 const oko = @import("oko");
+const zgui = @import("zgui");
 
 const Allocator = std.mem.Allocator;
 
@@ -27,6 +28,8 @@ pub const rendering = @import("client/rendering.zig");
 const SessionRenderer = rendering.SessionRenderer;
 const Scene = rendering.Scene;
 const Camera = Scene.Camera;
+
+pub const gui = @import("client/gui.zig");
 
 pub const main_decls = struct {
     pub const std_options = struct {
@@ -91,6 +94,12 @@ pub fn run(self: *Client) !void {
     gl.setDepthFunction(.less);
     gl.enable(.cull_face);
 
+    zgui.init(self.allocator);
+    defer zgui.deinit();
+
+    var gui_platform = gui.backend.Platform.init(&self.window);
+    defer gui_platform.deinit();
+
     var session = try self.engine.createSession();
     defer session.destroy();
 
@@ -133,6 +142,7 @@ pub fn run(self: *Client) !void {
 
     while (self.window.nextFrame()) {
         frame_time.frame();
+        gui_platform.startFrame();
         gl.viewport(self.window.size);
         if (self.window.buttonPressed(.grave)) {
             switch (self.window.mouse_mode) {

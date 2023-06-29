@@ -44,6 +44,16 @@ pub const DisplayMode = enum {
     borderless,
 };
 
+pub const Focus = enum(c_int) {
+    unfocused = 0,
+    focused = 1,
+};
+
+pub const MouseEnter = enum(c_int) {
+    exited = 0,
+    entered = 1,
+};
+
 pub const Window = struct {
     allocator: Allocator,
     handle: Handle = null,
@@ -62,6 +72,10 @@ pub const Window = struct {
         button_pressed: ButtonCode,
         button_released: ButtonCode,
         framebuffer_size: [2]u32,
+        character_input: u32,
+        scroll: [2]f32,
+        focus: Focus,
+        mouse_enter: MouseEnter,
     });
 
     pub const ButtonSet = std.AutoHashMapUnmanaged(ButtonCode, void);
@@ -99,6 +113,10 @@ pub const Window = struct {
             _ = c.glfwSetKeyCallback(handle, keyCallback);
             _ = c.glfwSetMouseButtonCallback(handle, mouseButtonCallback);
             _ = c.glfwSetFramebufferSizeCallback(self.handle, framebufferSizeCallback);
+            _ = c.glfwSetCharCallback(self.handle, charCallback);
+            _ = c.glfwSetScrollCallback(self.handle, scrollCallback);
+            _ = c.glfwSetWindowFocusCallback(self.handle, focusCallback);
+            _ = c.glfwSetCursorEnterCallback(self.handle, mouseEnterCallback);
         } else {
             return error.GlfwCreateWindowFailed;
         }
@@ -128,6 +146,11 @@ pub const Window = struct {
 
     pub fn setShouldClose(self: Window) void {
         c.glfwSetWindowShouldClose(self.handle, c.GLFW_TRUE);
+    }
+
+    pub fn getTime(self: Window) f64 {
+        _ = self;
+        return c.glfwGetTime();
     }
 
     pub fn setDisplayMode(self: *Window, mode: DisplayMode) void {
@@ -165,6 +188,34 @@ pub const Window = struct {
         const self = fromUserPtr(handle);
         const code = @enumFromInt(ButtonCode, key);
         self.buttonCallback(code, action) catch |err| {
+            @panic(@errorName(err));
+        };
+    }
+
+    fn charCallback(handle: Handle, char: c_uint) callconv(.C) void {
+        const self = fromUserPtr(handle);
+        self.events.post(.character_input, @intCast(u32, char)) catch |err| {
+            @panic(@errorName(err));
+        };
+    }
+
+    fn scrollCallback(handle: Handle, x: f64, y: f64) callconv(.C) void {
+        const self = fromUserPtr(handle);
+        self.events.post(.scroll, .{ @floatCast(f32, x), @floatCast(f32, y) }) catch |err| {
+            @panic(@errorName(err));
+        };
+    }
+
+    fn focusCallback(handle: Handle, focused: c_int) callconv(.C) void {
+        const self = fromUserPtr(handle);
+        self.events.post(.focus, @enumFromInt(Focus, focused)) catch |err| {
+            @panic(@errorName(err));
+        };
+    }
+
+    fn mouseEnterCallback(handle: Handle, entered: c_int) callconv(.C) void {
+        const self = fromUserPtr(handle);
+        self.events.post(.mouse_enter, @enumFromInt(MouseEnter, entered)) catch |err| {
             @panic(@errorName(err));
         };
     }
