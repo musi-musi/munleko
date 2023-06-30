@@ -1,7 +1,5 @@
-[submodule "lib/ziglua"]
-	path = lib/ziglua
-	url = git@github.com:musi-musi/ziglua.git
 [submodule "lib/ziglua/"]
+	path = lib/ziglua
 	url = https://github.com/musi-musi/ziglua.git
 [submodule "lib/zig-gamedev"]
 	path = lib/zig-gamedev
