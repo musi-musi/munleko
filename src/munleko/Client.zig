@@ -30,6 +30,7 @@ const Scene = rendering.Scene;
 const Camera = Scene.Camera;
 
 pub const Gui = @import("client/Gui.zig");
+pub const Input = @import("client/Input.zig");
 
 pub const main_decls = struct {
     pub const std_options = struct {
@@ -115,6 +116,9 @@ pub fn run(self: *Client) !void {
 
     var prev_player_eye = player.eyePosition();
 
+    var input = Input.init(&self.window, &player);
+    defer input.deinit();
+
     try session_renderer.start(player.observer);
     defer session_renderer.stop();
 
@@ -140,16 +144,15 @@ pub fn run(self: *Client) !void {
     var frame_time = try util.FrameTime.start();
 
     session_renderer.scene.directional_light = nm.vec3(.{ 1, 3, 2 }).norm() orelse unreachable;
-    var prev_mouse = nm.vec2(self.window.mousePosition());
 
     while (self.window.nextFrame()) {
         frame_time.frame();
         gui.newFrame();
         gl.viewport(self.window.size);
         if (self.window.buttonPressed(.grave)) {
-            switch (self.window.mouse_mode) {
-                .disabled => self.window.setMouseMode(.visible),
-                else => self.window.setMouseMode(.disabled),
+            switch (input.state) {
+                .gameplay => input.setState(.menu),
+                .menu => input.setState(.gameplay),
             }
         }
         if (self.window.buttonPressed(.f_10)) {
@@ -161,40 +164,9 @@ pub fn run(self: *Client) !void {
         if (self.window.buttonPressed(.f_4)) {
             self.window.setDisplayMode(util.cycleEnum(self.window.display_mode));
         }
-        if (self.window.buttonPressed(.z)) {
-            player.settings.move_mode = util.cycleEnum(player.settings.move_mode);
-        }
 
-        const mouse_sensitivity = 0.1;
-        const mouse_position = nm.vec2(self.window.mousePosition());
-        if (self.window.mouse_mode == .disabled) {
-            const mouse_delta = mouse_position.sub(prev_mouse).mulScalar(mouse_sensitivity);
-            player.updateLookFromMouse(mouse_delta);
-        }
-        prev_mouse = mouse_position;
+        input.frame();
 
-        var player_move = Vec3.zero;
-        if (self.window.buttonHeld(.d)) player_move.v[0] += 1;
-        if (self.window.buttonHeld(.a)) player_move.v[0] -= 1;
-        if (self.window.buttonHeld(.space)) player_move.v[1] += 1;
-        if (self.window.buttonHeld(.left_shift)) player_move.v[1] -= 1;
-        if (self.window.buttonHeld(.w)) player_move.v[2] += 1;
-        if (self.window.buttonHeld(.s)) player_move.v[2] -= 1;
-        player.input.move = player_move;
-
-        if (self.window.buttonHeld(.space)) {
-            player.input.trigger_jump = true;
-        }
-
-        if (self.window.buttonPressed(.mouse_1)) {
-            player.input.trigger_primary = true;
-        }
-
-        if (self.window.buttonPressed(.f)) {
-            player.leko_edit_mode = util.cycleEnum(player.leko_edit_mode);
-        }
-
-        // for (0..try session.frameTicks()) |_| {
         if ((try session.frameTicks()) > 0) {
             prev_player_eye = player.eyePosition();
             try player.onTick(session);
