@@ -69,7 +69,7 @@ pub fn IjoPool(comptime IjoT_: type) type {
 
         pub fn create(self: *Self) !IjoT {
             const id = try self.id_pool.acquire(self.allocator);
-            return @enumFromInt(IjoT, id);
+            return @as(IjoT, @enumFromInt(id));
         }
 
         pub fn delete(self: *Self, ijo: IjoT) void {

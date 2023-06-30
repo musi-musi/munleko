@@ -11,21 +11,21 @@ pub const InitError = error{
 };
 
 pub fn init(getProcAddress: anytype) InitError!void {
-    if (c.gladLoadGLLoader(@ptrCast(c.GLADloadproc, getProcAddress)) == 0) {
+    if (c.gladLoadGLLoader(@as(c.GLADloadproc, @ptrCast(getProcAddress))) == 0) {
         return InitError.LoadGlProcsFailed;
     }
 }
 
 pub fn viewport(vp: [2]u32) void {
-    c.glViewport(0, 0, @intCast(c_int, vp[0]), @intCast(c_int, vp[1]));
+    c.glViewport(0, 0, @as(c_int, @intCast(vp[0])), @as(c_int, @intCast(vp[1])));
 }
 
 fn iptrCast(x: anytype) c_longlong {
-    return @intCast(c_longlong, x);
+    return @as(c_longlong, @intCast(x));
 }
 
 fn vptrCast(p: anytype) *const anyopaque {
-    return @ptrCast(*const anyopaque, p);
+    return @as(*const anyopaque, @ptrCast(p));
 }
 
 pub const Enabled = enum {
@@ -106,7 +106,7 @@ pub const DepthBits = enum {
 };
 
 pub fn clearDepth(comptime bits: DepthBits, depth: bits.Type()) void {
-    c.glClearDepth(@floatCast(f64, depth));
+    c.glClearDepth(@as(f64, @floatCast(depth)));
 }
 
 pub fn clearStencil(stencil: i32) void {
@@ -142,16 +142,16 @@ pub const PrimitiveType = enum(c_uint) {
 };
 
 pub fn drawElements(primitive_type: PrimitiveType, index_count: usize, comptime index_type: IndexType) void {
-    c.glDrawElements(@intFromEnum(primitive_type), @intCast(c_int, index_count), @intFromEnum(index_type), null);
+    c.glDrawElements(@intFromEnum(primitive_type), @as(c_int, @intCast(index_count)), @intFromEnum(index_type), null);
 }
 
 pub fn drawElementsInstanced(primitive_type: PrimitiveType, index_count: usize, comptime index_type: IndexType, instance_count: usize) void {
     c.glDrawElementsInstanced(
         @intFromEnum(primitive_type),
-        @intCast(c_int, index_count),
+        @as(c_int, @intCast(index_count)),
         @intFromEnum(index_type),
         null,
-        @intCast(c_int, instance_count),
+        @as(c_int, @intCast(instance_count)),
     );
 }
 
@@ -228,22 +228,22 @@ pub const Array = struct {
         switch (attr_type.primitive) {
             .half,
             .float,
-            => c.glVertexArrayAttribFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @intFromEnum(attr_type.primitive), 0, @intCast(UInt, stride)),
-            .double => c.glVertexArrayAttribLFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @intFromEnum(attr_type.primitive), @intCast(UInt, stride)),
-            else => c.glVertexArrayAttribIFormat(self.name, @intCast(UInt, attr), @intCast(c_int, attr_type.len), @intFromEnum(attr_type.primitive), @intCast(UInt, stride)),
+            => c.glVertexArrayAttribFormat(self.name, @as(UInt, @intCast(attr)), @as(c_int, @intCast(attr_type.len)), @intFromEnum(attr_type.primitive), 0, @as(UInt, @intCast(stride))),
+            .double => c.glVertexArrayAttribLFormat(self.name, @as(UInt, @intCast(attr)), @as(c_int, @intCast(attr_type.len)), @intFromEnum(attr_type.primitive), @as(UInt, @intCast(stride))),
+            else => c.glVertexArrayAttribIFormat(self.name, @as(UInt, @intCast(attr)), @as(c_int, @intCast(attr_type.len)), @intFromEnum(attr_type.primitive), @as(UInt, @intCast(stride))),
         }
         c.glVertexArrayAttribBinding(
             self.name,
-            @intCast(UInt, attr),
-            @intCast(UInt, binding),
+            @as(UInt, @intCast(attr)),
+            @as(UInt, @intCast(binding)),
         );
     }
 
     pub fn setBindingDivisor(self: Array, binding: u32, divisor: u32) void {
         c.glVertexArrayBindingDivisor(
             self.name,
-            @intCast(UInt, binding),
-            @intCast(UInt, divisor),
+            @as(UInt, @intCast(binding)),
+            @as(UInt, @intCast(divisor)),
         );
     }
 
@@ -252,10 +252,10 @@ pub const Array = struct {
         comptime assertIsBuffer(B);
         c.glVertexArrayVertexBuffer(
             self.name,
-            @intCast(UInt, binding),
+            @as(UInt, @intCast(binding)),
             buffer.name,
-            @intCast(c.GLintptr, offset),
-            @intCast(c_int, B.stride),
+            @as(c.GLintptr, @intCast(offset)),
+            @as(c_int, @intCast(B.stride)),
         );
     }
 
@@ -376,7 +376,7 @@ pub fn Stage(comptime stage: StageType) type {
         }
 
         pub fn source(self: Self, text: []const u8) void {
-            const len = @intCast(c_int, text.len);
+            const len = @as(c_int, @intCast(text.len));
             c.glShaderSource(self.name, 1, &text.ptr, &len);
         }
 
@@ -459,8 +459,8 @@ pub const Program = struct {
         comptime uniform_type: GlslPrimitive,
         value: []const uniform_type.Type(),
     ) void {
-        const count = @intCast(c_int, value.len);
-        const ptr = @ptrCast(*const uniform_type.Element(), value.ptr);
+        const count = @as(c_int, @intCast(value.len));
+        const ptr = @as(*const uniform_type.Element(), @ptrCast(value.ptr));
         const transpose = 0;
         switch (uniform_type) {
             .float => c.glProgramUniform1fv(self.name, uniform, count, ptr),
@@ -600,31 +600,31 @@ pub fn Texture(comptime target_: TextureTarget, comptime format_: PixelFormat) t
         }
 
         pub fn bind(self: Self, unit: i32) void {
-            c.glBindTextureUnit(@intCast(c_uint, unit), self.name);
+            c.glBindTextureUnit(@as(c_uint, @intCast(unit)), self.name);
         }
 
         pub fn setFilter(self: Self, min_filter: TextureFilter, mag_filter: TextureFilter) void {
-            c.glTextureParameteri(self.name, c.GL_TEXTURE_MIN_FILTER, @intCast(c_int, @intFromEnum(min_filter)));
-            c.glTextureParameteri(self.name, c.GL_TEXTURE_MAG_FILTER, @intCast(c_int, @intFromEnum(mag_filter)));
+            c.glTextureParameteri(self.name, c.GL_TEXTURE_MIN_FILTER, @as(c_int, @intCast(@intFromEnum(min_filter))));
+            c.glTextureParameteri(self.name, c.GL_TEXTURE_MAG_FILTER, @as(c_int, @intCast(@intFromEnum(mag_filter))));
         }
 
         pub usingnamespace switch (target) {
             .texture_2d => struct {
                 pub fn alloc(self: Self, width: usize, height: usize) void {
-                    const w = @intCast(c_int, width);
-                    const h = @intCast(c_int, height);
+                    const w = @as(c_int, @intCast(width));
+                    const h = @as(c_int, @intCast(height));
                     c.glTextureStorage2D(self.name, 1, comptime format.sizedFormat(), w, h);
                 }
 
                 pub fn upload(self: Self, width: usize, height: usize, data: []const Pixel) void {
-                    const w = @intCast(c_int, width);
-                    const h = @intCast(c_int, height);
+                    const w = @as(c_int, @intCast(width));
+                    const h = @as(c_int, @intCast(height));
                     const x: c_int = 0;
                     const y: c_int = 0;
                     const mip: c_int = 0;
                     const channels = format.channels.glType();
                     const component = format.component.glType();
-                    c.glTextureSubImage2D(self.name, mip, x, y, w, h, channels, component, @ptrCast(*const anyopaque, data.ptr));
+                    c.glTextureSubImage2D(self.name, mip, x, y, w, h, channels, component, @as(*const anyopaque, @ptrCast(data.ptr)));
                 }
 
                 /// allocate for framebuffer usage
@@ -640,22 +640,22 @@ pub fn Texture(comptime target_: TextureTarget, comptime format_: PixelFormat) t
             },
             .array_2d => struct {
                 pub fn alloc(self: Self, width: usize, height: usize, count: usize) void {
-                    const w = @intCast(c_int, width);
-                    const h = @intCast(c_int, height);
-                    const cnt = @intCast(c_int, count);
+                    const w = @as(c_int, @intCast(width));
+                    const h = @as(c_int, @intCast(height));
+                    const cnt = @as(c_int, @intCast(count));
                     c.glTextureStorage3D(self.name, 1, comptime format.sizedFormat(), w, h, cnt);
                 }
 
                 pub fn upload(self: Self, width: usize, height: usize, index: usize, data: []const Pixel) void {
-                    const w = @intCast(c_int, width);
-                    const h = @intCast(c_int, height);
-                    const i = @intCast(c_int, index);
+                    const w = @as(c_int, @intCast(width));
+                    const h = @as(c_int, @intCast(height));
+                    const i = @as(c_int, @intCast(index));
                     const x: c_int = 0;
                     const y: c_int = 0;
                     const mip: c_int = 0;
                     const channels = format.channels.glType();
                     const component = format.component.glType();
-                    c.glTextureSubImage3D(self.name, mip, x, y, i, w, h, 1, channels, component, @ptrCast(*const anyopaque, data.ptr));
+                    c.glTextureSubImage3D(self.name, mip, x, y, i, w, h, 1, channels, component, @as(*const anyopaque, @ptrCast(data.ptr)));
                 }
             },
         };

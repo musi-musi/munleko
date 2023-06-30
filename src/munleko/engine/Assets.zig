@@ -46,14 +46,14 @@ pub const ImageData = struct {
 };
 
 pub fn decodePng(allocator: Allocator, data: []const u8) !ImageData {
-    const len = @intCast(c_int, data.len);
+    const len = @as(c_int, @intCast(data.len));
     var width: c_int = undefined;
     var height: c_int = undefined;
     if (stb_image.stbi_load_from_memory(data.ptr, len, &width, &height, null, 4)) |bytes| {
         defer stb_image.stbi_image_free(bytes);
-        const w = @intCast(usize, width);
-        const h = @intCast(usize, height);
-        const pixels = @ptrCast([*][4]u8, bytes)[0 .. w * h];
+        const w = @as(usize, @intCast(width));
+        const h = @as(usize, @intCast(height));
+        const pixels = @as([*][4]u8, @ptrCast(bytes))[0 .. w * h];
         return ImageData{
             .width = w,
             .height = h,
@@ -146,7 +146,7 @@ pub fn load(self: *Assets, lua: *Lua, data_root_path: []const u8) !void {
         return error.MissingLekoTextureSize;
     }
     if (lua.toInteger(-1)) |texture_size| {
-        self.leko_texture_size = @intCast(usize, texture_size);
+        self.leko_texture_size = @as(usize, @intCast(texture_size));
     } else |_| {
         std.log.err("assets table field 'leko_texture_size' is not an be integer number", .{});
     }

@@ -81,7 +81,7 @@ pub fn Perlin(comptime Scalar_: type, comptime dimensions_: u32) type {
             const grad = gradient(value);
             var dist: Vector = undefined;
             inline for (Vector.indices) |i| {
-                dist.v[i] = @floatFromInt(Scalar, value[i]) - position.v[i];
+                dist.v[i] = @as(Scalar, @floatFromInt(value[i])) - position.v[i];
             }
             return dist.dot(grad);
         }
@@ -92,9 +92,9 @@ pub fn Perlin(comptime Scalar_: type, comptime dimensions_: u32) type {
             var hash = comptime r.int(usize);
             comptime var i = 0;
             inline while (i < dimensions) : (i += 1) {
-                hash ^= (@bitCast(usize, value[i]) << 5 * i) ^ comptime r.int(usize) +% r.int(usize);
-                hash ^= (@bitCast(usize, value[i]) << 2 * i + 3) ^ comptime r.int(usize) +% r.int(usize);
-                hash ^= (@bitCast(usize, value[i]) << i + 6) ^ comptime r.int(usize) +% r.int(usize);
+                hash ^= (@as(usize, @bitCast(value[i])) << 5 * i) ^ comptime r.int(usize) +% r.int(usize);
+                hash ^= (@as(usize, @bitCast(value[i])) << 2 * i + 3) ^ comptime r.int(usize) +% r.int(usize);
+                hash ^= (@as(usize, @bitCast(value[i])) << i + 6) ^ comptime r.int(usize) +% r.int(usize);
             }
             return gradient_table[hash % gradient_table.len];
         }

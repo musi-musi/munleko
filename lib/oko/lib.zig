@@ -19,7 +19,7 @@ pub fn start(comptime tick_time: comptime_float) !void {
         fn thread_main() void {
             while (is_running.load(.Monotonic)) {
                 tick();
-                std.time.sleep(comptime @intFromFloat(u64, tick_time * std.time.ns_per_s));
+                std.time.sleep(comptime @as(u64, @intFromFloat(tick_time * std.time.ns_per_s)));
             }
         }
     };
@@ -125,7 +125,7 @@ fn OkoAllocator(comptime tag: []const u8) type {
         /// allocation call stack. If the value is `0` it means no return address
         /// has been provided.
         fn alloc(_: *anyopaque, len: usize, ptr_align: u8, ret_addr: usize) ?[*]u8 {
-            log(@intCast(isize, len));
+            log(@as(isize, @intCast(len)));
             return child.rawAlloc(len, ptr_align, ret_addr);
         }
 
@@ -145,7 +145,7 @@ fn OkoAllocator(comptime tag: []const u8) type {
         /// allocation call stack. If the value is `0` it means no return address
         /// has been provided.
         fn resize(_: *anyopaque, buf: []u8, buf_align: u8, new_len: usize, ret_addr: usize) bool {
-            const delta: isize = @intCast(isize, new_len) - @intCast(isize, buf.len);
+            const delta: isize = @as(isize, @intCast(new_len)) - @as(isize, @intCast(buf.len));
             log(delta);
             return child.rawResize(buf, buf_align, new_len, ret_addr);
         }
@@ -162,14 +162,14 @@ fn OkoAllocator(comptime tag: []const u8) type {
         /// allocation call stack. If the value is `0` it means no return address
         /// has been provided.
         fn free(_: *anyopaque, buf: []u8, buf_align: u8, ret_addr: usize) void {
-            const delta = -@intCast(isize, buf.len);
+            const delta = -@as(isize, @intCast(buf.len));
             log(delta);
             child.rawFree(buf, buf_align, ret_addr);
         }
 
         fn log(delta: isize) void {
-            const new_size = @intCast(isize, history.size) + delta;
-            history.size = @intCast(usize, if (new_size < 0) 0 else new_size);
+            const new_size = @as(isize, @intCast(history.size)) + delta;
+            history.size = @as(usize, @intCast(if (new_size < 0) 0 else new_size));
 
             // if (out) |o| {
             //     out_mutex.lock();

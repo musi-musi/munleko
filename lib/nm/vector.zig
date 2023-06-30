@@ -123,13 +123,13 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             inline for (indices) |i| {
                 switch (@typeInfo(Scalar)) {
                     .Float => switch (@typeInfo(S)) {
-                        .Float => result.v[i] = @floatCast(S, self.v[i]),
-                        .Int => result.v[i] = @intFromFloat(S, self.v[i]),
+                        .Float => result.v[i] = @as(S, @floatCast(self.v[i])),
+                        .Int => result.v[i] = @as(S, @intFromFloat(self.v[i])),
                         else => unreachable,
                     },
                     .Int => switch (@typeInfo(S)) {
-                        .Float => result.v[i] = @floatFromInt(S, self.v[i]),
-                        .Int => result.v[i] = @intCast(S, self.v[i]),
+                        .Float => result.v[i] = @as(S, @floatFromInt(self.v[i])),
+                        .Int => result.v[i] = @as(S, @intCast(self.v[i])),
                         else => unreachable,
                     },
                     else => unreachable,

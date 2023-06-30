@@ -63,19 +63,19 @@ fn Mixin(comptime Self: type, comptime dimensions_: comptime_int) type {
         const AxisTag = std.meta.Tag(Axis);
 
         pub fn init(a: Axis, s: Sign) Self {
-            return @enumFromInt(Self, @intCast(u32, @intFromEnum(a)) * 2 + @intFromEnum(s));
+            return @as(Self, @enumFromInt(@as(u32, @intCast(@intFromEnum(a))) * 2 + @intFromEnum(s)));
         }
 
         pub fn axis(self: Self) Axis {
-            return @enumFromInt(Axis, @truncate(AxisTag, @intFromEnum(self) >> 1));
+            return @as(Axis, @enumFromInt(@as(AxisTag, @truncate(@intFromEnum(self) >> 1))));
         }
 
         pub fn sign(self: Self) Sign {
-            return @enumFromInt(Sign, @truncate(u1, @intFromEnum(self) % 2));
+            return @as(Sign, @enumFromInt(@as(u1, @truncate(@intFromEnum(self) % 2))));
         }
 
         pub fn negate(self: Self) Self {
-            return @enumFromInt(Self, @intFromEnum(self) ^ 1);
+            return @as(Self, @enumFromInt(@intFromEnum(self) ^ 1));
         }
     };
 }

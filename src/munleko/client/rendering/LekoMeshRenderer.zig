@@ -162,9 +162,9 @@ const leko_face_shader_defs: []const u8 = blk: {
                 }
                 const normal = Vec3.unitSigned(card_n).v;
                 try w.print("vec3({d}, {d}, {d})", .{
-                    @intFromFloat(i32, normal[0]),
-                    @intFromFloat(i32, normal[1]),
-                    @intFromFloat(i32, normal[2]),
+                    @as(i32, @intFromFloat(normal[0])),
+                    @as(i32, @intFromFloat(normal[1])),
+                    @as(i32, @intFromFloat(normal[2])),
                 });
             }
             try w.writeAll(");\n");
@@ -214,9 +214,9 @@ const leko_face_shader_defs: []const u8 = blk: {
                         try w.writeAll(", ");
                     }
                     try w.print("vec3({d}, {d}, {d})", .{
-                        @intFromFloat(i32, position[0]),
-                        @intFromFloat(i32, position[1]),
-                        @intFromFloat(i32, position[2]),
+                        @as(i32, @intFromFloat(position[0])),
+                        @as(i32, @intFromFloat(position[1])),
+                        @as(i32, @intFromFloat(position[2])),
                     });
                     i += 1;
                 }

@@ -11,12 +11,12 @@ pub fn toVector(lua: *Lua, comptime Scalar: type, comptime dimensions: comptime_
     const is_float = comptime std.meta.trait.isFloat(Scalar);
     var vector: [dimensions]Scalar = undefined;
     for (&vector, 0..) |*v, i| {
-        _ = lua.getIndex(index, @intCast(Integer, i + 1));
+        _ = lua.getIndex(index, @as(Integer, @intCast(i + 1)));
         defer lua.pop(1);
         if (is_float) {
-            v.* = @floatCast(Scalar, try lua.toNumber(-1));
+            v.* = @as(Scalar, @floatCast(try lua.toNumber(-1)));
         } else {
-            v.* = @intCast(Scalar, try lua.toInteger(-1));
+            v.* = @as(Scalar, @intCast(try lua.toInteger(-1)));
         }
     }
     return vector;

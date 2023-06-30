@@ -205,7 +205,7 @@ pub fn run(self: *Client) !void {
         camera.setViewMatrix(nm.transform.createTranslate(interpolated_player_position.neg()).mul(player.lookMatrix()));
         camera.setProjectionPerspective(.{
             .fov = 90,
-            .aspect_ratio = @floatFromInt(f32, self.window.size[0]) / @floatFromInt(f32, self.window.size[1]),
+            .aspect_ratio = @as(f32, @floatFromInt(self.window.size[0])) / @as(f32, @floatFromInt(self.window.size[1])),
             .near_plane = 0.01,
             .far_plane = 1000,
         });

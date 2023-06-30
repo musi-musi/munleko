@@ -159,18 +159,18 @@ fn boundsLekoFaceRange(bounds: Bounds3, comptime direction: Cardinal3) Range3i {
         .z => .y,
     };
     var range: Range3i = undefined;
-    range.min.ptrMut(u).* = @intFromFloat(i32, @floor(bounds.center.get(u) - bounds.radius.get(u)));
-    range.min.ptrMut(v).* = @intFromFloat(i32, @floor(bounds.center.get(v) - bounds.radius.get(v)));
-    range.max.ptrMut(u).* = @intFromFloat(i32, @ceil(bounds.center.get(u) + bounds.radius.get(u)));
-    range.max.ptrMut(v).* = @intFromFloat(i32, @ceil(bounds.center.get(v) + bounds.radius.get(v)));
+    range.min.ptrMut(u).* = @as(i32, @intFromFloat(@floor(bounds.center.get(u) - bounds.radius.get(u))));
+    range.min.ptrMut(v).* = @as(i32, @intFromFloat(@floor(bounds.center.get(v) - bounds.radius.get(v))));
+    range.max.ptrMut(u).* = @as(i32, @intFromFloat(@ceil(bounds.center.get(u) + bounds.radius.get(u))));
+    range.max.ptrMut(v).* = @as(i32, @intFromFloat(@ceil(bounds.center.get(v) + bounds.radius.get(v))));
     switch (sign) {
         .positive => {
-            const x = @intFromFloat(i32, @ceil(bounds.center.get(axis) + bounds.radius.get(axis)));
+            const x = @as(i32, @intFromFloat(@ceil(bounds.center.get(axis) + bounds.radius.get(axis))));
             range.min.ptrMut(axis).* = x;
             range.max.ptrMut(axis).* = x + 1;
         },
         .negative => {
-            const x = @intFromFloat(i32, @floor(bounds.center.get(axis) - bounds.radius.get(axis)));
+            const x = @as(i32, @intFromFloat(@floor(bounds.center.get(axis) - bounds.radius.get(axis))));
             range.min.ptrMut(axis).* = x - 1;
             range.max.ptrMut(axis).* = x;
         },
@@ -243,7 +243,7 @@ pub const GridRaycastIterator = struct {
     }
 
     fn updateDistance(self: *GridRaycastIterator, axis: nm.Axis3, comptime sign: nm.Sign) void {
-        var distance = @floatFromInt(f32, self.cell.get(axis)) - self.origin.get(axis);
+        var distance = @as(f32, @floatFromInt(self.cell.get(axis))) - self.origin.get(axis);
         distance += (1 - sign.scalar(f32)) / 2;
         self.distance = distance / self.direction.get(axis);
     }

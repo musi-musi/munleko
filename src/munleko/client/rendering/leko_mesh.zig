@@ -372,7 +372,7 @@ pub const LekoMeshSystem = struct {
         var table = std.mem.zeroes([256]u8);
         var i: u32 = 0;
         while (i < 256) : (i += 1) {
-            var neighbors = @intCast(u8, i);
+            var neighbors = @as(u8, @intCast(i));
             for ([4]u3{ 0, 1, 3, 2 }) |vert| {
                 var vert_neighbors = neighbors & 0b111;
                 neighbors = std.math.rotr(u8, neighbors, 2);
@@ -431,7 +431,7 @@ pub const FaceMaterialTable = struct {
             const texture_index = (if (assets.leko_texture_table.getByName(leko_asset.texture_name)) |leko_texture_asset| (leko_texture_asset.index) else (0));
             try self.list.append(self.allocator, FaceMaterial{
                 .color = leko_asset.color,
-                .texture_index = @intCast(u32, texture_index),
+                .texture_index = @as(u32, @intCast(texture_index)),
             });
         }
     }

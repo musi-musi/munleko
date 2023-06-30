@@ -56,7 +56,7 @@ pub fn Mesh(comptime mesh_cfg: MeshConfig) type {
                 const T = buffer.data_type;
                 inline for (std.meta.fields(T)) |field| {
                     array.setAttributeFormat(
-                        @intCast(u32, b),
+                        @as(u32, @intCast(b)),
                         a,
                         comptime gl.AttrType.fromType(field.type),
                         @offsetOf(buffer.data_type, field.name),
@@ -64,7 +64,7 @@ pub fn Mesh(comptime mesh_cfg: MeshConfig) type {
                     a += 1;
                 }
                 if (buffer.divisor != 0) {
-                    array.setBindingDivisor(@intCast(u32, b), buffer.divisor);
+                    array.setBindingDivisor(@as(u32, @intCast(b)), buffer.divisor);
                 }
             }
             return Self{
@@ -401,7 +401,7 @@ pub fn Shader(comptime shader_defs: ShaderDefs) type {
         }
 
         pub fn setSampler(self: Self, comptime tag: SamplerTag, value: u32) void {
-            self.program.setUniform(self.sampler_locations[@intFromEnum(tag)], .int, @intCast(c_int, value));
+            self.program.setUniform(self.sampler_locations[@intFromEnum(tag)], .int, @as(c_int, @intCast(value)));
         }
 
         pub fn use(self: Self) void {

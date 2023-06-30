@@ -102,7 +102,7 @@ pub fn Matrix(comptime Scalar_: type, comptime rows_: comptime_int, comptime col
 
         pub fn invert(self: Self) ?Self {
             // https://github.com/stackgl/gl-mat4/blob/master/invert.js
-            const a = @bitCast([16]Scalar, self.v);
+            const a = @as([16]Scalar, @bitCast(self.v));
 
             const a00 = a[0];
             const a01 = a[1];
@@ -160,7 +160,7 @@ pub fn Matrix(comptime Scalar_: type, comptime rows_: comptime_int, comptime col
                 (a31 * b01 - a30 * b03 - a32 * b00) * det, // 14
                 (a20 * b03 - a21 * b01 + a22 * b00) * det, // 15
             };
-            return init(@bitCast([4][4]Scalar, result));
+            return init(@as([4][4]Scalar, @bitCast(result)));
         }
 
         pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, w: anytype) !void {

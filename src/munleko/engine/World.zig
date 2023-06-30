@@ -280,8 +280,8 @@ const ObserverZone = struct {
 
 fn observerZoneRange(center: Vec3i, radius: u32) Range3i {
     return Range3i.init(
-        center.subScalar(@intCast(i32, radius)).v,
-        center.addScalar(@intCast(i32, radius)).v,
+        center.subScalar(@as(i32, @intCast(radius))).v,
+        center.addScalar(@as(i32, @intCast(radius))).v,
     );
 }
 

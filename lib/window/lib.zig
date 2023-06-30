@@ -96,18 +96,19 @@ pub const Window = struct {
     }
 
     fn fromUserPtr(handle: Handle) *Window {
-        return @ptrCast(*Window, @alignCast(@alignOf(Window), c.glfwGetWindowUserPointer(handle).?));
+        const aligned: *align(@alignOf(Window)) anyopaque = @alignCast(c.glfwGetWindowUserPointer(handle).?);
+        return @as(*Window, @ptrCast(aligned));
     }
 
     pub fn create(self: *Window, gl_options: GlContextOptions) !void {
-        c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, @intCast(c_int, gl_options.version_major));
-        c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, @intCast(c_int, gl_options.version_minor));
+        c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, @as(c_int, @intCast(gl_options.version_major)));
+        c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, @as(c_int, @intCast(gl_options.version_minor)));
         c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, @intFromEnum(gl_options.profile));
         // c.glfwWindowHint(c.GLFW_SAMPLES, 8);
         const debug: c_int = (if (builtin.mode == .Debug) c.GLFW_TRUE else c.GLFW_FALSE);
         c.glfwWindowHint(c.GLFW_OPENGL_DEBUG_CONTEXT, debug);
 
-        if (c.glfwCreateWindow(@intCast(c_int, self.size[0]), @intCast(c_int, self.size[1]), "window", null, null)) |handle| {
+        if (c.glfwCreateWindow(@as(c_int, @intCast(self.size[0])), @as(c_int, @intCast(self.size[1])), "window", null, null)) |handle| {
             self.handle = handle;
             c.glfwSetWindowUserPointer(handle, self);
             _ = c.glfwSetKeyCallback(handle, keyCallback);
@@ -161,10 +162,10 @@ pub const Window = struct {
                 c.glfwSetWindowMonitor(
                     self.handle,
                     null,
-                    @intCast(c_int, self.windowed_position[0]),
-                    @intCast(c_int, self.windowed_position[1]),
-                    @intCast(c_int, self.windowed_size[0]),
-                    @intCast(c_int, self.windowed_size[1]),
+                    @as(c_int, @intCast(self.windowed_position[0])),
+                    @as(c_int, @intCast(self.windowed_position[1])),
+                    @as(c_int, @intCast(self.windowed_size[0])),
+                    @as(c_int, @intCast(self.windowed_size[1])),
                     0,
                 );
             },
@@ -173,8 +174,8 @@ pub const Window = struct {
                 var y: c_int = 0;
                 c.glfwGetWindowPos(self.handle, &x, &y);
                 self.windowed_position = .{
-                    @intCast(i32, x),
-                    @intCast(i32, y),
+                    @as(i32, @intCast(x)),
+                    @as(i32, @intCast(y)),
                 };
                 self.windowed_size = self.size;
                 const monitor = c.glfwGetPrimaryMonitor();
@@ -186,7 +187,7 @@ pub const Window = struct {
 
     fn keyCallback(handle: Handle, key: c_int, _: c_int, action: c_int, _: c_int) callconv(.C) void {
         const self = fromUserPtr(handle);
-        const code = @enumFromInt(ButtonCode, key);
+        const code = @as(ButtonCode, @enumFromInt(key));
         self.buttonCallback(code, action) catch |err| {
             @panic(@errorName(err));
         };
@@ -194,35 +195,35 @@ pub const Window = struct {
 
     fn charCallback(handle: Handle, char: c_uint) callconv(.C) void {
         const self = fromUserPtr(handle);
-        self.events.post(.character_input, @intCast(u32, char)) catch |err| {
+        self.events.post(.character_input, @as(u32, @intCast(char))) catch |err| {
             @panic(@errorName(err));
         };
     }
 
     fn scrollCallback(handle: Handle, x: f64, y: f64) callconv(.C) void {
         const self = fromUserPtr(handle);
-        self.events.post(.scroll, .{ @floatCast(f32, x), @floatCast(f32, y) }) catch |err| {
+        self.events.post(.scroll, .{ @as(f32, @floatCast(x)), @as(f32, @floatCast(y)) }) catch |err| {
             @panic(@errorName(err));
         };
     }
 
     fn focusCallback(handle: Handle, focused: c_int) callconv(.C) void {
         const self = fromUserPtr(handle);
-        self.events.post(.focus, @enumFromInt(Focus, focused)) catch |err| {
+        self.events.post(.focus, @as(Focus, @enumFromInt(focused))) catch |err| {
             @panic(@errorName(err));
         };
     }
 
     fn mouseEnterCallback(handle: Handle, entered: c_int) callconv(.C) void {
         const self = fromUserPtr(handle);
-        self.events.post(.mouse_enter, @enumFromInt(MouseEnter, entered)) catch |err| {
+        self.events.post(.mouse_enter, @as(MouseEnter, @enumFromInt(entered))) catch |err| {
             @panic(@errorName(err));
         };
     }
 
     fn mouseButtonCallback(handle: Handle, button: c_int, action: c_int, _: c_int) callconv(.C) void {
         const self = fromUserPtr(handle);
-        const code = @enumFromInt(ButtonCode, button + c.GLFW_KEY_LAST + 1);
+        const code = @as(ButtonCode, @enumFromInt(button + c.GLFW_KEY_LAST + 1));
         self.buttonCallback(code, action) catch |err| {
             @panic(@errorName(err));
         };
@@ -231,8 +232,8 @@ pub const Window = struct {
     fn framebufferSizeCallback(handle: Handle, width: c_int, height: c_int) callconv(.C) void {
         const self = fromUserPtr(handle);
         self.size = .{
-            @intCast(u32, width),
-            @intCast(u32, height),
+            @as(u32, @intCast(width)),
+            @as(u32, @intCast(height)),
         };
         self.events.post(.framebuffer_size, self.size) catch |err| {
             @panic(@errorName(err));
@@ -280,13 +281,13 @@ pub const Window = struct {
         var y: f64 = undefined;
         c.glfwGetCursorPos(self.handle, &x, &y);
         return [2]f32{
-            @floatCast(f32, x),
-            @floatCast(f32, y),
+            @as(f32, @floatCast(x)),
+            @as(f32, @floatCast(y)),
         };
     }
 
     pub fn setMousePosition(self: Window, pos: [2]f32) void {
-        c.glfwSetCursorPos(self.handle, @floatCast(f64, pos[0]), @floatCast(f64, pos[1]));
+        c.glfwSetCursorPos(self.handle, @as(f64, @floatCast(pos[0])), @as(f64, @floatCast(pos[1])));
     }
 
     pub fn setMouseMode(self: *Window, mode: MouseMode) void {
@@ -495,6 +496,6 @@ pub const Monitor = extern struct {
     pub fn getAll() []const Monitor {
         var count: c_int = 0;
         const ptr = c.glfwGetMonitors(&count);
-        return @ptrCast([*]Monitor, ptr)[0..@intCast(usize, count)];
+        return @as([*]Monitor, @ptrCast(ptr))[0..@as(usize, @intCast(count))];
     }
 };

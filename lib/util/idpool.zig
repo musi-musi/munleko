@@ -50,7 +50,7 @@ pub fn IdPoolUnmanaged(comptime Id_: type) type {
             if (self.unused.pop()) |id| {
                 return id;
             } else {
-                const id = @intCast(Id, self.capacity);
+                const id = @as(Id, @intCast(self.capacity));
                 self.capacity += 1;
                 try self.unused.items.ensureTotalCapacity(allocator, self.capacity);
                 return id;

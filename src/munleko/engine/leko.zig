@@ -173,9 +173,9 @@ pub const ChunkLoader = struct {
         //     // types.getValueForName("sand") orelse .empty,
         // };
 
-        const seed: u64 = (@intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[0]))) << 32 |
-            @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[1]))) << 16 |
-            @intCast(u64, @truncate(u16, @bitCast(u32, chunk_origin.v[2]))));
+        const seed: u64 = (@as(u64, @intCast(@as(u16, @truncate(@as(u32, @bitCast(chunk_origin.v[0])))))) << 32 |
+            @as(u64, @intCast(@as(u16, @truncate(@as(u32, @bitCast(chunk_origin.v[1])))))) << 16 |
+            @as(u64, @intCast(@as(u16, @truncate(@as(u32, @bitCast(chunk_origin.v[2])))))));
         var rng = std.rand.DefaultPrng.init(seed);
         const r = rng.random();
         _ = r;
@@ -241,8 +241,8 @@ pub const LekoTypeTable = struct {
     }
 
     pub fn addLekoType(self: *LekoTypeTable, name: []const u8, properties: LekoType.Properties) !void {
-        const index = @intCast(u16, self.list.items.len);
-        const leko_value = @enumFromInt(LekoValue, index);
+        const index = @as(u16, @intCast(self.list.items.len));
+        const leko_value = @as(LekoValue, @enumFromInt(index));
         const owned_name = try self.arena.allocator().dupe(u8, name);
         const leko_type = LekoType{
             .value = leko_value,
@@ -300,24 +300,24 @@ pub const Address = struct {
     pub const zero = Address{};
 
     pub fn init(comptime T: type, value: [3]T) Address {
-        var v: UAddress = @intCast(UChunkWidth, value[0]);
-        v = (v << chunk_width_bits) | @intCast(UChunkWidth, value[1]);
-        v = (v << chunk_width_bits) | @intCast(UChunkWidth, value[2]);
+        var v: UAddress = @as(UChunkWidth, @intCast(value[0]));
+        v = (v << chunk_width_bits) | @as(UChunkWidth, @intCast(value[1]));
+        v = (v << chunk_width_bits) | @as(UChunkWidth, @intCast(value[2]));
         return .{ .v = v };
     }
 
     pub fn initI(value: usize) Address {
         return Address{
-            .v = @intCast(UAddress, value),
+            .v = @as(UAddress, @intCast(value)),
         };
     }
 
     pub fn get(self: Address, axis: nm.Axis3) UChunkWidth {
-        return @truncate(UChunkWidth, shr(UAddress, self.v, chunk_width_bits * @as(u32, 2 - @intFromEnum(axis))));
+        return @as(UChunkWidth, @truncate(shr(UAddress, self.v, chunk_width_bits * @as(u32, 2 - @intFromEnum(axis)))));
     }
 
     pub fn isBorder(self: Address) bool {
-        const w: UChunkWidth = @intCast(UChunkWidth, chunk_width - 1);
+        const w: UChunkWidth = @as(UChunkWidth, @intCast(chunk_width - 1));
         if (self.get(.x) == 0) return true;
         if (self.get(.x) == w) return true;
         if (self.get(.y) == 0) return true;
@@ -328,7 +328,7 @@ pub const Address = struct {
     }
 
     pub fn isEdge(self: Address, direction: nm.Cardinal3) bool {
-        const w: UChunkWidth = @intCast(UChunkWidth, chunk_width - 1);
+        const w: UChunkWidth = @as(UChunkWidth, @intCast(chunk_width - 1));
         return switch (direction.sign()) {
             .positive => self.get(direction.axis()) == w,
             .negative => self.get(direction.axis()) == 0,
@@ -337,7 +337,7 @@ pub const Address = struct {
 
     /// move this index to the edge of the chunk in `direction`
     pub fn toEdge(self: Address, direction: nm.Cardinal3) Address {
-        const w: UChunkWidth = @intCast(UChunkWidth, chunk_width - 1);
+        const w: UChunkWidth = @as(UChunkWidth, @intCast(chunk_width - 1));
         return switch (direction.sign()) {
             .positive => .{ .v = self.v | single(UChunkWidth, w, direction.axis()).v },
             .negative => .{ .v = self.v & ~single(UChunkWidth, w, direction.axis()).v },
@@ -345,7 +345,7 @@ pub const Address = struct {
     }
 
     pub fn edge(comptime T: type, offset: T, direction: nm.Cardinal3) Address {
-        const w: UChunkWidth = @intCast(UChunkWidth, chunk_width - 1);
+        const w: UChunkWidth = @as(UChunkWidth, @intCast(chunk_width - 1));
         return switch (direction.sign()) {
             .positive => .{ .v = single(u32, w - offset, direction.axis()).v },
             .negative => .{ .v = single(u32, offset, direction.axis()).v },
@@ -354,22 +354,22 @@ pub const Address = struct {
 
     pub fn single(comptime T: type, value: T, axis: nm.Axis3) Address {
         return Address{
-            .v = shl(UAddress, @intCast(UAddress, value), (chunk_width_bits * @as(u32, 2 - @intFromEnum(axis)))),
+            .v = shl(UAddress, @as(UAddress, @intCast(value)), (chunk_width_bits * @as(u32, 2 - @intFromEnum(axis)))),
         };
     }
 
     pub fn localPosition(self: Address) Vec3i {
         return Vec3i.init(.{
-            @truncate(UChunkWidth, shr(UAddress, self.v, chunk_width_bits * 2)),
-            @truncate(UChunkWidth, shr(UAddress, self.v, chunk_width_bits * 1)),
-            @truncate(UChunkWidth, shr(UAddress, self.v, chunk_width_bits * 0)),
+            @as(UChunkWidth, @truncate(shr(UAddress, self.v, chunk_width_bits * 2))),
+            @as(UChunkWidth, @truncate(shr(UAddress, self.v, chunk_width_bits * 1))),
+            @as(UChunkWidth, @truncate(shr(UAddress, self.v, chunk_width_bits * 0))),
         });
     }
 
     /// increment this index one cell in a cardinal direction
     /// trying to increment out of bounds is UB, only use when in bounds
     pub fn incrUnchecked(self: Address, card: nm.Cardinal3) Address {
-        const w: UChunkWidth = @intCast(UChunkWidth, chunk_width - 1);
+        const w: UChunkWidth = @as(UChunkWidth, @intCast(chunk_width - 1));
         const offset = switch (card) {
             .x_pos => init(UChunkWidth, .{ 1, 0, 0 }),
             .x_neg => init(UChunkWidth, .{ w, 0, 0 }),
