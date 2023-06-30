@@ -13,6 +13,7 @@ const Thread = std.Thread;
 const ThreadGroup = util.ThreadGroup;
 const Atomic = std.atomic.Atomic;
 const AtomicFlag = util.AtomicFlag;
+const Mutex = Thread.Mutex;
 
 const JobQueue = util.JobQueueUnmanaged;
 const List = std.ArrayListUnmanaged;
@@ -36,23 +37,38 @@ pub const ChunkLeko = [chunk_leko_count]LekoValue;
 
 pub const ChunkLekoStore = util.IjoDataStoreArenaInit(Chunk, ChunkLeko);
 
+pub const LekoEvents = util.Events(union(enum) {
+    leko_edit: LekoEditEvent,
+});
+
+pub const LekoEditEvent = struct {
+    reference: Reference,
+    old_value: LekoValue,
+    new_value: LekoValue,
+};
+
 pub const LekoData = struct {
     world: *World,
     chunk_leko: ChunkLekoStore,
     leko_types: LekoTypeTable,
+    events: LekoEvents,
+    events_mutex: Mutex = .{},
 
     pub fn init(self: *LekoData, world: *World) !void {
+        const allocator = world.allocator;
         self.* = .{
             .world = world,
-            .chunk_leko = ChunkLekoStore.init(world.allocator),
+            .chunk_leko = ChunkLekoStore.init(allocator),
             .leko_types = undefined,
+            .events = LekoEvents.init(allocator),
         };
-        try self.leko_types.init(world.allocator);
+        try self.leko_types.init(allocator);
     }
 
     pub fn deinit(self: *LekoData) void {
         self.chunk_leko.deinit();
         self.leko_types.deinit();
+        self.events.deinit();
     }
 
     pub fn matchDataCapacity(self: *LekoData) !void {
@@ -75,6 +91,34 @@ pub const LekoData = struct {
             return self.lekoValueAt(reference);
         }
         return null;
+    }
+
+    pub fn editLekoAt(self: *LekoData, reference: Reference, new_value: LekoValue) !void {
+        const ptr = &self.chunk_leko.get(reference.chunk).*[reference.address.v];
+        const old_value = ptr.*;
+        ptr.* = new_value;
+        self.events_mutex.lock();
+        defer self.events_mutex.unlock();
+        try self.events.post(.leko_edit, .{
+            .reference = reference,
+            .old_value = old_value,
+            .new_value = new_value,
+        });
+    }
+
+    /// return true if successful
+    pub fn editLekoAtPosition(self: *LekoData, position: Vec3i, new_value: LekoValue) !bool {
+        if (Reference.initGlobalPosition(self.world, position)) |reference| {
+            try self.editLekoAt(reference, new_value);
+            return true;
+        }
+        return false;
+    }
+
+    pub fn clearEvents(self: *LekoData) void {
+        self.events_mutex.lock();
+        defer self.events_mutex.unlock();
+        self.events.clearAll();
     }
 };
 
@@ -106,8 +150,8 @@ pub const ChunkLoader = struct {
 
         const stone = types.getValueForName("stone") orelse .empty;
         const dirt = types.getValueForName("dirt") orelse .empty;
-        _ = dirt;
         const brick = types.getValueForName("brick") orelse .empty;
+        _ = brick;
         // const pallete = [_]LekoValue{
         //     types.getValueForName("stone") orelse .empty,
         //     types.getValueForName("stone") orelse .empty,
@@ -152,7 +196,7 @@ pub const ChunkLoader = struct {
                 // if ((material_noise + r.float(f32) / 20) < 0.1) {
                 leko[i] = stone;
             } else {
-                leko[i] = brick;
+                leko[i] = dirt;
             }
             // leko[i] = pallete[@intCast(usize, @mod(leko_position.v[1], @intCast(i32, pallete.len)))];
         }
@@ -270,6 +314,17 @@ pub const Address = struct {
 
     pub fn get(self: Address, axis: nm.Axis3) UChunkWidth {
         return @truncate(UChunkWidth, shr(UAddress, self.v, chunk_width_bits * @as(u32, 2 - @intFromEnum(axis))));
+    }
+
+    pub fn isBorder(self: Address) bool {
+        const w: UChunkWidth = @intCast(UChunkWidth, chunk_width - 1);
+        if (self.get(.x) == 0) return true;
+        if (self.get(.x) == w) return true;
+        if (self.get(.y) == 0) return true;
+        if (self.get(.y) == w) return true;
+        if (self.get(.z) == 0) return true;
+        if (self.get(.z) == w) return true;
+        return false;
     }
 
     pub fn isEdge(self: Address, direction: nm.Cardinal3) bool {

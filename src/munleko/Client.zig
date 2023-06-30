@@ -111,6 +111,8 @@ pub fn run(self: *Client) !void {
     var player = try Player.init(session.world, Vec3.zero);
     defer player.deinit();
 
+    player.leko_equip = session.world.leko_data.leko_types.getForName("brick");
+
     var prev_player_eye = player.eyePosition();
 
     try session_renderer.start(player.observer);
@@ -184,10 +186,18 @@ pub fn run(self: *Client) !void {
             player.input.trigger_jump = true;
         }
 
+        if (self.window.buttonPressed(.mouse_1)) {
+            player.input.trigger_primary = true;
+        }
+
+        if (self.window.buttonPressed(.f)) {
+            player.leko_edit_mode = util.cycleEnum(player.leko_edit_mode);
+        }
+
         // for (0..try session.frameTicks()) |_| {
         if ((try session.frameTicks()) > 0) {
             prev_player_eye = player.eyePosition();
-            player.onTick(session);
+            try player.onTick(session);
         }
 
         const interpolated_player_position = prev_player_eye.lerpTo(player.eyePosition(), session.tickProgress());

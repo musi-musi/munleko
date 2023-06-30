@@ -504,6 +504,7 @@ pub const Manager = struct {
             try self.processObservers(&load_range_events);
             try self.processLoadRangeEvents(&load_range_events);
             try on_update_fn(context, self.world);
+            self.world.leko_data.clearEvents();
         }
     }
 

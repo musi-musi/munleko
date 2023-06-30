@@ -8,6 +8,8 @@ const leko = @import("leko.zig");
 const Physics = @import("Physics.zig");
 const Observer = World.Observer;
 
+const LekoType = leko.LekoType;
+
 const Vec2 = nm.Vec2;
 const vec2 = nm.vec2;
 const Vec3 = nm.Vec3;
@@ -33,6 +35,9 @@ eye_height: f32 = 1.5,
 eye_height_offset: f32 = 0,
 
 leko_cursor: ?Vec3i = null,
+/// the leko type to place when placing
+leko_equip: ?LekoType = null,
+leko_edit_mode: LekoEditMode = .remove,
 
 look_angles: Vec2 = Vec2.zero,
 observer: Observer,
@@ -42,6 +47,7 @@ settings: Settings = .{},
 pub const Input = struct {
     move: Vec3 = Vec3.zero,
     trigger_jump: bool = false,
+    trigger_primary: bool = false,
 };
 
 pub const Settings = struct {
@@ -55,6 +61,11 @@ pub const Settings = struct {
 pub const MoveMode = enum {
     normal,
     noclip,
+};
+
+pub const LekoEditMode = enum {
+    remove,
+    place,
 };
 
 pub fn init(world: *World, position: Vec3) !Player {
@@ -72,8 +83,9 @@ pub fn deinit(self: Player) void {
     self.world.observers.delete(self.observer);
 }
 
-pub fn onTick(self: *Player, session: *Session) void {
+pub fn onTick(self: *Player, session: *Session) !void {
     defer self.input.trigger_jump = false;
+    defer self.input.trigger_primary = false;
     switch (self.settings.move_mode) {
         .normal => self.moveNormal(session),
         .noclip => self.moveNoclip(session),
@@ -81,6 +93,18 @@ pub fn onTick(self: *Player, session: *Session) void {
     self.position = self.hull.center;
     self.world.observers.setPosition(self.observer, self.position.cast(i32));
     self.updateLekoCursor(session.world);
+    if (self.leko_cursor) |cursor| {
+        if (self.input.trigger_primary) {
+            switch (self.leko_edit_mode) {
+                .remove => _ = try session.world.leko_data.editLekoAtPosition(cursor, .empty),
+                .place => _ = {
+                    if (self.leko_equip) |leko_type| {
+                        _ = try session.world.leko_data.editLekoAtPosition(cursor, leko_type.value);
+                    }
+                },
+            }
+        }
+    }
 }
 
 fn moveNoclip(self: *Player, session: *Session) void {
@@ -128,7 +152,20 @@ fn updateLekoCursor(self: *Player, world: *World) void {
     while (raycast.distance < self.settings.interact_range) : (raycast.next()) {
         if (world.leko_data.lekoValueAtPosition(raycast.cell)) |leko_value| {
             if (leko_value != .empty) {
-                self.leko_cursor = raycast.cell;
+                switch (self.leko_edit_mode) {
+                    .remove => {
+                        self.leko_cursor = raycast.cell;
+                    },
+                    .place => {
+                        if (raycast.move) |move| {
+                            const offset = switch (move) {
+                                inline else => |m| Vec3i.unitSigned(m),
+                            };
+                            self.leko_cursor = raycast.cell.sub(offset);
+                        }
+                        break;
+                    },
+                }
                 break;
             }
         } else {

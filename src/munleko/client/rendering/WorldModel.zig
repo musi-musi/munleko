@@ -260,6 +260,29 @@ pub const Manager = struct {
         for (observer_chunk_events.get(.exit)) |chunk| {
             model.deleteAndRemoveChunkModel(chunk);
         }
+        world.leko_data.events_mutex.lock();
+        defer world.leko_data.events_mutex.unlock();
+        for (world.leko_data.events.get(.leko_edit)) |edit| {
+            const reference = edit.reference;
+            const chunk = reference.chunk;
+            const chunk_model = model.chunk_models.map.get(reference.chunk) orelse continue;
+            if (reference.address.isBorder()) {
+                const chunk_position = world.graph.positions.get(chunk);
+                var neighbor_range_iter = nm.Range3i.init(
+                    chunk_position.subScalar(1).v,
+                    chunk_position.addScalar(2).v,
+                ).iterate();
+                while (neighbor_range_iter.next()) |neighbor_position| {
+                    if (neighbor_position.eql(chunk_position)) {
+                        continue;
+                    }
+                    const neighbor_chunk = world.graph.position_map.get(neighbor_position) orelse continue;
+                    const neighbor_chunk_model = model.chunk_models.map.get(neighbor_chunk) orelse continue;
+                    try self.setTaskFlags(neighbor_chunk_model, 0, &.{.leko_mesh_generate_border});
+                }
+            }
+            try self.setTaskFlags(chunk_model, 0, &.{ .leko_mesh_generate_middle, .leko_mesh_generate_border });
+        }
     }
 
     fn generateThreadMain(self: *Manager) !void {
