@@ -27,3 +27,5 @@ standard wasd and mouse stuff, space goes up, lshift goes down
 - \[f4\] to toggle fullscreen
 - \[f10\] to toggle vsync
 - \[z\] to toggle noclip
+- \[f\] to cycle between remove and place
+- \[mouse 1\] to place/break
