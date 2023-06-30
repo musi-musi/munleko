@@ -5,4 +5,4 @@
 	url = https://github.com/musi-musi/ziglua.git
 [submodule "lib/zig-gamedev"]
 	path = lib/zig-gamedev
-	url = git@github.com:musi-musi/zig-gamedev.git
+	url = https://github.com/musi-musi/zig-gamedev.git
