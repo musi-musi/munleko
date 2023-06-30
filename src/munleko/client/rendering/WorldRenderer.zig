@@ -28,7 +28,6 @@ const WorldModel = @import("WorldModel.zig");
 const ChunkModel = WorldModel.ChunkModel;
 const leko_mesh = @import("leko_mesh.zig");
 const LekoMeshRenderer = @import("LekoMeshRenderer.zig");
-const SelectionBox = @import("SelectionBox.zig");
 
 const Debug = @import("Debug.zig");
 
@@ -62,8 +61,6 @@ chunk_map_mutex: Mutex = .{},
 
 leko_mesh_renderer: *LekoMeshRenderer,
 
-selection_box: SelectionBox,
-
 const ChunkMap = std.HashMapUnmanaged(Chunk, World.ChunkLoadState, Chunk.HashContext, std.hash_map.default_max_load_percentage);
 
 pub fn create(allocator: Allocator, scene: *Scene, world: *World) !*WorldRenderer {
@@ -75,11 +72,6 @@ pub fn create(allocator: Allocator, scene: *Scene, world: *World) !*WorldRendere
     errdefer world_model_manager.destroy();
     const leko_mesh_renderer = try LekoMeshRenderer.create(allocator, scene, world_model);
     errdefer leko_mesh_renderer.destroy();
-    const selection_box = try SelectionBox.init();
-    errdefer selection_box.deinit();
-
-    selection_box.setColor(.{ 1, 1, 1 });
-    selection_box.setPadding(0.05);
 
     self.* = WorldRenderer{
         .allocator = allocator,
@@ -88,7 +80,6 @@ pub fn create(allocator: Allocator, scene: *Scene, world: *World) !*WorldRendere
         .world_model = world_model,
         .world_model_manager = world_model_manager,
         .leko_mesh_renderer = leko_mesh_renderer,
-        .selection_box = selection_box,
     };
     return self;
 }
@@ -105,8 +96,6 @@ pub fn destroy(self: *WorldRenderer) void {
     self.draw_list.deinit(allocator);
     self.back_draw_list.deinit(allocator);
     self.chunk_map.deinit(allocator);
-
-    self.selection_box.deinit();
 }
 
 pub fn applyAssets(self: *WorldRenderer, assets: *const Assets) !void {
@@ -198,6 +187,4 @@ pub fn draw(self: *WorldRenderer) void {
     //     debug.drawCubeAssumeBound(position, 1, vec3(.{ 1, 1, 1 }));
     // }
     self.leko_mesh_renderer.updateAndDrawLekoMeshes(self.draw_list.items);
-    self.selection_box.setCamera(self.scene.camera);
-    self.selection_box.draw(.{ 0, 0, 0 }, .{ 1, 1, 1 });
 }

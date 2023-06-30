@@ -29,7 +29,7 @@ const SessionRenderer = rendering.SessionRenderer;
 const Scene = rendering.Scene;
 const Camera = Scene.Camera;
 
-pub const gui = @import("client/gui.zig");
+pub const Gui = @import("client/Gui.zig");
 
 pub const main_decls = struct {
     pub const std_options = struct {
@@ -94,7 +94,7 @@ pub fn run(self: *Client) !void {
     gl.setDepthFunction(.less);
     gl.enable(.cull_face);
 
-    gui.init(self.allocator, self.window);
+    var gui = Gui.init(self.allocator, self.window);
     defer gui.deinit();
 
     var session = try self.engine.createSession();
@@ -115,6 +115,9 @@ pub fn run(self: *Client) !void {
 
     try session_renderer.start(player.observer);
     defer session_renderer.stop();
+
+    const player_renderer = try rendering.PlayerRenderer.create(allocator, &session_renderer.scene, &player);
+    defer player_renderer.destroy();
 
     var session_context = SessionContext{
         .client = self,
@@ -203,10 +206,13 @@ pub fn run(self: *Client) !void {
         try session_renderer.update();
         session_renderer.draw();
 
+        player_renderer.draw();
+
         _ = fps_counter.frame();
 
         // zgui.showDemoWindow(null);
-        gui.showFrameRate(fps_counter.fps);
+        gui.showStats(fps_counter.fps);
+        gui.showHud();
         gui.render();
     }
 }

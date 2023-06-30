@@ -63,7 +63,7 @@ pub const Window = struct {
     vsync: Vsync = .disabled,
     mouse_mode: MouseMode = .visible,
     display_mode: DisplayMode = .windowed,
-    windowed_position: [2]u32 = .{ 0, 0 },
+    windowed_position: [2]i32 = .{ 0, 0 },
     windowed_size: [2]u32 = .{ 0, 0 },
 
     pub const Handle = ?*c.GLFWwindow;
@@ -173,8 +173,8 @@ pub const Window = struct {
                 var y: c_int = 0;
                 c.glfwGetWindowPos(self.handle, &x, &y);
                 self.windowed_position = .{
-                    @intCast(u32, x),
-                    @intCast(u32, y),
+                    @intCast(i32, x),
+                    @intCast(i32, y),
                 };
                 self.windowed_size = self.size;
                 const monitor = c.glfwGetPrimaryMonitor();
