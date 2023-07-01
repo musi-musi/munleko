@@ -192,7 +192,7 @@ pub fn run(self: *Client) !void {
 fn update(self: *Client) !void {
     self.input.update();
     if (self.session) |session| {
-        if ((try session.frameTicks()) > 0) {
+        if (try session.frameTicks()) {
             if (self.session_renderer) |session_renderer| {
                 try session_renderer.onTick();
             }

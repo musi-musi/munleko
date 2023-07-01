@@ -86,7 +86,7 @@ pub fn HookFunction(comptime Ctx: type) type {
     return fn (Ctx, *Session) anyerror!void;
 }
 
-pub fn frameTicks(self: *Session) !u64 {
+pub fn frameTicks(self: *Session) !bool {
     const time_ns = self.timer.read();
     const tick_count = @divFloor(time_ns, self.nsPerTick());
     if (tick_count > 0) {
@@ -95,7 +95,7 @@ pub fn frameTicks(self: *Session) !u64 {
     for (0..tick_count) |_| {
         try self.tick();
     }
-    return tick_count;
+    return tick_count > 0;
 }
 
 fn tick(self: *Session) !void {
