@@ -19,8 +19,8 @@ fog_start: f32 = 32,
 fog_end: f32 = 100,
 fog_power: f32 = 1.5,
 
-pub fn init(self: *Scene) !void {
-    self.* = .{
+pub fn init() !Scene {
+    return .{
         .debug = try Debug.init(),
     };
 }

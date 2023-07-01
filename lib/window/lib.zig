@@ -80,25 +80,14 @@ pub const Window = struct {
 
     pub const ButtonSet = std.AutoHashMapUnmanaged(ButtonCode, void);
 
-    pub fn init(allocator: Allocator) Window {
-        return .{
+    pub fn create(allocator: Allocator, gl_options: GlContextOptions) !*Window {
+        const self = try allocator.create(Window);
+        errdefer self.destroy();
+        self.* = .{
             .allocator = allocator,
             .events = Events.init(allocator),
         };
-    }
 
-    pub fn deinit(self: *Window) void {
-        self.close();
-        self.events.deinit();
-        self.held_buttons.deinit(self.allocator);
-    }
-
-    fn fromUserPtr(handle: Handle) *Window {
-        const aligned: *align(@alignOf(Window)) anyopaque = @alignCast(c.glfwGetWindowUserPointer(handle).?);
-        return @as(*Window, @ptrCast(aligned));
-    }
-
-    pub fn open(self: *Window, gl_options: GlContextOptions) !void {
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, @as(c_int, @intCast(gl_options.version_major)));
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, @as(c_int, @intCast(gl_options.version_minor)));
         c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, @intFromEnum(gl_options.profile));
@@ -120,12 +109,20 @@ pub const Window = struct {
             return error.GlfwCreateWindowFailed;
         }
         self.setVsync(self.vsync);
+        return self;
     }
 
-    pub fn close(self: *Window) void {
-        if (self.handle == null) return;
+    pub fn destroy(self: *Window) void {
+        const allocator = self.allocator;
+        defer allocator.destroy(self);
         c.glfwDestroyWindow(self.handle);
-        self.handle = null;
+        self.events.deinit();
+        self.held_buttons.deinit(self.allocator);
+    }
+
+    fn fromUserPtr(handle: Handle) *Window {
+        const aligned: *align(@alignOf(Window)) anyopaque = @alignCast(c.glfwGetWindowUserPointer(handle).?);
+        return @as(*Window, @ptrCast(aligned));
     }
 
     pub fn makeContextCurrent(self: Window) void {

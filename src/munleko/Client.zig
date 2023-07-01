@@ -59,11 +59,12 @@ pub const main_decls = struct {
 };
 
 allocator: Allocator,
-window: Window,
+window: *Window,
 
 input: Input,
 engine: *Engine,
 renderer: *Renderer,
+gui: Gui,
 
 session: ?*Session = null,
 session_renderer: ?*SessionRenderer = null,
@@ -71,18 +72,30 @@ session_renderer: ?*SessionRenderer = null,
 pub fn create(allocator: Allocator) !*Client {
     const self = try allocator.create(Client);
     errdefer allocator.destroy(self);
+
     const args = try Engine.Arguments.initFromCommandLineArgs(allocator);
     defer args.deinit(allocator);
     const engine = try Engine.create(allocator, args);
     errdefer engine.destroy();
+
+    const win = try Window.create(allocator, .{});
+    errdefer win.destroy();
+    win.makeContextCurrent();
+    try gl.init(window.getGlProcAddress);
+
     const renderer = try Renderer.create(allocator);
     errdefer renderer.destroy();
+
+    const gui = try Gui.init(allocator, win);
+    errdefer gui.deinit();
+
     self.* = .{
         .allocator = allocator,
-        .window = Window.init(allocator),
+        .window = win,
         .input = Input.init(self),
         .engine = engine,
         .renderer = renderer,
+        .gui = gui,
     };
 
     return self;
@@ -97,7 +110,8 @@ pub fn destroy(self: *Client) void {
     if (self.session) |session| {
         session.destroy();
     }
-    self.window.deinit();
+    self.gui.deinit();
+    self.window.destroy();
     self.engine.destroy();
     self.renderer.destroy();
     self.input.deinit();
@@ -138,28 +152,10 @@ fn stopSession(self: *Client) void {
 }
 
 pub fn run(self: *Client) !void {
-    const allocator = self.allocator;
-    _ = allocator;
-
     try self.engine.load();
-
-    try self.window.open(.{});
-    defer self.window.close();
 
     self.window.makeContextCurrent();
     self.window.setVsync(.disabled);
-
-    try gl.init(window.getGlProcAddress);
-    gl.viewport(self.window.size);
-    gl.enable(.depth_test);
-    gl.setDepthFunction(.less);
-    gl.enable(.cull_face);
-
-    try self.renderer.start();
-    defer self.renderer.stop();
-
-    var gui = Gui.init(self.allocator, self.window);
-    defer gui.deinit();
 
     try self.startSession();
     defer self.stopSession();
@@ -176,30 +172,36 @@ pub fn run(self: *Client) !void {
 
     while (self.window.nextFrame()) {
         frame_time.frame();
-        gui.newFrame();
+        self.gui.newFrame();
+
+        try self.update();
+
         gl.viewport(self.window.size);
-        if (self.window.buttonPressed(.grave)) {
-            switch (self.input.state) {
-                .gameplay => self.input.setState(.menu),
-                .menu => self.input.setState(.gameplay),
+
+        // zgui.showDemoWindow(null);
+        _ = fps_counter.frame();
+        self.gui.showStats(fps_counter.fps);
+        if (self.session != null) {
+            self.gui.showHud();
+        }
+
+        try self.draw();
+    }
+}
+
+fn update(self: *Client) !void {
+    self.input.update();
+    if (self.session) |session| {
+        if ((try session.frameTicks()) > 0) {
+            if (self.session_renderer) |session_renderer| {
+                try session_renderer.onTick();
             }
         }
-        if (self.window.buttonPressed(.f_10)) {
-            self.window.setVsync(switch (self.window.vsync) {
-                .enabled => .disabled,
-                .disabled => .enabled,
-            });
-        }
-        if (self.window.buttonPressed(.f_4)) {
-            self.window.setDisplayMode(util.cycleEnum(self.window.display_mode));
-        }
+    }
+}
 
-        self.input.update();
-
-        if ((try session.frameTicks()) > 0) {
-            try session_renderer.onTick();
-        }
-
+fn draw(self: *Client) !void {
+    if (self.session_renderer) |session_renderer| {
         session_renderer.scene.camera.setProjectionPerspective(.{
             .fov = 90,
             .aspect_ratio = @as(f32, @floatFromInt(self.window.size[0])) / @as(f32, @floatFromInt(self.window.size[1])),
@@ -209,13 +211,8 @@ pub fn run(self: *Client) !void {
 
         try session_renderer.update();
         session_renderer.draw();
-
-        // zgui.showDemoWindow(null);
-        _ = fps_counter.frame();
-        gui.showStats(fps_counter.fps);
-        gui.showHud();
-        gui.render();
     }
+    self.gui.render();
 }
 
 fn onWorldUpdate(self: *Client, world: *World) !void {

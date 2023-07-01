@@ -79,7 +79,7 @@ pub fn setColor(self: SelectionBox, color: [3]f32) void {
     self.shader.setUniform(.color, color);
 }
 
-pub fn setCamera(self: SelectionBox, camera: *Scene.Camera) void {
+pub fn setCamera(self: SelectionBox, camera: Scene.Camera) void {
     self.shader.setUniform(.view, camera.view_matrix.v);
     self.shader.setUniform(.proj, camera.projection_matrix.v);
 }

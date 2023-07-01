@@ -22,7 +22,7 @@ pub const Fonts = struct {
     large: zgui.Font,
 };
 
-pub fn init(allocator: Allocator, window: Window) Gui {
+pub fn init(allocator: Allocator, window: *Window) !Gui {
     zgui.init(allocator);
     zgui.io.setIniFilename(null);
     const fonts = Fonts{

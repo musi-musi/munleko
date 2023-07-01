@@ -37,10 +37,19 @@ pub fn deinit(self: *Input) void {
 }
 
 pub fn update(self: *Input) void {
-    const w = &self.client.window;
+    const w = self.client.window;
+    if (w.buttonPressed(.f_10)) {
+        w.setVsync(switch (w.vsync) {
+            .enabled => .disabled,
+            .disabled => .enabled,
+        });
+    }
+    if (w.buttonPressed(.f_4)) {
+        w.setDisplayMode(util.cycleEnum(w.display_mode));
+    }
     if (self.client.session) |session| {
         const p = &session.player;
-        const mouse_position = vec2(w.mousePosition());
+        const mouse_position = vec2(w.*.mousePosition());
         defer self.previous_mouse_position = mouse_position;
         switch (self.state) {
             .gameplay => {
@@ -71,11 +80,17 @@ pub fn update(self: *Input) void {
                 p.input = .{};
             },
         }
+        if (w.buttonPressed(.grave)) {
+            switch (self.state) {
+                .gameplay => self.setState(.menu),
+                .menu => self.setState(.gameplay),
+            }
+        }
     }
 }
 
 pub fn setState(self: *Input, state: InputState) void {
-    const w = &self.client.window;
+    const w = self.client.window;
     switch (state) {
         .gameplay => {
             self.previous_mouse_position = vec2(w.mousePosition());

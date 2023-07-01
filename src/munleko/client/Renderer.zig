@@ -9,7 +9,6 @@ pub const Debug = @import("renderer/Debug.zig");
 pub const SessionRenderer = @import("renderer/SessionRenderer.zig");
 pub const WorldRenderer = @import("renderer/WorldRenderer.zig");
 pub const Scene = @import("renderer/Scene.zig");
-pub const PlayerRenderer = @import("renderer/PlayerRenderer.zig");
 
 const Client = @import("../Client.zig");
 const Engine = @import("../Engine.zig");
@@ -26,7 +25,7 @@ pub fn create(allocator: Allocator) !*Renderer {
     errdefer allocator.destroy(self);
     self.* = .{
         .allocator = allocator,
-        .scene = undefined,
+        .scene = try Scene.init(),
     };
     return self;
 }
@@ -35,14 +34,6 @@ pub fn destroy(self: *Renderer) void {
     const allocator = self.allocator;
     defer allocator.destroy(self);
     self.scene.deinit();
-}
-
-pub fn start(self: *Renderer) !void {
-    try self.scene.init();
-}
-
-pub fn stop(self: *Renderer) void {
-    _ = self;
 }
 
 pub fn createSessionRenderer(self: *Renderer, session: *Session) !*SessionRenderer {

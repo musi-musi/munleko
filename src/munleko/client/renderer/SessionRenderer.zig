@@ -13,6 +13,8 @@ const WorldRenderer = @import("WorldRenderer.zig");
 const Client = @import("../../Client.zig");
 const Engine = @import("../../Engine.zig");
 
+const SelectionBox = @import("SelectionBox.zig");
+
 const Camera = Scene.Camera;
 
 const Session = Engine.Session;
@@ -29,17 +31,23 @@ scene: *Scene,
 session: *Session,
 world_renderer: *WorldRenderer,
 previous_player_eye_position: Vec3 = Vec3.zero,
+selection_box: SelectionBox,
 
 pub fn create(allocator: Allocator, session: *Session, scene: *Scene) !*SessionRenderer {
     const self = try allocator.create(SessionRenderer);
     errdefer allocator.destroy(self);
     const world_renderer = try WorldRenderer.create(allocator, scene, session.world);
     errdefer world_renderer.destroy();
+    const selection_box = try SelectionBox.init();
+    errdefer selection_box.deinit();
+    selection_box.setColor(.{ 1, 1, 1 });
+    selection_box.setPadding(0.01);
     self.* = SessionRenderer{
         .allocator = allocator,
         .scene = scene,
         .session = session,
         .world_renderer = world_renderer,
+        .selection_box = selection_box,
     };
     return self;
 }
@@ -50,6 +58,7 @@ pub fn destroy(self: *SessionRenderer) void {
     self.stop();
     self.world_renderer.destroy();
     self.scene.deinit();
+    self.selection_box.deinit();
 }
 
 pub fn applyAssets(self: *SessionRenderer, assets: *const Assets) !void {
@@ -90,4 +99,9 @@ pub fn draw(self: *SessionRenderer) void {
     gl.clearDepth(.float, 1);
     gl.clear(.color_depth);
     self.world_renderer.draw();
+
+    if (player.leko_cursor) |leko_cursor| {
+        self.selection_box.setCamera(self.scene.camera);
+        self.selection_box.draw(leko_cursor.cast(f32).v, .{ 1, 1, 1 });
+    }
 }
