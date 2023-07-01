@@ -1,7 +1,7 @@
 const std = @import("std");
 const util = @import("util");
 const nm = @import("nm");
-const oko = @import("oko");
+const gl = @import("gl");
 
 const Vec3 = nm.Vec3;
 const vec3 = nm.vec3;
@@ -25,20 +25,22 @@ const Allocator = std.mem.Allocator;
 const SessionRenderer = @This();
 
 allocator: Allocator,
-scene: Scene,
+scene: *Scene,
 session: *Session,
 world_renderer: *WorldRenderer,
+previous_player_eye_position: Vec3 = Vec3.zero,
 
-pub fn create(allocator: Allocator, session: *Session, camera: *Camera) !*SessionRenderer {
+pub fn create(allocator: Allocator, session: *Session, scene: *Scene) !*SessionRenderer {
     const self = try allocator.create(SessionRenderer);
+    errdefer allocator.destroy(self);
+    const world_renderer = try WorldRenderer.create(allocator, scene, session.world);
+    errdefer world_renderer.destroy();
     self.* = SessionRenderer{
         .allocator = allocator,
-        .scene = undefined,
+        .scene = scene,
         .session = session,
-        .world_renderer = undefined,
+        .world_renderer = world_renderer,
     };
-    try self.scene.init(camera);
-    self.world_renderer = try WorldRenderer.create(allocator, &self.scene, session.world);
     return self;
 }
 
@@ -55,11 +57,16 @@ pub fn applyAssets(self: *SessionRenderer, assets: *const Assets) !void {
 }
 
 pub fn start(self: *SessionRenderer, observer: Observer) !void {
+    self.previous_player_eye_position = self.session.player.eyePosition();
     try self.world_renderer.start(observer);
 }
 
 pub fn stop(self: *SessionRenderer) void {
     self.world_renderer.stop();
+}
+
+pub fn onTick(self: *SessionRenderer) !void {
+    self.previous_player_eye_position = self.session.player.eyePosition();
 }
 
 pub fn onWorldUpdate(self: *SessionRenderer, world: *World) !void {
@@ -71,5 +78,16 @@ pub fn update(self: *SessionRenderer) !void {
 }
 
 pub fn draw(self: *SessionRenderer) void {
+    const player = &self.session.player;
+    const eye_position = self.previous_player_eye_position.lerpTo(player.eyePosition(), self.session.tickProgress());
+    self.scene.camera.setViewMatrix(nm.transform.createTranslate(eye_position.neg()).mul(player.lookMatrix()));
+
+    gl.enable(.depth_test);
+    gl.setDepthFunction(.less);
+    gl.enable(.cull_face);
+
+    gl.clearColor(self.scene.fog_color.addDimension(1).v);
+    gl.clearDepth(.float, 1);
+    gl.clear(.color_depth);
     self.world_renderer.draw();
 }

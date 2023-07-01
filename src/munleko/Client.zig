@@ -24,9 +24,9 @@ const Mutex = std.Thread.Mutex;
 
 const Window = window.Window;
 
-pub const rendering = @import("client/rendering.zig");
-const SessionRenderer = rendering.SessionRenderer;
-const Scene = rendering.Scene;
+pub const Renderer = @import("client/Renderer.zig");
+const SessionRenderer = Renderer.SessionRenderer;
+const Scene = Renderer.Scene;
 const Camera = Scene.Camera;
 
 pub const Gui = @import("client/Gui.zig");
@@ -49,9 +49,8 @@ pub const main_decls = struct {
         try window.init();
         defer window.deinit();
 
-        var client: Client = undefined;
-        try client.init(allocator);
-        defer client.deinit();
+        const client = try Client.create(allocator);
+        defer client.destroy();
 
         try client.run();
 
@@ -61,33 +60,94 @@ pub const main_decls = struct {
 
 allocator: Allocator,
 window: Window,
-engine: *Engine,
 
-pub fn init(self: *Client, allocator: Allocator) !void {
+input: Input,
+engine: *Engine,
+renderer: *Renderer,
+
+session: ?*Session = null,
+session_renderer: ?*SessionRenderer = null,
+
+pub fn create(allocator: Allocator) !*Client {
+    const self = try allocator.create(Client);
+    errdefer allocator.destroy(self);
     const args = try Engine.Arguments.initFromCommandLineArgs(allocator);
     defer args.deinit(allocator);
+    const engine = try Engine.create(allocator, args);
+    errdefer engine.destroy();
+    const renderer = try Renderer.create(allocator);
+    errdefer renderer.destroy();
     self.* = .{
         .allocator = allocator,
         .window = Window.init(allocator),
-        .engine = try Engine.create(allocator, args),
+        .input = Input.init(self),
+        .engine = engine,
+        .renderer = renderer,
     };
+
+    return self;
 }
 
-pub fn deinit(self: *Client) void {
+pub fn destroy(self: *Client) void {
+    const allocator = self.allocator;
+    defer allocator.destroy(self);
+    if (self.session_renderer) |session_renderer| {
+        session_renderer.destroy();
+    }
+    if (self.session) |session| {
+        session.destroy();
+    }
     self.window.deinit();
     self.engine.destroy();
+    self.renderer.destroy();
+    self.input.deinit();
+}
+
+fn startSession(self: *Client) !void {
+    const session = try self.engine.createSession();
+    errdefer session.destroy();
+    try session.applyAssets(self.engine.assets);
+    const session_renderer = try self.renderer.createSessionRenderer(session);
+    errdefer session_renderer.destroy();
+    try session_renderer.applyAssets(self.engine.assets);
+    try session_renderer.start(session.player.observer);
+    try session.start(self, .{
+        .on_world_update = onWorldUpdate,
+    });
+    self.session = session;
+    self.session_renderer = session_renderer;
+    self.input.setState(.gameplay);
+}
+
+fn stopSession(self: *Client) void {
+    if (self.session) |session| {
+        session.stop();
+    }
+    if (self.session_renderer) |session_renderer| {
+        session_renderer.stop();
+    }
+    if (self.session) |session| {
+        session.destroy();
+        self.session = null;
+    }
+    if (self.session_renderer) |session_renderer| {
+        session_renderer.destroy();
+        self.session_renderer = null;
+    }
+    self.input.setState(.menu);
 }
 
 pub fn run(self: *Client) !void {
     const allocator = self.allocator;
+    _ = allocator;
 
     try self.engine.load();
 
-    try self.window.create(.{});
-    defer self.window.destroy();
+    try self.window.open(.{});
+    defer self.window.close();
+
     self.window.makeContextCurrent();
     self.window.setVsync(.disabled);
-    // self.window.setDisplayMode(.borderless);
 
     try gl.init(window.getGlProcAddress);
     gl.viewport(self.window.size);
@@ -95,50 +155,19 @@ pub fn run(self: *Client) !void {
     gl.setDepthFunction(.less);
     gl.enable(.cull_face);
 
+    try self.renderer.start();
+    defer self.renderer.stop();
+
     var gui = Gui.init(self.allocator, self.window);
     defer gui.deinit();
 
-    var session = try self.engine.createSession();
-    defer session.destroy();
+    try self.startSession();
+    defer self.stopSession();
 
-    try session.applyAssets(self.engine.assets);
+    const session = self.session.?;
+    const session_renderer = self.session_renderer.?;
 
-    var camera = Camera{};
-    const session_renderer = try SessionRenderer.create(allocator, session, &camera);
-    defer session_renderer.destroy();
-
-    try session_renderer.applyAssets(self.engine.assets);
-
-    var player = try Player.init(session.world, Vec3.zero);
-    defer player.deinit();
-
-    player.leko_equip = session.world.leko_data.leko_types.getForName("brick");
-
-    var prev_player_eye = player.eyePosition();
-
-    var input = Input.init(&self.window, &player);
-    defer input.deinit();
-
-    try session_renderer.start(player.observer);
-    defer session_renderer.stop();
-
-    const player_renderer = try rendering.PlayerRenderer.create(allocator, &session_renderer.scene, &player);
-    defer player_renderer.destroy();
-
-    var session_context = SessionContext{
-        .client = self,
-        .session_renderer = session_renderer,
-    };
-
-    try session.start(&session_context, .{
-        // .on_tick = SessionContext.onTick,
-        .on_world_update = SessionContext.onWorldUpdate,
-    });
-    defer session.stop();
-
-    self.window.setMouseMode(.disabled);
-
-    gl.clearDepth(.float, 1);
+    session.player.leko_equip = session.world.leko_data.leko_types.getForName("brick");
 
     var fps_counter = try util.FpsCounter.start(0.25);
     var frame_time = try util.FrameTime.start();
@@ -150,9 +179,9 @@ pub fn run(self: *Client) !void {
         gui.newFrame();
         gl.viewport(self.window.size);
         if (self.window.buttonPressed(.grave)) {
-            switch (input.state) {
-                .gameplay => input.setState(.menu),
-                .menu => input.setState(.gameplay),
+            switch (self.input.state) {
+                .gameplay => self.input.setState(.menu),
+                .menu => self.input.setState(.gameplay),
             }
         }
         if (self.window.buttonPressed(.f_10)) {
@@ -165,52 +194,32 @@ pub fn run(self: *Client) !void {
             self.window.setDisplayMode(util.cycleEnum(self.window.display_mode));
         }
 
-        input.frame();
+        self.input.update();
 
         if ((try session.frameTicks()) > 0) {
-            prev_player_eye = player.eyePosition();
-            try player.onTick(session);
+            try session_renderer.onTick();
         }
 
-        const interpolated_player_position = prev_player_eye.lerpTo(player.eyePosition(), session.tickProgress());
-
-        camera.setViewMatrix(nm.transform.createTranslate(interpolated_player_position.neg()).mul(player.lookMatrix()));
-        camera.setProjectionPerspective(.{
+        session_renderer.scene.camera.setProjectionPerspective(.{
             .fov = 90,
             .aspect_ratio = @as(f32, @floatFromInt(self.window.size[0])) / @as(f32, @floatFromInt(self.window.size[1])),
             .near_plane = 0.01,
             .far_plane = 1000,
         });
 
-        gl.clearColor(session_renderer.scene.fog_color.addDimension(1).v);
-        gl.clear(.color_depth);
-
         try session_renderer.update();
         session_renderer.draw();
 
-        player_renderer.draw();
-
-        _ = fps_counter.frame();
-
         // zgui.showDemoWindow(null);
+        _ = fps_counter.frame();
         gui.showStats(fps_counter.fps);
         gui.showHud();
         gui.render();
     }
 }
 
-const SessionContext = struct {
-    client: *Client,
-    session_renderer: *SessionRenderer,
-
-    fn onTick(self: *SessionContext, session: *Session) !void {
-        self.prev_player_eye = self.player.position;
-        self.player.onTick(session);
+fn onWorldUpdate(self: *Client, world: *World) !void {
+    if (self.session_renderer) |session_renderer| {
+        try session_renderer.onWorldUpdate(world);
     }
-
-    fn onWorldUpdate(self: *SessionContext, world: *World) !void {
-        // _ = self;
-        // _ = world;
-        try self.session_renderer.onWorldUpdate(world);
-    }
-};
+}

@@ -88,9 +88,7 @@ pub const Window = struct {
     }
 
     pub fn deinit(self: *Window) void {
-        if (self.handle != null) {
-            self.destroy();
-        }
+        self.close();
         self.events.deinit();
         self.held_buttons.deinit(self.allocator);
     }
@@ -100,7 +98,7 @@ pub const Window = struct {
         return @as(*Window, @ptrCast(aligned));
     }
 
-    pub fn create(self: *Window, gl_options: GlContextOptions) !void {
+    pub fn open(self: *Window, gl_options: GlContextOptions) !void {
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, @as(c_int, @intCast(gl_options.version_major)));
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, @as(c_int, @intCast(gl_options.version_minor)));
         c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, @intFromEnum(gl_options.profile));
@@ -124,7 +122,8 @@ pub const Window = struct {
         self.setVsync(self.vsync);
     }
 
-    pub fn destroy(self: *Window) void {
+    pub fn close(self: *Window) void {
+        if (self.handle == null) return;
         c.glfwDestroyWindow(self.handle);
         self.handle = null;
     }

@@ -12,17 +12,16 @@ const Scene = @This();
 debug: Debug,
 
 directional_light: Vec3 = Vec3.zero,
-camera: *Camera,
+camera: Camera = .{},
 
 fog_color: Vec3 = vec3(.{ 0.7, 0.7, 0.7 }),
 fog_start: f32 = 32,
 fog_end: f32 = 100,
 fog_power: f32 = 1.5,
 
-pub fn init(self: *Scene, camera: *Camera) !void {
+pub fn init(self: *Scene) !void {
     self.* = .{
         .debug = try Debug.init(),
-        .camera = camera,
     };
 }
 

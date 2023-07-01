@@ -83,7 +83,7 @@ pub fn deinit(self: Player) void {
     self.world.observers.delete(self.observer);
 }
 
-pub fn onTick(self: *Player, session: *Session) !void {
+pub fn tick(self: *Player, session: *Session) !void {
     defer self.input.trigger_jump = false;
     defer self.input.trigger_primary = false;
     switch (self.settings.move_mode) {

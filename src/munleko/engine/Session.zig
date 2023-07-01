@@ -1,5 +1,9 @@
 const std = @import("std");
 const util = @import("util");
+const nm = @import("nm");
+
+const Vec3 = nm.Vec3;
+const vec3 = nm.vec3;
 
 const Allocator = std.mem.Allocator;
 
@@ -11,6 +15,7 @@ const World = @import("World.zig");
 const WorldManager = World.Manager;
 
 const Assets = @import("Assets.zig");
+const Player = @import("Player.zig");
 
 const Thread = std.Thread;
 const AtomicFlag = util.AtomicFlag;
@@ -19,7 +24,7 @@ allocator: Allocator,
 
 world: *World,
 world_man: *WorldManager,
-
+player: Player,
 // thread: Thread = undefined,
 // is_running: AtomicFlag = .{},
 
@@ -30,11 +35,16 @@ tick_rate: f32 = 60,
 pub fn create(allocator: Allocator) !*Session {
     const self = try allocator.create(Session);
     const world = try World.create(allocator);
+    errdefer world.destroy();
     const world_man = try WorldManager.create(allocator, world);
+    errdefer world_man.destroy();
+    const player = try Player.init(world, Vec3.zero);
+    errdefer player.deinit();
     self.* = .{
         .allocator = allocator,
         .world = world,
         .world_man = world_man,
+        .player = player,
     };
     return self;
 }
@@ -43,6 +53,7 @@ pub fn destroy(self: *Session) void {
     self.stop();
     const allocator = self.allocator;
     defer allocator.destroy(self);
+    self.player.deinit();
     self.world.destroy();
     self.world_man.destroy();
 }
@@ -88,6 +99,7 @@ pub fn frameTicks(self: *Session) !u64 {
 }
 
 fn tick(self: *Session) !void {
+    try self.player.tick(self);
     try self.world_man.tick();
 }
 
