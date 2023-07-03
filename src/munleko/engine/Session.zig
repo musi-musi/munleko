@@ -7,8 +7,7 @@ const vec3 = nm.vec3;
 
 const Allocator = std.mem.Allocator;
 
-const time = std.time;
-const Timer = time.Timer;
+const Timer = std.time.Timer;
 const Session = @This();
 
 const World = @import("World.zig");
@@ -28,9 +27,8 @@ player: Player,
 // thread: Thread = undefined,
 // is_running: AtomicFlag = .{},
 
-timer: Timer = undefined,
+tick_timer: TickTimer = .{ .rate = 40 },
 tick_count: u64 = 0,
-tick_rate: f32 = 60,
 
 pub fn create(allocator: Allocator) !*Session {
     const self = try allocator.create(Session);
@@ -63,7 +61,7 @@ pub fn applyAssets(self: *Session, assets: *const Assets) !void {
 }
 
 pub fn start(self: *Session, ctx: anytype, comptime hooks: Hooks(@TypeOf(ctx))) !void {
-    self.timer = try Timer.start();
+    self.tick_timer.reset();
     if (hooks.on_world_update) |on_world_update| {
         try self.world_man.start(ctx, on_world_update);
     } else {
@@ -86,60 +84,50 @@ pub fn HookFunction(comptime Ctx: type) type {
     return fn (Ctx, *Session) anyerror!void;
 }
 
-pub fn frameTicks(self: *Session) !bool {
-    const time_ns = self.timer.read();
-    const tick_count = @divFloor(time_ns, self.nsPerTick());
-    if (tick_count > 0) {
-        self.timer.reset();
-    }
-    for (0..tick_count) |_| {
-        try self.tick();
-    }
-    return tick_count > 0;
-}
-
-fn tick(self: *Session) !void {
+pub fn tick(self: *Session) !void {
     try self.player.tick(self);
     try self.world_man.tick();
 }
 
-// /// session main loop
-// pub fn threadMain(self: *Session, ctx: anytype, comptime hooks: Hooks(@TypeOf(ctx))) !void {
-//
-//     while (self.isRunning()) : (self.nextTick()) {
-//         try self.world_man.tick();
-//         if (hooks.on_tick) |on_tick| {
-//             try on_tick(ctx, self);
-//         }
-//     }
-//     self.world_man.stop();
-// }
-
-// pub fn isRunning(self: Session) bool {
-//     return self.is_running.get();
-// }
-
-// fn nextTick(self: *Session) void {
-//     const elapsed = self.timer.read();
-//     const quota = self.nsPerTick();
-//     if (elapsed < quota) {
-//         time.sleep(quota - elapsed);
-//     } else {
-//         const extra = elapsed - quota;
-//         const elapsed_ms = @divFloor(elapsed, time.ns_per_ms);
-//         const extra_ms = @divFloor(extra, time.ns_per_ms);
-//         std.log.warn("tick {d} took {d}ms too long ({d}ms total)", .{ self.tick_count, extra_ms, elapsed_ms });
-//     }
-//     self.tick_count += 1;
-//     self.tick_compensation_factor = 1 / self.tickProgressEstimate();
-//     if (self.tick_count % 30 == 0) std.log.info("tick_compensation_factor = {d}", .{self.tick_compensation_factor});
-//     self.timer.reset();
-// }
-
-pub fn nsPerTick(self: Session) u64 {
-    return @as(u64, @intFromFloat(std.time.ns_per_s / @as(f64, @floatCast(self.tick_rate))));
-}
-
 pub fn tickProgress(self: *Session) f32 {
-    return @as(f32, @floatFromInt(self.timer.read() >> 10)) / @as(f32, @floatFromInt(self.nsPerTick() >> 10));
+    const time = self.tick_timer.read();
+    const tick_rate_f64: f64 = @floatCast(self.tick_rate);
+    return @floatCast(time * tick_rate_f64);
 }
+
+const TickTimer = struct {
+    last_time: i64 = 0,
+    rate: f32,
+
+    fn reset(self: *TickTimer) void {
+        self.last_time = std.time.microTimestamp();
+    }
+
+    fn read(self: TickTimer) f32 {
+        const last_time: f64 = @floatFromInt(self.last_time);
+        const time: f64 = @floatFromInt(std.time.microTimestamp());
+        return @floatCast((time - last_time) / std.time.us_per_s);
+    }
+
+    pub fn progress(self: TickTimer) f32 {
+        const time = self.read();
+        return time * self.rate;
+    }
+
+    fn countTicks(self: TickTimer) u32 {
+        const prog = self.progress();
+        const count: u32 = @intFromFloat(@floor(prog));
+        return count;
+    }
+
+    pub fn countTicksAndReset(self: *TickTimer) u32 {
+        const ticks = self.countTicks();
+        self.last_time += @as(i64, ticks) * self.usPerTick();
+        return ticks;
+    }
+
+    fn usPerTick(self: TickTimer) i64 {
+        const us = std.time.us_per_s / self.rate;
+        return @intFromFloat(us);
+    }
+};

@@ -18,13 +18,15 @@ const Session = Engine.Session;
 const Allocator = std.mem.Allocator;
 
 allocator: Allocator,
+engine: *Engine,
 scene: Scene,
 
-pub fn create(allocator: Allocator) !*Renderer {
+pub fn create(allocator: Allocator, engine: *Engine) !*Renderer {
     const self = try allocator.create(Renderer);
     errdefer allocator.destroy(self);
     self.* = .{
         .allocator = allocator,
+        .engine = engine,
         .scene = try Scene.init(),
     };
     return self;
@@ -37,5 +39,7 @@ pub fn destroy(self: *Renderer) void {
 }
 
 pub fn createSessionRenderer(self: *Renderer, session: *Session) !*SessionRenderer {
-    return try SessionRenderer.create(self.allocator, session, &self.scene);
+    const session_renderer = try SessionRenderer.create(self.allocator, session, &self.scene);
+    try session_renderer.applyAssets(self.engine.assets);
+    return session_renderer;
 }

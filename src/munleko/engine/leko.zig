@@ -149,8 +149,10 @@ pub const ChunkLoader = struct {
         const types = &world.leko_data.leko_types;
 
         const stone = types.getValueForName("stone") orelse .empty;
+        _ = stone;
         const dirt = types.getValueForName("dirt") orelse .empty;
         const brick = types.getValueForName("brick") orelse .empty;
+        const sand = types.getValueForName("sand") orelse .empty;
         _ = brick;
         // const pallete = [_]LekoValue{
         //     types.getValueForName("stone") orelse .empty,
@@ -194,7 +196,7 @@ pub const ChunkLoader = struct {
             }
             if ((material_noise) < 0.1) {
                 // if ((material_noise + r.float(f32) / 20) < 0.1) {
-                leko[i] = stone;
+                leko[i] = sand;
             } else {
                 leko[i] = dirt;
             }

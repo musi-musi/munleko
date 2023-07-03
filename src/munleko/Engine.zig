@@ -82,7 +82,9 @@ fn initLua(self: *Engine) !void {
 }
 
 pub fn createSession(self: *Engine) !*Session {
-    return Session.create(self.allocator);
+    const session = try Session.create(self.allocator);
+    try session.applyAssets(self.assets);
+    return session;
 }
 
 pub const Arguments = struct {

@@ -66,8 +66,12 @@ engine: *Engine,
 renderer: *Renderer,
 gui: Gui,
 
-session: ?*Session = null,
-session_renderer: ?*SessionRenderer = null,
+session_state: ?SessionState = null,
+
+pub const SessionState = struct {
+    session: *Session,
+    renderer: *SessionRenderer,
+};
 
 pub fn create(allocator: Allocator) !*Client {
     const self = try allocator.create(Client);
@@ -83,7 +87,7 @@ pub fn create(allocator: Allocator) !*Client {
     win.makeContextCurrent();
     try gl.init(window.getGlProcAddress);
 
-    const renderer = try Renderer.create(allocator);
+    const renderer = try Renderer.create(allocator, engine);
     errdefer renderer.destroy();
 
     const gui = try Gui.init(allocator, win);
@@ -104,11 +108,11 @@ pub fn create(allocator: Allocator) !*Client {
 pub fn destroy(self: *Client) void {
     const allocator = self.allocator;
     defer allocator.destroy(self);
-    if (self.session_renderer) |session_renderer| {
-        session_renderer.destroy();
-    }
-    if (self.session) |session| {
-        session.destroy();
+    if (self.session_state) |state| {
+        state.renderer.stop();
+        state.session.stop();
+        state.renderer.destroy();
+        state.session.destroy();
     }
     self.gui.deinit();
     self.window.destroy();
@@ -120,34 +124,27 @@ pub fn destroy(self: *Client) void {
 fn startSession(self: *Client) !void {
     const session = try self.engine.createSession();
     errdefer session.destroy();
-    try session.applyAssets(self.engine.assets);
-    const session_renderer = try self.renderer.createSessionRenderer(session);
-    errdefer session_renderer.destroy();
-    try session_renderer.applyAssets(self.engine.assets);
-    try session_renderer.start(session.player.observer);
+    const renderer = try self.renderer.createSessionRenderer(session);
+    errdefer renderer.destroy();
+    try renderer.start(session.player.observer);
     try session.start(self, .{
         .on_world_update = onWorldUpdate,
     });
-    self.session = session;
-    self.session_renderer = session_renderer;
+    self.session_state = .{
+        .session = session,
+        .renderer = renderer,
+    };
     self.input.setState(.gameplay);
 }
 
 fn stopSession(self: *Client) void {
-    if (self.session) |session| {
-        session.stop();
+    if (self.session_state) |state| {
+        state.session.stop();
+        state.renderer.stop();
+        state.session.destroy();
+        state.renderer.destroy();
     }
-    if (self.session_renderer) |session_renderer| {
-        session_renderer.stop();
-    }
-    if (self.session) |session| {
-        session.destroy();
-        self.session = null;
-    }
-    if (self.session_renderer) |session_renderer| {
-        session_renderer.destroy();
-        self.session_renderer = null;
-    }
+    self.session_state = null;
     self.input.setState(.menu);
 }
 
@@ -160,8 +157,8 @@ pub fn run(self: *Client) !void {
     try self.startSession();
     defer self.stopSession();
 
-    const session = self.session.?;
-    const session_renderer = self.session_renderer.?;
+    const session = self.session_state.?.session;
+    const session_renderer = self.session_state.?.renderer;
 
     session.player.leko_equip = session.world.leko_data.leko_types.getForName("brick");
 
@@ -181,7 +178,7 @@ pub fn run(self: *Client) !void {
         // zgui.showDemoWindow(null);
         _ = fps_counter.frame();
         self.gui.showStats(fps_counter.fps);
-        if (self.session != null) {
+        if (self.session_state != null) {
             self.gui.showHud();
         }
 
@@ -191,32 +188,33 @@ pub fn run(self: *Client) !void {
 
 fn update(self: *Client) !void {
     self.input.update();
-    if (self.session) |session| {
-        if (try session.frameTicks()) {
-            if (self.session_renderer) |session_renderer| {
-                try session_renderer.onTick();
-            }
+    if (self.session_state) |state| {
+        const tick_count = state.session.tick_timer.countTicksAndReset();
+        for (0..tick_count) |_| {
+            try state.renderer.preTick();
+            try state.session.tick();
         }
     }
 }
 
 fn draw(self: *Client) !void {
-    if (self.session_renderer) |session_renderer| {
-        session_renderer.scene.camera.setProjectionPerspective(.{
+    if (self.session_state) |state| {
+        const renderer = state.renderer;
+        renderer.scene.camera.setProjectionPerspective(.{
             .fov = 90,
             .aspect_ratio = @as(f32, @floatFromInt(self.window.size[0])) / @as(f32, @floatFromInt(self.window.size[1])),
             .near_plane = 0.01,
             .far_plane = 1000,
         });
 
-        try session_renderer.update();
-        session_renderer.draw();
+        try renderer.update();
+        renderer.draw();
     }
     self.gui.render();
 }
 
 fn onWorldUpdate(self: *Client, world: *World) !void {
-    if (self.session_renderer) |session_renderer| {
-        try session_renderer.onWorldUpdate(world);
+    if (self.session_state) |state| {
+        try state.renderer.onWorldUpdate(world);
     }
 }

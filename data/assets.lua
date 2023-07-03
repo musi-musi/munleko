@@ -4,6 +4,7 @@ leko.stone = {}
 leko.grass = {}
 leko.dirt = {}
 leko.brick = {}
+leko.sand = {}
 
 return {
     leko_texture_size = 256,

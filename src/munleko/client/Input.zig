@@ -47,7 +47,8 @@ pub fn update(self: *Input) void {
     if (w.buttonPressed(.f_4)) {
         w.setDisplayMode(util.cycleEnum(w.display_mode));
     }
-    if (self.client.session) |session| {
+    if (self.client.session_state) |session_state| {
+        const session = session_state.session;
         const p = &session.player;
         const mouse_position = vec2(w.*.mousePosition());
         defer self.previous_mouse_position = mouse_position;

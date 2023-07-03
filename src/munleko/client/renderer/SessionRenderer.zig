@@ -74,7 +74,7 @@ pub fn stop(self: *SessionRenderer) void {
     self.world_renderer.stop();
 }
 
-pub fn onTick(self: *SessionRenderer) !void {
+pub fn preTick(self: *SessionRenderer) !void {
     self.previous_player_eye_position = self.session.player.eyePosition();
 }
 
@@ -88,7 +88,8 @@ pub fn update(self: *SessionRenderer) !void {
 
 pub fn draw(self: *SessionRenderer) void {
     const player = &self.session.player;
-    const eye_position = self.previous_player_eye_position.lerpTo(player.eyePosition(), self.session.tickProgress());
+    const tick_progress = self.session.tick_timer.progress();
+    const eye_position = self.previous_player_eye_position.lerpTo(player.eyePosition(), tick_progress);
     self.scene.camera.setViewMatrix(nm.transform.createTranslate(eye_position.neg()).mul(player.lookMatrix()));
 
     gl.enable(.depth_test);

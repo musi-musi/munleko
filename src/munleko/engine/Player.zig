@@ -24,6 +24,7 @@ const Player = @This();
 world: *World,
 
 position: Vec3,
+
 hull: Bounds3 = .{
     .center = undefined,
     .radius = vec3(.{ 1.5 / 2.0, 3.5 / 2.0, 1.5 / 2.0 }),
@@ -108,7 +109,7 @@ pub fn tick(self: *Player, session: *Session) !void {
 }
 
 fn moveNoclip(self: *Player, session: *Session) void {
-    const dt = 1 / session.tick_rate;
+    const dt = 1 / session.tick_timer.rate;
     const move_xz = self.getMoveXZ();
     self.hull.center.v[0] += move_xz.v[0] * dt * self.settings.noclip_move_speed;
     self.hull.center.v[1] += self.input.move.v[1] * dt * self.settings.noclip_move_speed;
@@ -120,7 +121,7 @@ fn moveNoclip(self: *Player, session: *Session) void {
 
 fn moveNormal(self: *Player, session: *Session) void {
     const world = session.world;
-    const dt = 1 / session.tick_rate;
+    const dt = 1 / session.tick_timer.rate;
     self.velocity_y -= world.physics.settings.gravity * dt;
     if (world.physics.moveLekoBoundsAxis(&self.hull, self.velocity_y * dt, .y)) |_| {
         defer self.velocity_y = 0;
@@ -172,8 +173,6 @@ fn updateLekoCursor(self: *Player, world: *World) void {
             break;
         }
     }
-
-    // self.leko_cursor = self.eyePosition().add(forward.mulScalar(5)).floor().cast(i32);
 }
 
 fn moveXZ(self: *Player, world: *World, move: Vec2) void {
@@ -255,10 +254,12 @@ pub fn updateLookFromMouse(self: *Player, mouse_delta: Vec2) void {
     self.look_angles.v[1] = std.math.clamp(look_y, -90, 90);
 }
 
+pub fn eyePositionOffset(self: Player) Vec3 {
+    return vec3(.{ 0, self.eye_height + self.eye_height_offset, 0 });
+}
+
 pub fn eyePosition(self: Player) Vec3 {
-    var position = self.position;
-    position.ptrMut(.y).* += self.eye_height + self.eye_height_offset;
-    return position;
+    return self.position.add(self.eyePositionOffset());
 }
 
 pub fn lookMatrix(self: Player) nm.Mat4 {
