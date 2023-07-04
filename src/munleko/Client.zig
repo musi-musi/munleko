@@ -200,9 +200,9 @@ fn update(self: *Client) !void {
 fn draw(self: *Client) !void {
     if (self.session_state) |state| {
         const renderer = state.renderer;
+        renderer.scene.camera.setScreenSize(self.window.size);
         renderer.scene.camera.setProjectionPerspective(.{
             .fov = 90,
-            .aspect_ratio = @as(f32, @floatFromInt(self.window.size[0])) / @as(f32, @floatFromInt(self.window.size[1])),
             .near_plane = 0.01,
             .far_plane = 1000,
         });

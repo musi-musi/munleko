@@ -3,6 +3,8 @@ const nm = @import("nm");
 
 const Vec3 = nm.Vec3;
 const vec3 = nm.vec3;
+const Vec2 = nm.Vec2;
+const vec2 = nm.vec2;
 const Mat4 = nm.Mat4;
 
 const Debug = @import("Debug.zig");
@@ -54,6 +56,7 @@ pub const Camera = struct {
     view_matrix: Mat4 = Mat4.identity,
     projection_matrix: Mat4 = Mat4.identity,
     frustum: Frustum = undefined,
+    screen_size: Vec2 = Vec2.zero,
 
     pub const Frustum = struct {
         planes: [6]Plane3,
@@ -81,6 +84,10 @@ pub const Camera = struct {
         return Camera.init(.{ .orthographic = orthographic }, view_matrix);
     }
 
+    pub fn setScreenSize(self: *Camera, size: [2]u32) void {
+        self.screen_size = nm.vec2u(size).cast(f32);
+    }
+
     pub fn setViewMatrix(self: *Camera, matrix: Mat4) void {
         self.view_matrix = matrix;
         const world_to_view = matrix.invert() orelse unreachable;
@@ -96,7 +103,11 @@ pub const Camera = struct {
     }
 
     pub fn setProjectionPerspective(self: *Camera, perspective: Projection.Perspective) void {
-        self.setProjection(.{ .perspective = perspective });
+        var pers = perspective;
+        if (pers.aspect_ratio == null) {
+            pers.aspect_ratio = self.screen_size.v[0] / self.screen_size.v[1];
+        }
+        self.setProjection(.{ .perspective = pers });
     }
 
     pub fn setProjectionOrthographic(self: *Camera, orthographic: Projection.Orthographic) void {
@@ -117,7 +128,7 @@ pub const Camera = struct {
             fov: f32 = 90,
             near_plane: f32 = 0.001,
             far_plane: f32 = 1000,
-            aspect_ratio: f32 = 1,
+            aspect_ratio: ?f32 = null,
         };
 
         pub const Orthographic = struct {
@@ -133,7 +144,7 @@ pub const Camera = struct {
             return switch (self) {
                 .perspective => |p| nm.transform.createPerspective(
                     std.math.degreesToRadians(f32, p.fov),
-                    p.aspect_ratio,
+                    p.aspect_ratio orelse 1,
                     p.near_plane,
                     p.far_plane,
                 ),
@@ -152,7 +163,7 @@ pub const Camera = struct {
             switch (self) {
                 .perspective => |p| {
                     const fov_v = std.math.degreesToRadians(f32, p.fov) / 2;
-                    const fov_h = std.math.atan(std.math.tan(fov_v) * p.aspect_ratio);
+                    const fov_h = std.math.atan(std.math.tan(fov_v) * (p.aspect_ratio orelse 1));
                     const sin_v = std.math.sin(fov_v);
                     const cos_v = std.math.cos(fov_v);
                     const sin_h = std.math.sin(fov_h);

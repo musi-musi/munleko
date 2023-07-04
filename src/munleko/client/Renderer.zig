@@ -19,7 +19,6 @@ const Allocator = std.mem.Allocator;
 
 allocator: Allocator,
 engine: *Engine,
-scene: Scene,
 
 pub fn create(allocator: Allocator, engine: *Engine) !*Renderer {
     const self = try allocator.create(Renderer);
@@ -27,7 +26,6 @@ pub fn create(allocator: Allocator, engine: *Engine) !*Renderer {
     self.* = .{
         .allocator = allocator,
         .engine = engine,
-        .scene = try Scene.init(),
     };
     return self;
 }
@@ -35,11 +33,10 @@ pub fn create(allocator: Allocator, engine: *Engine) !*Renderer {
 pub fn destroy(self: *Renderer) void {
     const allocator = self.allocator;
     defer allocator.destroy(self);
-    self.scene.deinit();
 }
 
 pub fn createSessionRenderer(self: *Renderer, session: *Session) !*SessionRenderer {
-    const session_renderer = try SessionRenderer.create(self.allocator, session, &self.scene);
+    const session_renderer = try SessionRenderer.create(self.allocator, session);
     try session_renderer.applyAssets(self.engine.assets);
     return session_renderer;
 }

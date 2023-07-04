@@ -27,17 +27,16 @@ const Allocator = std.mem.Allocator;
 const SessionRenderer = @This();
 
 allocator: Allocator,
-scene: *Scene,
+scene: Scene,
 session: *Session,
 world_renderer: *WorldRenderer,
 previous_player_eye_position: Vec3 = Vec3.zero,
 selection_box: SelectionBox,
 
-pub fn create(allocator: Allocator, session: *Session, scene: *Scene) !*SessionRenderer {
+pub fn create(allocator: Allocator, session: *Session) !*SessionRenderer {
     const self = try allocator.create(SessionRenderer);
     errdefer allocator.destroy(self);
-    const world_renderer = try WorldRenderer.create(allocator, scene, session.world);
-    errdefer world_renderer.destroy();
+    const scene = try Scene.init();
     const selection_box = try SelectionBox.init();
     errdefer selection_box.deinit();
     selection_box.setColor(.{ 1, 1, 1 });
@@ -46,9 +45,12 @@ pub fn create(allocator: Allocator, session: *Session, scene: *Scene) !*SessionR
         .allocator = allocator,
         .scene = scene,
         .session = session,
-        .world_renderer = world_renderer,
+        .world_renderer = undefined,
         .selection_box = selection_box,
     };
+    const world_renderer = try WorldRenderer.create(allocator, &self.scene, session.world);
+    errdefer world_renderer.destroy();
+    self.world_renderer = world_renderer;
     return self;
 }
 
