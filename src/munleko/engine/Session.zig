@@ -21,6 +21,8 @@ const AtomicFlag = util.AtomicFlag;
 
 allocator: Allocator,
 
+assets: *Assets,
+
 world: *World,
 world_man: *WorldManager,
 player: Player,
@@ -30,9 +32,9 @@ player: Player,
 tick_timer: TickTimer = .{ .rate = 40 },
 tick_count: u64 = 0,
 
-pub fn create(allocator: Allocator) !*Session {
+pub fn create(allocator: Allocator, assets: *Assets) !*Session {
     const self = try allocator.create(Session);
-    const world = try World.create(allocator);
+    const world = try World.create(allocator, assets);
     errdefer world.destroy();
     const world_man = try WorldManager.create(allocator, world);
     errdefer world_man.destroy();
@@ -40,6 +42,7 @@ pub fn create(allocator: Allocator) !*Session {
     errdefer player.deinit();
     self.* = .{
         .allocator = allocator,
+        .assets = assets,
         .world = world,
         .world_man = world_man,
         .player = player,
@@ -54,12 +57,6 @@ pub fn destroy(self: *Session) void {
     self.player.deinit();
     self.world.destroy();
     self.world_man.destroy();
-}
-
-pub fn applyAssets(self: *Session, assets: *Assets) !void {
-    const world_leko_types = &self.world.leko_data.leko_types;
-    world_leko_types.deinit();
-    try world_leko_types.dupe(self.allocator, &assets.leko_type_table);
 }
 
 pub fn start(self: *Session, ctx: anytype, comptime hooks: Hooks(@TypeOf(ctx))) !void {

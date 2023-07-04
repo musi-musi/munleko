@@ -50,24 +50,22 @@ pub const LekoEditEvent = struct {
 pub const LekoData = struct {
     world: *World,
     chunk_leko: ChunkLekoStore,
-    leko_types: LekoTypeTable,
+    leko_types: *LekoTypeTable,
     events: LekoEvents,
     events_mutex: Mutex = .{},
 
-    pub fn init(self: *LekoData, world: *World) !void {
+    pub fn init(self: *LekoData, world: *World, leko_type_table: *LekoTypeTable) !void {
         const allocator = world.allocator;
         self.* = .{
             .world = world,
             .chunk_leko = ChunkLekoStore.init(allocator),
-            .leko_types = undefined,
+            .leko_types = leko_type_table,
             .events = LekoEvents.init(allocator),
         };
-        try self.leko_types.init(allocator);
     }
 
     pub fn deinit(self: *LekoData) void {
         self.chunk_leko.deinit();
-        self.leko_types.deinit();
         self.events.deinit();
     }
 
@@ -146,7 +144,7 @@ pub const ChunkLoader = struct {
         const world = self.world;
         const chunk_origin = world.graph.positions.get(chunk).mulScalar(chunk_width);
         const leko = world.leko_data.chunk_leko.get(chunk);
-        const types = &world.leko_data.leko_types;
+        const types = world.leko_data.leko_types;
 
         const stone = types.getValueForName("stone") orelse .empty;
         _ = stone;
@@ -240,17 +238,6 @@ pub const LekoTypeTable = struct {
         self.arena.deinit();
         self.list.deinit(self.allocator);
         self.name_map.deinit(self.allocator);
-    }
-
-    pub fn dupe(self: *LekoTypeTable, allocator: Allocator, source: *LekoTypeTable) !void {
-        self.* = .{
-            .allocator = allocator,
-            .arena = Arena.init(allocator),
-        };
-        errdefer self.deinit();
-        for (source.list.items) |leko_type| {
-            try self.addLekoType(leko_type.name, leko_type.properties);
-        }
     }
 
     pub fn addLekoType(self: *LekoTypeTable, name: []const u8, properties: LekoType.Properties) !void {

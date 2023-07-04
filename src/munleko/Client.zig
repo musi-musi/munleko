@@ -161,7 +161,7 @@ pub fn run(self: *Client) !void {
     const session = self.session_state.?.session;
     const session_renderer = self.session_state.?.renderer;
 
-    session.player.leko_equip = session.world.leko_data.leko_types.getForName("brick");
+    session.player.leko_equip = self.engine.assets.leko_type_table.getForName("brick");
 
     var fps_counter = try util.FpsCounter.start(0.25);
     var frame_time = try util.FrameTime.start();

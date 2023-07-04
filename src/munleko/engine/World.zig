@@ -3,6 +3,7 @@ const util = @import("util");
 const nm = @import("nm");
 
 const Engine = @import("../Engine.zig");
+const Assets = Engine.Assets;
 const Session = @import("Session.zig");
 const leko = @import("leko.zig");
 const Physics = @import("Physics.zig");
@@ -47,7 +48,7 @@ leko_data: LekoData = undefined,
 observers: Observers = undefined,
 physics: Physics = undefined,
 
-pub fn create(allocator: Allocator) !*World {
+pub fn create(allocator: Allocator, assets: *Assets) !*World {
     const self = try allocator.create(World);
     self.* = .{
         .allocator = allocator,
@@ -55,7 +56,7 @@ pub fn create(allocator: Allocator) !*World {
     try self.chunks.init(self);
     try self.graph.init(self);
     try self.observers.init(self);
-    try self.leko_data.init(self);
+    try self.leko_data.init(self, &assets.leko_type_table);
     self.physics.init(self);
     return self;
 }
