@@ -150,6 +150,7 @@ fn stopSession(self: *Client) void {
 
 pub fn run(self: *Client) !void {
     try self.engine.load();
+    try self.renderer.applyAssets(self.engine.assets);
 
     self.window.makeContextCurrent();
     self.window.setVsync(.disabled);

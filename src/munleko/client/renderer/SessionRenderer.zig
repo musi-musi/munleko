@@ -9,6 +9,7 @@ const Vec3i = nm.Vec3i;
 const vec3i = nm.vec3i;
 
 const Scene = @import("Scene.zig");
+const Resources = @import("Resources.zig");
 const WorldRenderer = @import("WorldRenderer.zig");
 const Client = @import("../../Client.zig");
 const Engine = @import("../../Engine.zig");
@@ -33,7 +34,7 @@ world_renderer: *WorldRenderer,
 previous_player_eye_position: Vec3 = Vec3.zero,
 selection_box: SelectionBox,
 
-pub fn create(allocator: Allocator, session: *Session) !*SessionRenderer {
+pub fn create(allocator: Allocator, resources: *Resources, session: *Session) !*SessionRenderer {
     const self = try allocator.create(SessionRenderer);
     errdefer allocator.destroy(self);
     const scene = try Scene.init();
@@ -48,7 +49,7 @@ pub fn create(allocator: Allocator, session: *Session) !*SessionRenderer {
         .world_renderer = undefined,
         .selection_box = selection_box,
     };
-    const world_renderer = try WorldRenderer.create(allocator, &self.scene, session.world);
+    const world_renderer = try WorldRenderer.create(allocator, &self.scene, resources, session.world);
     errdefer world_renderer.destroy();
     self.world_renderer = world_renderer;
     return self;
@@ -61,10 +62,6 @@ pub fn destroy(self: *SessionRenderer) void {
     self.world_renderer.destroy();
     self.scene.deinit();
     self.selection_box.deinit();
-}
-
-pub fn applyAssets(self: *SessionRenderer, assets: *const Assets) !void {
-    try self.world_renderer.applyAssets(assets);
 }
 
 pub fn start(self: *SessionRenderer, observer: Observer) !void {

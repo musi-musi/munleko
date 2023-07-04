@@ -56,8 +56,10 @@ pub fn destroy(self: *Session) void {
     self.world_man.destroy();
 }
 
-pub fn applyAssets(self: *Session, assets: *const Assets) !void {
-    try self.world.leko_data.leko_types.addLekoTypesFromAssetTable(assets.leko_table);
+pub fn applyAssets(self: *Session, assets: *Assets) !void {
+    const world_leko_types = &self.world.leko_data.leko_types;
+    world_leko_types.deinit();
+    try world_leko_types.dupe(self.allocator, &assets.leko_type_table);
 }
 
 pub fn start(self: *Session, ctx: anytype, comptime hooks: Hooks(@TypeOf(ctx))) !void {

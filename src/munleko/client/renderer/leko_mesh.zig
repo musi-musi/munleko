@@ -133,22 +133,20 @@ pub const ChunkLekoMeshes = struct {
     mesh_data: LekoMeshDataStore,
     face_buffers: LekoFaceBufferStore,
 
-    face_material_table: FaceMaterialTable,
+    material_table: *LekoMaterialTable,
 
-    pub fn init(self: *ChunkLekoMeshes, allocator: Allocator) !void {
+    pub fn init(self: *ChunkLekoMeshes, allocator: Allocator, material_table: *LekoMaterialTable) !void {
         self.* = .{
             .allocator = allocator,
             .mesh_data = LekoMeshDataStore.initWithContext(allocator, .{ .allocator = allocator }),
             .face_buffers = LekoFaceBufferStore.init(allocator),
-            .face_material_table = undefined,
+            .material_table = material_table,
         };
-        try self.face_material_table.init(allocator);
     }
 
     pub fn deinit(self: *ChunkLekoMeshes) void {
         self.mesh_data.deinit();
         self.face_buffers.deinit();
-        self.face_material_table.deinit();
     }
 
     pub fn matchDataCapacity(self: *ChunkLekoMeshes, world_model: *const WorldModel) !void {
@@ -309,7 +307,7 @@ pub const LekoMeshSystem = struct {
 
     fn getMaterial(self: LekoMeshSystem, reference: Reference) ?FaceMaterial {
         const leko_value = self.world_model.world.leko_data.lekoValueAt(reference);
-        return self.world_model.chunk_leko_meshes.face_material_table.getForLekoValue(leko_value);
+        return self.world_model.chunk_leko_meshes.material_table.getForLekoValue(leko_value);
     }
 
     fn computeAO(self: LekoMeshSystem, world: *World, comptime traverse_edges: bool, reference: Reference, comptime normal: Cardinal3) u8 {
@@ -403,11 +401,11 @@ pub const FaceMaterial = struct {
     texture_index: u32,
 };
 
-pub const FaceMaterialTable = struct {
+pub const LekoMaterialTable = struct {
     allocator: Allocator,
     list: std.ArrayListUnmanaged(?FaceMaterial) = .{},
 
-    fn init(self: *FaceMaterialTable, allocator: Allocator) !void {
+    pub fn init(self: *LekoMaterialTable, allocator: Allocator) !void {
         self.* = .{
             .allocator = allocator,
         };
@@ -416,12 +414,12 @@ pub const FaceMaterialTable = struct {
         try self.list.append(self.allocator, null);
     }
 
-    fn deinit(self: *FaceMaterialTable) void {
+    pub fn deinit(self: *LekoMaterialTable) void {
         self.list.deinit(self.allocator);
     }
 
-    pub fn addMaterialsFromLekoAssets(self: *FaceMaterialTable, assets: *const Assets, type_table: leko.LekoTypeTable) !void {
-        for (type_table.list.items[1..]) |leko_type| {
+    pub fn addMaterialsFromLekoAssets(self: *LekoMaterialTable, assets: *const Assets) !void {
+        for (assets.leko_type_table.list.items[1..]) |leko_type| {
             const name = leko_type.name;
             const leko_asset = assets.leko_table.getByName(name) orelse unreachable;
             if (!leko_asset.is_visible) {
@@ -436,7 +434,7 @@ pub const FaceMaterialTable = struct {
         }
     }
 
-    pub fn getForLekoValue(self: *FaceMaterialTable, value: LekoValue) ?FaceMaterial {
+    pub fn getForLekoValue(self: *LekoMaterialTable, value: LekoValue) ?FaceMaterial {
         const index = @intFromEnum(value);
         if (index >= self.list.items.len) {
             return null;

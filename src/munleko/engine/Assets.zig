@@ -15,6 +15,9 @@ const Assets = @This();
 
 const stb_image = @cImport(@cInclude("stb_image.h"));
 
+const leko = @import("leko.zig");
+const LekoTypeTable = leko.LekoTypeTable;
+
 allocator: Allocator,
 
 leko_table: LekoAssetTable = undefined,
@@ -22,13 +25,17 @@ leko_texture_table: LekoTextureAssetTable = undefined,
 
 leko_texture_size: usize = undefined,
 
+leko_type_table: LekoTypeTable,
+
 pub fn create(allocator: Allocator) !*Assets {
     const self = try allocator.create(Assets);
     self.* = .{
         .allocator = allocator,
+        .leko_type_table = undefined,
     };
     self.leko_table.init(allocator);
     self.leko_texture_table.init(allocator);
+    try self.leko_type_table.init(allocator);
     return self;
 }
 
@@ -37,6 +44,7 @@ pub fn destroy(self: *Assets) void {
     defer allocator.destroy(self);
     self.leko_table.deinit();
     self.leko_texture_table.deinit();
+    self.leko_type_table.deinit();
 }
 
 pub const ImageData = struct {
@@ -155,6 +163,8 @@ pub fn load(self: *Assets, lua: *Lua, data_root_path: []const u8) !void {
     defer texture_dir.close();
     error_count += try self.loadLekoTextures(texture_dir);
     std.log.info("loaded assets ({d} errors)", .{error_count});
+
+    try self.leko_type_table.addLekoTypesFromAssetTable(self.leko_table);
 }
 
 pub const LekoAsset = struct {

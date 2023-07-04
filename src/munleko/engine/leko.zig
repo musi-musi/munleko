@@ -224,7 +224,7 @@ pub const LekoTypeTable = struct {
     list: List(LekoType) = .{},
     name_map: std.StringHashMapUnmanaged(*LekoType) = .{},
 
-    fn init(self: *LekoTypeTable, allocator: Allocator) !void {
+    pub fn init(self: *LekoTypeTable, allocator: Allocator) !void {
         self.* = .{
             .allocator = allocator,
             .arena = Arena.init(allocator),
@@ -236,10 +236,21 @@ pub const LekoTypeTable = struct {
         });
     }
 
-    fn deinit(self: *LekoTypeTable) void {
+    pub fn deinit(self: *LekoTypeTable) void {
         self.arena.deinit();
         self.list.deinit(self.allocator);
         self.name_map.deinit(self.allocator);
+    }
+
+    pub fn dupe(self: *LekoTypeTable, allocator: Allocator, source: *LekoTypeTable) !void {
+        self.* = .{
+            .allocator = allocator,
+            .arena = Arena.init(allocator),
+        };
+        errdefer self.deinit();
+        for (source.list.items) |leko_type| {
+            try self.addLekoType(leko_type.name, leko_type.properties);
+        }
     }
 
     pub fn addLekoType(self: *LekoTypeTable, name: []const u8, properties: LekoType.Properties) !void {

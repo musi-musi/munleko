@@ -19,6 +19,8 @@ const leko_mesh = @import("leko_mesh.zig");
 const ChunkLekoMeshes = leko_mesh.ChunkLekoMeshes;
 const LekoMeshSystem = leko_mesh.LekoMeshSystem;
 
+const LekoMaterialTable = leko_mesh.LekoMaterialTable;
+
 const Session = Engine.Session;
 const World = Engine.World;
 const Chunk = World.Chunk;
@@ -38,14 +40,17 @@ chunk_models: ChunkModels = undefined,
 chunk_leko_meshes: ChunkLekoMeshes = undefined,
 dirty_event: ResetEvent = .{},
 
-pub fn create(allocator: Allocator, world: *World) !*WorldModel {
+pub fn create(allocator: Allocator, world: *World, material_table: *LekoMaterialTable) !*WorldModel {
     const self = try allocator.create(WorldModel);
+    errdefer allocator.destroy(self);
     self.* = WorldModel{
         .allocator = allocator,
         .world = world,
     };
     try self.chunk_models.init(self);
-    try self.chunk_leko_meshes.init(allocator);
+    errdefer self.chunk_models.deinit();
+    try self.chunk_leko_meshes.init(allocator, material_table);
+    errdefer self.chunk_leko_meshes.deinit();
     return self;
 }
 
