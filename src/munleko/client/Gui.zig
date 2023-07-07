@@ -1,5 +1,9 @@
 const std = @import("std");
 const zgui = @import("zgui");
+const nm = @import("nm");
+
+const Vec2 = nm.Vec2;
+const vec2 = nm.vec2;
 
 const Allocator = std.mem.Allocator;
 
@@ -116,5 +120,69 @@ pub fn showHud(self: *Gui) void {
         .p = .{ screen_size[0] / 2, screen_size[1] / 2 },
         .r = 4,
         .col = 0xffffffff,
+    });
+}
+
+pub const Radial = struct {
+    /// if null, show in center of screen
+    position: ?Vec2 = null,
+    radius_inner: f32,
+    radius_outer: f32,
+    radius_deadzone: f32,
+};
+
+pub const RadialWedge = struct {
+    radial_center: Vec2,
+    is_hovered: bool,
+    center: Vec2,
+};
+
+pub fn showRadial(self: *Gui, radial: Radial, wedges: []RadialWedge, mouse_position: Vec2) void {
+    const position = radial.position orelse vec2(zgui.io.getDisplaySize()).divScalar(2);
+    const delta_theta = std.math.pi * 2 / @as(f32, @floatFromInt(wedges.len));
+    const draw_list = zgui.getForegroundDrawList();
+    const relative_mouse_position = mouse_position.sub(position);
+    const in_deadzone = relative_mouse_position.mag() < radial.radius_deadzone;
+    var mouse_theta = std.math.atan2(f32, relative_mouse_position.v[1], relative_mouse_position.v[0]) + std.math.pi / 4.0;
+    const mouse_wedge_index_signed: i32 = @intFromFloat((@floor((mouse_theta / delta_theta) - 0.5)));
+    const mouse_wedge_index: usize = @intCast(@mod(mouse_wedge_index_signed, @as(i32, @intCast(wedges.len))));
+    const radius_center = (radial.radius_outer + radial.radius_inner) / 2;
+    draw_list.addCircle(.{
+        .p = position.v,
+        .r = radius_center,
+        .col = zgui.colorConvertFloat4ToU32(zgui.getStyle().getColor(.window_bg)),
+        .thickness = radial.radius_outer - radial.radius_inner,
+    });
+    for (wedges, 0..) |*wedge, w| {
+        wedge.radial_center = position;
+        const w_f32: f32 = @floatFromInt(w);
+        const theta_start = (w_f32 - 0.5) * delta_theta;
+        const theta_end = (w_f32 + 0.5) * delta_theta;
+        const theta = w_f32 * delta_theta;
+        wedge.is_hovered = (!in_deadzone) and w == mouse_wedge_index;
+        wedge.center = position.add(angleToVector(theta, radius_center));
+        if (wedge.is_hovered) {
+            const thickness = 8;
+            draw_list.pathArcTo(.{
+                .p = position.v,
+                .r = radial.radius_inner + (thickness / 2),
+                .amin = theta_start,
+                .amax = theta_end,
+            });
+            draw_list.pathStroke(.{
+                .col = zgui.colorConvertFloat4ToU32(.{ 1, 1, 1, 1 }),
+                .flags = zgui.DrawFlags.round_corners_all,
+                .thickness = thickness,
+            });
+        }
+    }
+
+    _ = self;
+}
+
+fn angleToVector(theta: f32, len: f32) Vec2 {
+    return vec2(.{
+        @sin(theta) * len,
+        -@cos(theta) * len,
     });
 }

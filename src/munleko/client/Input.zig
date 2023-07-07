@@ -18,6 +18,7 @@ const Input = @This();
 pub const InputState = enum {
     gameplay,
     menu,
+    radial,
 };
 
 client: *Client,
@@ -53,13 +54,7 @@ pub fn update(self: *Input) void {
         const mouse_position = vec2(w.*.mousePosition());
         defer self.previous_mouse_position = mouse_position;
         switch (self.state) {
-            .gameplay => {
-                if (w.buttonPressed(.z)) {
-                    p.settings.move_mode = util.cycleEnum(p.settings.move_mode);
-                }
-                if (w.buttonPressed(.f)) {
-                    p.leko_edit_mode = util.cycleEnum(p.leko_edit_mode);
-                }
+            .gameplay, .radial => {
                 var player_move = nm.Vec3.zero;
                 if (w.buttonHeld(.d)) player_move.v[0] += 1;
                 if (w.buttonHeld(.a)) player_move.v[0] -= 1;
@@ -71,20 +66,46 @@ pub fn update(self: *Input) void {
                 if (w.buttonHeld(.space)) {
                     p.input.trigger_jump = true;
                 }
+            },
+            else => {
+                p.input = .{};
+            },
+        }
+        switch (self.state) {
+            .gameplay => {
+                if (w.buttonPressed(.g)) {
+                    p.settings.move_mode = util.cycleEnum(p.settings.move_mode);
+                }
+                if (w.buttonPressed(.f)) {
+                    p.leko_edit_mode = util.cycleEnum(p.leko_edit_mode);
+                }
                 if (w.buttonPressed(.mouse_1)) {
                     p.input.trigger_primary = true;
                 }
                 const mouse_delta = mouse_position.sub(self.previous_mouse_position).mulScalar(0.1);
                 p.updateLookFromMouse(mouse_delta);
+                if (w.buttonHeld(.c)) {
+                    self.setState(.radial);
+                }
             },
-            .menu => {
-                p.input = .{};
+            .radial => {
+                var wedges: [8]Client.Gui.RadialWedge = undefined;
+                self.client.gui.showRadial(.{
+                    .radius_inner = 128,
+                    .radius_outer = 256,
+                    .radius_deadzone = 64,
+                }, &wedges, vec2(w.mousePosition()));
+                if (!w.buttonHeld(.c)) {
+                    self.setState(.gameplay);
+                }
             },
+            else => {},
         }
         if (w.buttonPressed(.grave)) {
             switch (self.state) {
                 .gameplay => self.setState(.menu),
                 .menu => self.setState(.gameplay),
+                else => {},
             }
         }
     }
@@ -99,6 +120,13 @@ pub fn setState(self: *Input, state: InputState) void {
         },
         .menu => {
             w.setMouseMode(.visible);
+            const center = nm.vec2u(w.size).cast(f32).divScalar(2);
+            w.setMousePosition(center.v);
+        },
+        .radial => {
+            w.setMouseMode(.visible);
+            const center = nm.vec2u(w.size).cast(f32).divScalar(2);
+            w.setMousePosition(center.v);
         },
     }
     self.state = state;
