@@ -59,6 +59,7 @@ pub const Window = struct {
     handle: Handle = null,
     events: Events,
     held_buttons: ButtonSet = .{},
+    position: [2]i32 = .{ 0, 0 },
     size: [2]u32 = .{ 1280, 720 },
     vsync: Vsync = .disabled,
     mouse_mode: MouseMode = .visible,
@@ -71,6 +72,7 @@ pub const Window = struct {
     pub const Events = util.Events(union(enum) {
         button_pressed: ButtonCode,
         button_released: ButtonCode,
+        position: [2]i32,
         framebuffer_size: [2]u32,
         character_input: u32,
         scroll: [2]f32,
@@ -100,6 +102,7 @@ pub const Window = struct {
             c.glfwSetWindowUserPointer(handle, self);
             _ = c.glfwSetKeyCallback(handle, keyCallback);
             _ = c.glfwSetMouseButtonCallback(handle, mouseButtonCallback);
+            _ = c.glfwSetWindowPosCallback(handle, positionCallback);
             _ = c.glfwSetFramebufferSizeCallback(self.handle, framebufferSizeCallback);
             _ = c.glfwSetCharCallback(self.handle, charCallback);
             _ = c.glfwSetScrollCallback(self.handle, scrollCallback);
@@ -108,6 +111,9 @@ pub const Window = struct {
         } else {
             return error.GlfwCreateWindowFailed;
         }
+
+        c.glfwGetWindowPos(self.handle, &self.position[0], &self.position[1]);
+
         self.setVsync(self.vsync);
         return self;
     }
@@ -166,17 +172,28 @@ pub const Window = struct {
                 );
             },
             .borderless => {
-                var x: c_int = 0;
-                var y: c_int = 0;
-                c.glfwGetWindowPos(self.handle, &x, &y);
-                self.windowed_position = .{
-                    @as(i32, @intCast(x)),
-                    @as(i32, @intCast(y)),
-                };
+                self.windowed_position = self.position;
                 self.windowed_size = self.size;
-                const monitor = c.glfwGetPrimaryMonitor();
-                const monitor_mode = c.glfwGetVideoMode(monitor).*;
-                c.glfwSetWindowMonitor(self.handle, monitor, 0, 0, monitor_mode.width, monitor_mode.height, monitor_mode.refreshRate);
+                const center: [2]i32 = .{
+                    self.position[0] + @as(i32, @intCast(self.size[0] >> 1)),
+                    self.position[1] + @as(i32, @intCast(self.size[1] >> 1)),
+                };
+                const monitor: Monitor = for (Monitor.getAll()) |m| {
+                    // find the monitor that contains the center of the window
+                    const m_min = m.getPosition();
+                    const m_mode = m.getVideoMode();
+                    const m_max: [2]i32 = .{
+                        m_min[0] + m_mode.width,
+                        m_min[1] + m_mode.height,
+                    };
+                    if (center[0] < m_min[0]) continue;
+                    if (center[1] < m_min[1]) continue;
+                    if (center[0] > m_max[0]) continue;
+                    if (center[1] > m_max[1]) continue;
+                    break m;
+                } else Monitor.getPrimary(); // fall back to the primary if the center of the window is off screen
+                const monitor_mode = monitor.getVideoMode();
+                c.glfwSetWindowMonitor(self.handle, monitor.handle, 0, 0, monitor_mode.width, monitor_mode.height, monitor_mode.refreshRate);
             },
         }
     }
@@ -221,6 +238,17 @@ pub const Window = struct {
         const self = fromUserPtr(handle);
         const code = @as(ButtonCode, @enumFromInt(button + c.GLFW_KEY_LAST + 1));
         self.buttonCallback(code, action) catch |err| {
+            @panic(@errorName(err));
+        };
+    }
+
+    fn positionCallback(handle: Handle, x: c_int, y: c_int) callconv(.C) void {
+        const self = fromUserPtr(handle);
+        self.position = .{
+            @intCast(x),
+            @intCast(y),
+        };
+        self.events.post(.position, self.position) catch |err| {
             @panic(@errorName(err));
         };
     }
@@ -479,6 +507,8 @@ pub const MouseMode = enum(c_int) {
     disabled = c.GLFW_CURSOR_DISABLED,
 };
 
+pub const VideoMode = *const c.struct_GLFWvidmode;
+
 pub const Monitor = extern struct {
     handle: Handle,
 
@@ -493,5 +523,19 @@ pub const Monitor = extern struct {
         var count: c_int = 0;
         const ptr = c.glfwGetMonitors(&count);
         return @as([*]Monitor, @ptrCast(ptr))[0..@as(usize, @intCast(count))];
+    }
+
+    pub fn getVideoMode(self: Monitor) VideoMode {
+        return c.glfwGetVideoMode(self.handle);
+    }
+
+    pub fn getPosition(self: Monitor) [2]i32 {
+        var x: c_int = undefined;
+        var y: c_int = undefined;
+        c.glfwGetMonitorPos(self.handle, &x, &y);
+        return .{
+            @intCast(x),
+            @intCast(y),
+        };
     }
 };

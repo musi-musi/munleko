@@ -3,8 +3,9 @@ local leko = {}
 leko.stone = {}
 leko.grass = {}
 leko.dirt = {}
-leko.brick = {}
 leko.sand = {}
+leko.brick = {}
+leko.planks = {}
 
 return {
     leko_texture_size = 256,
