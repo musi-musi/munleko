@@ -18,6 +18,7 @@ const LekoMaterialTable = leko_mesh.LekoMaterialTable;
 allocator: Allocator,
 leko_texture_atlas: LekoTextureAtlas,
 leko_material_table: LekoMaterialTable,
+leko_uv_scale: f32 = 1,
 
 pub fn create(allocator: Allocator) !*Resources {
     const self = try allocator.create(Resources);
@@ -51,6 +52,7 @@ pub fn applyAssets(self: *Resources, assets: *Engine.Assets) !void {
         self.leko_texture_atlas.upload(texture_size, texture_size, texture.index, texture.pixels);
     }
     try self.leko_material_table.addMaterialsFromLekoAssets(assets);
+    self.leko_uv_scale = @as(f32, @floatFromInt(assets.leko_pixels_per_unit)) / @as(f32, @floatFromInt(assets.leko_texture_size));
 }
 
 pub const LekoTextureAtlas = gl.TextureRgba8(.array_2d);

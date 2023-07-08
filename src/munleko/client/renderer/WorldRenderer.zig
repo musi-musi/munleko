@@ -71,7 +71,7 @@ pub fn create(allocator: Allocator, scene: *Scene, resources: *Resources, world:
     errdefer world_model.destroy();
     const world_model_manager = try WorldModel.Manager.create(allocator, world_model);
     errdefer world_model_manager.destroy();
-    const leko_mesh_renderer = try LekoMeshRenderer.create(allocator, scene, world_model, resources.leko_texture_atlas);
+    const leko_mesh_renderer = try LekoMeshRenderer.create(allocator, scene, world_model, resources);
     errdefer leko_mesh_renderer.destroy();
 
     self.* = WorldRenderer{

@@ -58,7 +58,7 @@ leko_face_index_buffer: LekoMesh.IndexBuffer,
 leko_face_shader: LekoFaceShader,
 leko_texture_atlas: LekoTextureAtlas,
 
-pub fn create(allocator: Allocator, scene: *Scene, world_model: *WorldModel, leko_texture_atlas: LekoTextureAtlas) !*LekoMeshRenderer {
+pub fn create(allocator: Allocator, scene: *Scene, world_model: *WorldModel, resources: *Resources) !*LekoMeshRenderer {
     const self = try allocator.create(LekoMeshRenderer);
     self.* = .{
         .allocator = allocator,
@@ -67,11 +67,11 @@ pub fn create(allocator: Allocator, scene: *Scene, world_model: *WorldModel, lek
         .leko_mesh = LekoMesh.create(),
         .leko_face_index_buffer = LekoMesh.IndexBuffer.create(),
         .leko_face_shader = try LekoFaceShader.create(.{}, @embedFile("leko_face.glsl")),
-        .leko_texture_atlas = leko_texture_atlas,
+        .leko_texture_atlas = undefined,
     };
     self.leko_face_index_buffer.data(&.{ 0, 1, 3, 2 }, .static_draw);
     self.leko_mesh.setIndexBuffer(self.leko_face_index_buffer);
-    self.leko_face_shader.setSampler(.texture_atlas, 3);
+    self.updateResources(resources);
     return self;
 }
 
@@ -81,6 +81,12 @@ pub fn destroy(self: *LekoMeshRenderer) void {
     self.leko_mesh.destroy();
     self.leko_face_index_buffer.destroy();
     self.leko_face_shader.destroy();
+}
+
+pub fn updateResources(self: *LekoMeshRenderer, resources: *Resources) void {
+    self.leko_texture_atlas = resources.leko_texture_atlas;
+    self.leko_face_shader.setSampler(.texture_atlas, 3);
+    self.leko_face_shader.setUniform(.uv_scale, resources.leko_uv_scale);
 }
 
 pub fn updateAndDrawLekoMeshes(self: *LekoMeshRenderer, draw_chunks: []const WorldRenderer.DrawChunk) void {
@@ -128,6 +134,7 @@ pub const LekoFaceShader = ls.Shader(.{
         ls.defUniform("fog_start", .float),
         ls.defUniform("fog_end", .float),
         ls.defUniform("fog_power", .float),
+        ls.defUniform("uv_scale", .float),
     },
     .samplers = &.{
         ls.defSampler("texture_atlas", .sampler_2d_array),

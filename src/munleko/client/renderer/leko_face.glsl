@@ -33,7 +33,7 @@ void main() {
 
     uv_texture.x = dot(world_position.xyz, cube_umat_texture[n]);
     uv_texture.y = dot(world_position.xyz, cube_vmat_texture[n]);
-    uv_texture *= 8.0/256.0;
+    uv_texture *= u_uv_scale;
 
     face_ao[0] = (3 - float(ao >> 0u & 0x3u)) / 3.0;
     face_ao[1] = (3 - float(ao >> 2u & 0x3u)) / 3.0;

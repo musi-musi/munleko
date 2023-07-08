@@ -24,6 +24,7 @@ leko_table: LekoAssetTable = undefined,
 leko_texture_table: LekoTextureAssetTable = undefined,
 
 leko_texture_size: usize = undefined,
+leko_pixels_per_unit: usize = undefined,
 
 leko_type_table: LekoTypeTable,
 
@@ -156,7 +157,17 @@ pub fn load(self: *Assets, lua: *Lua, data_root_path: []const u8) !void {
     if (lua.toInteger(-1)) |texture_size| {
         self.leko_texture_size = @as(usize, @intCast(texture_size));
     } else |_| {
-        std.log.err("assets table field 'leko_texture_size' is not an be integer number", .{});
+        std.log.err("assets table field 'leko_texture_size' is not an integer number", .{});
+    }
+    lua.pop(1);
+    if (lua.getField(-1, "leko_pixels_per_unit") == .nil) {
+        std.log.err("assets table missing field 'leko_pixels_per_unit'", .{});
+        return error.MissingLekoTextureSize;
+    }
+    if (lua.toInteger(-1)) |texture_size| {
+        self.leko_pixels_per_unit = @as(usize, @intCast(texture_size));
+    } else |_| {
+        std.log.err("assets table field 'leko_pixels_per_unit' is not an integer number", .{});
     }
     lua.pop(1);
     var texture_dir = try data_dir.openDir("textures", .{});
