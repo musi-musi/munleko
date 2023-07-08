@@ -45,6 +45,10 @@ observer: Observer,
 input: Input = .{},
 settings: Settings = .{},
 
+leko_equip_radial: [leko_equip_radial_len]?LekoType = [1]?LekoType{null} ** leko_equip_radial_len,
+
+pub const leko_equip_radial_len = 8;
+
 pub const Input = struct {
     move: Vec3 = Vec3.zero,
     trigger_jump: bool = false,

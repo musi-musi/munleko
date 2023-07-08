@@ -163,6 +163,13 @@ pub fn run(self: *Client) !void {
 
     session.player.leko_equip = self.engine.assets.leko_type_table.getForName("brick");
 
+    session.player.leko_equip_radial[0] = self.engine.assets.leko_type_table.getForName("stone");
+    session.player.leko_equip_radial[1] = self.engine.assets.leko_type_table.getForName("dirt");
+    session.player.leko_equip_radial[2] = self.engine.assets.leko_type_table.getForName("grass");
+    session.player.leko_equip_radial[3] = self.engine.assets.leko_type_table.getForName("sand");
+    session.player.leko_equip_radial[4] = self.engine.assets.leko_type_table.getForName("brick");
+    session.player.leko_equip_radial[5] = self.engine.assets.leko_type_table.getForName("planks");
+
     var fps_counter = try util.FpsCounter.start(0.25);
     var frame_time = try util.FrameTime.start();
 

@@ -13,6 +13,9 @@ const Window = @import("window").Window;
 
 const Gui = @This();
 
+const Client = @import("../Client.zig");
+const Engine = @import("../Engine.zig");
+
 extern fn imgui_backend_init(win: Window.Handle) void;
 extern fn imgui_backend_deinit() void;
 extern fn imgui_backend_newframe() void;
@@ -143,8 +146,8 @@ pub fn showRadial(self: *Gui, radial: Radial, wedges: []RadialWedge, mouse_posit
     const draw_list = zgui.getForegroundDrawList();
     const relative_mouse_position = mouse_position.sub(position);
     const in_deadzone = relative_mouse_position.mag() < radial.radius_deadzone;
-    var mouse_theta = std.math.atan2(f32, relative_mouse_position.v[1], relative_mouse_position.v[0]) + std.math.pi / 4.0;
-    const mouse_wedge_index_signed: i32 = @intFromFloat((@floor((mouse_theta / delta_theta) - 0.5)));
+    var mouse_theta = std.math.atan2(f32, relative_mouse_position.v[1], relative_mouse_position.v[0]);
+    const mouse_wedge_index_signed: i32 = @intFromFloat((@floor((mouse_theta / delta_theta) + 0.5)));
     const mouse_wedge_index: usize = @intCast(@mod(mouse_wedge_index_signed, @as(i32, @intCast(wedges.len))));
     const radius_center = (radial.radius_outer + radial.radius_inner) / 2;
     draw_list.addCircle(.{
@@ -165,7 +168,7 @@ pub fn showRadial(self: *Gui, radial: Radial, wedges: []RadialWedge, mouse_posit
             const thickness = 8;
             draw_list.pathArcTo(.{
                 .p = position.v,
-                .r = radial.radius_inner + (thickness / 2),
+                .r = radial.radius_inner + thickness,
                 .amin = theta_start,
                 .amax = theta_end,
             });
@@ -182,7 +185,35 @@ pub fn showRadial(self: *Gui, radial: Radial, wedges: []RadialWedge, mouse_posit
 
 fn angleToVector(theta: f32, len: f32) Vec2 {
     return vec2(.{
+        @cos(theta) * len,
         @sin(theta) * len,
-        -@cos(theta) * len,
     });
+}
+
+const LekoType = Engine.leko.LekoType;
+const LekoValue = Engine.leko.LekoValue;
+
+pub fn showEquipSelectRadial(self: *Gui, mouse_position: Vec2, comptime count: usize, values: *const [count]?LekoType) ?LekoType {
+    var wedges: [count]RadialWedge = undefined;
+    self.showRadial(.{
+        .radius_inner = 128,
+        .radius_outer = 256,
+        .radius_deadzone = 64,
+    }, &wedges, mouse_position);
+    var selection: ?LekoType = null;
+    const draw_list = zgui.getForegroundDrawList();
+    const font = self.fonts.normal;
+    zgui.pushFont(font);
+    defer zgui.popFont();
+    for (wedges, 0..) |wedge, w| {
+        if (wedge.is_hovered) {
+            selection = values.*[w];
+        }
+        if (values.*[w]) |leko_type| {
+            const text = leko_type.name;
+            const size = vec2(zgui.calcTextSize(text, .{}));
+            draw_list.addTextUnformatted(wedge.center.sub(size.divScalar(2)).v, 0xffffffff, text);
+        }
+    }
+    return selection;
 }

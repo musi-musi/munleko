@@ -51,7 +51,7 @@ pub fn update(self: *Input) void {
     if (self.client.session_state) |session_state| {
         const session = session_state.session;
         const p = &session.player;
-        const mouse_position = vec2(w.*.mousePosition());
+        const mouse_position = vec2(w.mousePosition());
         defer self.previous_mouse_position = mouse_position;
         switch (self.state) {
             .gameplay, .radial => {
@@ -76,7 +76,7 @@ pub fn update(self: *Input) void {
                 if (w.buttonPressed(.g)) {
                     p.settings.move_mode = util.cycleEnum(p.settings.move_mode);
                 }
-                if (w.buttonPressed(.f)) {
+                if (w.buttonPressed(.x)) {
                     p.leko_edit_mode = util.cycleEnum(p.leko_edit_mode);
                 }
                 if (w.buttonPressed(.mouse_1)) {
@@ -89,13 +89,12 @@ pub fn update(self: *Input) void {
                 }
             },
             .radial => {
-                var wedges: [8]Client.Gui.RadialWedge = undefined;
-                self.client.gui.showRadial(.{
-                    .radius_inner = 128,
-                    .radius_outer = 256,
-                    .radius_deadzone = 64,
-                }, &wedges, vec2(w.mousePosition()));
+                const selection = self.client.gui.showEquipSelectRadial(mouse_position, Engine.Player.leko_equip_radial_len, &p.leko_equip_radial);
                 if (!w.buttonHeld(.c)) {
+                    if (selection != null) {
+                        p.leko_equip = selection;
+                        p.leko_edit_mode = .place;
+                    }
                     self.setState(.gameplay);
                 }
             },
