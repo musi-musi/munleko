@@ -82,6 +82,7 @@ pub fn update(self: *Input) void {
                 if (w.buttonPressed(.mouse_1)) {
                     p.input.trigger_primary = true;
                 }
+                p.input.primary = w.buttonHeld(.mouse_1);
                 const mouse_delta = mouse_position.sub(self.previous_mouse_position).mulScalar(0.1);
                 p.updateLookFromMouse(mouse_delta);
                 if (w.buttonHeld(.c)) {

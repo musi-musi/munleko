@@ -39,6 +39,7 @@ leko_cursor: ?Vec3i = null,
 /// the leko type to place when placing
 leko_equip: ?LekoType = null,
 leko_edit_mode: LekoEditMode = .remove,
+leko_edit_cooldown: i32 = 0,
 
 look_angles: Vec2 = Vec2.zero,
 observer: Observer,
@@ -53,6 +54,7 @@ pub const Input = struct {
     move: Vec3 = Vec3.zero,
     trigger_jump: bool = false,
     trigger_primary: bool = false,
+    primary: bool = false,
 };
 
 pub const Settings = struct {
@@ -61,6 +63,7 @@ pub const Settings = struct {
     noclip_move_speed: f32 = 32,
     move_mode: MoveMode = .normal,
     interact_range: f32 = 10,
+    edit_cooldown_duration: f32 = 0.2,
 };
 
 pub const MoveMode = enum {
@@ -99,7 +102,8 @@ pub fn tick(self: *Player, session: *Session) !void {
     self.world.observers.setPosition(self.observer, self.position.cast(i32));
     self.updateLekoCursor(session.world);
     if (self.leko_cursor) |cursor| {
-        if (self.input.trigger_primary) {
+        if (self.input.primary and self.leko_edit_cooldown <= 0) {
+            self.leko_edit_cooldown = self.editCooldownTicksFromDuration(session);
             switch (self.leko_edit_mode) {
                 .remove => _ = try session.world.leko_data.editLekoAtPosition(cursor, .empty),
                 .place => _ = {
@@ -110,6 +114,15 @@ pub fn tick(self: *Player, session: *Session) !void {
             }
         }
     }
+    if (self.leko_edit_cooldown > 0) {
+        self.leko_edit_cooldown -= 1;
+    }
+}
+
+fn editCooldownTicksFromDuration(self: Player, session: *Session) i32 {
+    const tick_duration = 1 / session.tick_timer.rate;
+    const tick_count: i32 = @intFromFloat(@round(self.settings.edit_cooldown_duration / tick_duration));
+    return @max(1, tick_count);
 }
 
 fn moveNoclip(self: *Player, session: *Session) void {
