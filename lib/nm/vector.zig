@@ -230,6 +230,14 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             return true;
         }
 
+        pub fn abs(self: Self) Self {
+            var res: Self = undefined;
+            inline for (indices) |i| {
+                res.v[i] = nm.abs(self.v[i]);
+            }
+            return res;
+        }
+
         /// unary negation
         pub fn neg(self: Self) Self {
             var res: Self = undefined;

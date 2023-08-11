@@ -79,6 +79,9 @@ pub fn update(self: *Input) void {
                 if (w.buttonPressed(.x)) {
                     p.leko_edit_mode = util.cycleEnum(p.leko_edit_mode);
                 }
+                if (p.leko_edit_mode == .place and w.buttonPressed(.mouse_2)) {
+                    p.leko_place_mode = util.cycleEnum(p.leko_place_mode);
+                }
                 if (w.buttonPressed(.mouse_1)) {
                     p.input.trigger_primary = true;
                 }

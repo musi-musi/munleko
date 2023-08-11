@@ -19,6 +19,9 @@ const vec3i = nm.vec3i;
 
 const Bounds3 = nm.Bounds3;
 
+const Cardinal3 = nm.Cardinal3;
+const Axis3 = nm.Axis3;
+
 const Player = @This();
 
 world: *World,
@@ -39,6 +42,8 @@ leko_cursor: ?Vec3i = null,
 /// the leko type to place when placing
 leko_equip: ?LekoType = null,
 leko_edit_mode: LekoEditMode = .remove,
+leko_place_mode: LekoPlaceMode = .normal,
+
 leko_edit_cooldown: i32 = 0,
 
 look_angles: Vec2 = Vec2.zero,
@@ -74,6 +79,11 @@ pub const MoveMode = enum {
 pub const LekoEditMode = enum {
     remove,
     place,
+};
+
+pub const LekoPlaceMode = enum {
+    normal,
+    wall,
 };
 
 pub fn init(world: *World, position: Vec3) !Player {
@@ -174,22 +184,62 @@ fn updateLekoCursor(self: *Player, world: *World) void {
                     .remove => {
                         self.leko_cursor = raycast.cell;
                     },
-                    .place => {
-                        if (raycast.move) |move| {
-                            const offset = switch (move) {
-                                inline else => |m| Vec3i.unitSigned(m),
-                            };
-                            self.leko_cursor = raycast.cell.sub(offset);
-                        }
-                        break;
+                    .place => switch (self.leko_place_mode) {
+                        .normal => {
+                            if (raycast.move) |move| {
+                                const offset = switch (move) {
+                                    inline else => |m| Vec3i.unitSigned(m),
+                                };
+                                self.leko_cursor = raycast.cell.sub(offset);
+                            }
+                            break;
+                        },
+                        .wall => {
+                            break;
+                        },
                     },
                 }
                 break;
+            } else {
+                switch (self.leko_edit_mode) {
+                    .place => switch (self.leko_place_mode) {
+                        .wall => {
+                            // if (checkNeighborsWallPlaceMode(world, forward.abs().maxComponent().axis, raycast.cell)) {
+                            if (checkNeighborsWallPlaceMode(world, (raycast.move orelse break).axis(), raycast.cell)) {
+                                self.leko_cursor = raycast.cell;
+                                break;
+                            }
+                        },
+                        else => {},
+                    },
+                    else => {},
+                }
             }
         } else {
             break;
         }
     }
+}
+
+fn checkNeighborsWallPlaceMode(world: *World, axis: Axis3, cell: Vec3i) bool {
+    switch (axis) {
+        inline else => |a| {
+            const check_list: [4]Cardinal3 = comptime switch (a) {
+                .x => [4]Cardinal3{ .y_neg, .y_pos, .z_neg, .z_pos },
+                .y => [4]Cardinal3{ .x_neg, .x_pos, .z_neg, .z_pos },
+                .z => [4]Cardinal3{ .x_neg, .x_pos, .y_neg, .y_pos },
+            };
+            inline for (check_list) |dir| {
+                const neighbor_cell = cell.add(Vec3i.unitSigned(dir));
+                if (world.leko_data.lekoValueAtPosition(neighbor_cell)) |neighbor_value| {
+                    if (neighbor_value != .empty) {
+                        return true;
+                    }
+                }
+            }
+        },
+    }
+    return false;
 }
 
 fn moveXZ(self: *Player, world: *World, move: Vec2) void {

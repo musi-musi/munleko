@@ -105,6 +105,14 @@ pub fn draw(self: *SessionRenderer) void {
     self.world_renderer.draw();
 
     if (player.leko_cursor) |leko_cursor| {
+        const selection_box_color: [3]f32 = switch (player.leko_edit_mode) {
+            .place => switch (player.leko_place_mode) {
+                .normal => [3]f32{ 1, 1, 1 },
+                .wall => [3]f32{ 0.8, 0.8, 1 },
+            },
+            .remove => [3]f32{ 1, 1, 1 },
+        };
+        self.selection_box.setColor(selection_box_color);
         self.selection_box.setCamera(self.scene.camera);
         self.selection_box.draw(leko_cursor.cast(f32).v, .{ 1, 1, 1 });
     }
