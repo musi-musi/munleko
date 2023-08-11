@@ -42,7 +42,8 @@ pub fn destroy(self: *Renderer) void {
 }
 
 pub fn createSessionRenderer(self: *Renderer, session: *Session) !*SessionRenderer {
-    const session_renderer = try SessionRenderer.create(self.allocator, self.resources, session);
+    const session_renderer = try SessionRenderer.create(self.allocator, session);
+    try session_renderer.applyResources(self.resources);
     return session_renderer;
 }
 

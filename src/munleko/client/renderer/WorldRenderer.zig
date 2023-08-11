@@ -64,14 +64,14 @@ leko_mesh_renderer: *LekoMeshRenderer,
 
 const ChunkMap = std.HashMapUnmanaged(Chunk, World.ChunkLoadState, Chunk.HashContext, std.hash_map.default_max_load_percentage);
 
-pub fn create(allocator: Allocator, scene: *Scene, resources: *Resources, world: *World) !*WorldRenderer {
+pub fn create(allocator: Allocator, scene: *Scene, world: *World) !*WorldRenderer {
     const self = try allocator.create(WorldRenderer);
     errdefer allocator.destroy(self);
-    const world_model = try WorldModel.create(allocator, world, &resources.leko_material_table);
+    const world_model = try WorldModel.create(allocator, world);
     errdefer world_model.destroy();
     const world_model_manager = try WorldModel.Manager.create(allocator, world_model);
     errdefer world_model_manager.destroy();
-    const leko_mesh_renderer = try LekoMeshRenderer.create(allocator, scene, world_model, resources);
+    const leko_mesh_renderer = try LekoMeshRenderer.create(allocator, scene, world_model);
     errdefer leko_mesh_renderer.destroy();
 
     self.* = WorldRenderer{
@@ -99,8 +99,9 @@ pub fn destroy(self: *WorldRenderer) void {
     self.chunk_map.deinit(allocator);
 }
 
-pub fn applyAssets(self: *WorldRenderer, assets: *const Assets) !void {
-    try self.world_model.applyAssets(assets);
+pub fn applyResources(self: *WorldRenderer, resources: *Resources) !void {
+    try self.world_model.applyResources(resources);
+    try self.leko_mesh_renderer.applyResources(resources);
 }
 
 pub fn start(self: *WorldRenderer, observer: Observer) !void {

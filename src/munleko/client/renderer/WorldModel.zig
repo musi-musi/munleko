@@ -15,6 +15,8 @@ const Engine = @import("../../Engine.zig");
 
 const Assets = Engine.Assets;
 
+const Resources = @import("Resources.zig");
+
 const leko_mesh = @import("leko_mesh.zig");
 const ChunkLekoMeshes = leko_mesh.ChunkLekoMeshes;
 const LekoMeshSystem = leko_mesh.LekoMeshSystem;
@@ -40,7 +42,7 @@ chunk_models: ChunkModels = undefined,
 chunk_leko_meshes: ChunkLekoMeshes = undefined,
 dirty_event: ResetEvent = .{},
 
-pub fn create(allocator: Allocator, world: *World, material_table: *LekoMaterialTable) !*WorldModel {
+pub fn create(allocator: Allocator, world: *World) !*WorldModel {
     const self = try allocator.create(WorldModel);
     errdefer allocator.destroy(self);
     self.* = WorldModel{
@@ -49,7 +51,7 @@ pub fn create(allocator: Allocator, world: *World, material_table: *LekoMaterial
     };
     try self.chunk_models.init(self);
     errdefer self.chunk_models.deinit();
-    try self.chunk_leko_meshes.init(allocator, material_table);
+    try self.chunk_leko_meshes.init(allocator);
     errdefer self.chunk_leko_meshes.deinit();
     return self;
 }
@@ -61,10 +63,9 @@ pub fn destroy(self: *WorldModel) void {
     self.chunk_leko_meshes.deinit();
 }
 
-pub fn applyAssets(self: *WorldModel, assets: *const Assets) !void {
-    try self.chunk_leko_meshes.face_material_table.addMaterialsFromLekoAssets(assets, self.world.leko_data.leko_types);
+pub fn applyResources(self: *WorldModel, resources: *Resources) !void {
+    try self.chunk_leko_meshes.applyResources(resources);
 }
-
 fn createAndAddChunkModel(self: *WorldModel, chunk: Chunk) !ChunkModel {
     const chunk_model = try self.chunk_models.createAndAddChunkModel(chunk);
     try self.chunk_leko_meshes.matchDataCapacity(self);

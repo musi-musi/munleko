@@ -34,7 +34,7 @@ world_renderer: *WorldRenderer,
 previous_player_eye_position: Vec3 = Vec3.zero,
 selection_box: SelectionBox,
 
-pub fn create(allocator: Allocator, resources: *Resources, session: *Session) !*SessionRenderer {
+pub fn create(allocator: Allocator, session: *Session) !*SessionRenderer {
     const self = try allocator.create(SessionRenderer);
     errdefer allocator.destroy(self);
     const scene = try Scene.init();
@@ -49,7 +49,7 @@ pub fn create(allocator: Allocator, resources: *Resources, session: *Session) !*
         .world_renderer = undefined,
         .selection_box = selection_box,
     };
-    const world_renderer = try WorldRenderer.create(allocator, &self.scene, resources, session.world);
+    const world_renderer = try WorldRenderer.create(allocator, &self.scene, session.world);
     errdefer world_renderer.destroy();
     self.world_renderer = world_renderer;
     return self;
@@ -62,6 +62,10 @@ pub fn destroy(self: *SessionRenderer) void {
     self.world_renderer.destroy();
     self.scene.deinit();
     self.selection_box.deinit();
+}
+
+pub fn applyResources(self: *SessionRenderer, resources: *Resources) !void {
+    try self.world_renderer.applyResources(resources);
 }
 
 pub fn start(self: *SessionRenderer, observer: Observer) !void {

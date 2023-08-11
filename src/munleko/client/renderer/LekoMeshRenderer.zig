@@ -29,6 +29,8 @@ const ChunkModel = WorldModel.ChunkModel;
 const Resources = @import("Resources.zig");
 const LekoTextureAtlas = Resources.LekoTextureAtlas;
 
+const LekoMaterialResources = Resources.LekoMaterialResources;
+
 const leko_mesh = @import("leko_mesh.zig");
 const LekoFace = leko_mesh.LekoFace;
 
@@ -56,9 +58,9 @@ world_model: *WorldModel,
 leko_mesh: LekoMesh,
 leko_face_index_buffer: LekoMesh.IndexBuffer,
 leko_face_shader: LekoFaceShader,
-leko_texture_atlas: LekoTextureAtlas,
+leko_texture_atlas: LekoTextureAtlas = undefined,
 
-pub fn create(allocator: Allocator, scene: *Scene, world_model: *WorldModel, resources: *Resources) !*LekoMeshRenderer {
+pub fn create(allocator: Allocator, scene: *Scene, world_model: *WorldModel) !*LekoMeshRenderer {
     const self = try allocator.create(LekoMeshRenderer);
     self.* = .{
         .allocator = allocator,
@@ -67,11 +69,9 @@ pub fn create(allocator: Allocator, scene: *Scene, world_model: *WorldModel, res
         .leko_mesh = LekoMesh.create(),
         .leko_face_index_buffer = LekoMesh.IndexBuffer.create(),
         .leko_face_shader = try LekoFaceShader.create(.{}, @embedFile("leko_face.glsl")),
-        .leko_texture_atlas = undefined,
     };
     self.leko_face_index_buffer.data(&.{ 0, 1, 3, 2 }, .static_draw);
     self.leko_mesh.setIndexBuffer(self.leko_face_index_buffer);
-    self.updateResources(resources);
     return self;
 }
 
@@ -83,10 +83,10 @@ pub fn destroy(self: *LekoMeshRenderer) void {
     self.leko_face_shader.destroy();
 }
 
-pub fn updateResources(self: *LekoMeshRenderer, resources: *Resources) void {
-    self.leko_texture_atlas = resources.leko_texture_atlas;
+pub fn applyResources(self: *LekoMeshRenderer, resources: *Resources) !void {
+    self.leko_texture_atlas = resources.leko_material.texture_atlas;
     self.leko_face_shader.setSampler(.texture_atlas, 3);
-    self.leko_face_shader.setUniform(.uv_scale, resources.leko_uv_scale);
+    self.leko_face_shader.setUniform(.uv_scale, resources.leko_material.uv_scale);
 }
 
 pub fn updateAndDrawLekoMeshes(self: *LekoMeshRenderer, draw_chunks: []const WorldRenderer.DrawChunk) void {
@@ -140,11 +140,11 @@ pub const LekoFaceShader = ls.Shader(.{
         ls.defSampler("texture_atlas", .sampler_2d_array),
     },
     .source_modules = &.{
-        leko_face_shader_defs,
+        leko_face_shader_constants_glsl,
     },
 });
 
-const leko_face_shader_defs: []const u8 = blk: {
+pub const leko_face_shader_constants_glsl: []const u8 = blk: {
     const Formatter = struct {
         pub fn format(self: @This(), comptime _: []const u8, _: std.fmt.FormatOptions, w: anytype) !void {
             _ = self;

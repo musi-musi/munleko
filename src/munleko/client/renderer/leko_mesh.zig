@@ -23,6 +23,8 @@ const Observer = World.Observer;
 
 const chunk_width = World.chunk_width;
 
+const Resources = @import("Resources.zig");
+
 const Scene = @import("Scene.zig");
 const WorldModel = @import("WorldModel.zig");
 const WorldRenderer = @import("WorldRenderer.zig");
@@ -57,7 +59,7 @@ const Axis3 = nm.Axis3;
 ///  - xyz  position of leko
 ///  - n    0-5 face index; Cardinal3 (face normal)
 ///  - a    ao strength per vertex, packed 0b33221100
-pub const LekoFace = struct {
+pub const LekoFace = extern struct {
     base: u32,
     color: [3]f32,
     texture_index: u32,
@@ -133,14 +135,13 @@ pub const ChunkLekoMeshes = struct {
     mesh_data: LekoMeshDataStore,
     face_buffers: LekoFaceBufferStore,
 
-    material_table: *LekoMaterialTable,
+    material_table: ?*const LekoMaterialTable = null,
 
-    pub fn init(self: *ChunkLekoMeshes, allocator: Allocator, material_table: *LekoMaterialTable) !void {
+    pub fn init(self: *ChunkLekoMeshes, allocator: Allocator) !void {
         self.* = .{
             .allocator = allocator,
             .mesh_data = LekoMeshDataStore.initWithContext(allocator, .{ .allocator = allocator }),
             .face_buffers = LekoFaceBufferStore.init(allocator),
-            .material_table = material_table,
         };
     }
 
@@ -152,6 +153,10 @@ pub const ChunkLekoMeshes = struct {
     pub fn matchDataCapacity(self: *ChunkLekoMeshes, world_model: *const WorldModel) !void {
         try self.mesh_data.matchCapacity(world_model.chunk_models.pool);
         try self.face_buffers.matchCapacity(world_model.chunk_models.pool);
+    }
+
+    pub fn applyResources(self: *ChunkLekoMeshes, resources: *Resources) !void {
+        self.material_table = &resources.leko_material.material_table;
     }
 
     pub fn getUpdatedFaceBuffer(self: *ChunkLekoMeshes, chunk_model: ChunkModel, was_updated: *bool) LekoFaceBuffer {
@@ -307,7 +312,8 @@ pub const LekoMeshSystem = struct {
 
     fn getMaterial(self: LekoMeshSystem, reference: Reference) ?FaceMaterial {
         const leko_value = self.world_model.world.leko_data.lekoValueAt(reference);
-        return self.world_model.chunk_leko_meshes.material_table.getForLekoValue(leko_value);
+        const material_table = self.world_model.chunk_leko_meshes.material_table orelse return null;
+        return material_table.getForLekoValue(leko_value);
     }
 
     fn computeAO(self: LekoMeshSystem, world: *World, comptime traverse_edges: bool, reference: Reference, comptime normal: Cardinal3) u8 {
@@ -434,7 +440,7 @@ pub const LekoMaterialTable = struct {
         }
     }
 
-    pub fn getForLekoValue(self: *LekoMaterialTable, value: LekoValue) ?FaceMaterial {
+    pub fn getForLekoValue(self: LekoMaterialTable, value: LekoValue) ?FaceMaterial {
         const index = @intFromEnum(value);
         if (index >= self.list.items.len) {
             return null;
