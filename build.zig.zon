@@ -1,0 +1,10 @@
+.{
+    .name = "munleko",
+    .version = "0.0.1",
+    .dependencies = .{
+        .ziglua = .{
+            .url = "https://github.com/natecraddock/ziglua/archive/b3f0d75.tar.gz",
+            .hash = "1220d14df5c57d4c3fafe26191fcc3b32c23ffd319e7f5d839d2ace030372f1f85b4",
+        },
+    },
+}

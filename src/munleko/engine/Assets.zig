@@ -187,7 +187,7 @@ pub const LekoAsset = struct {
 
 pub const LekoAssetTable = AssetTable(LekoAsset);
 
-fn loadLekoLuaAsset(l: *Lua, name: []const u8) !?LekoAsset {
+fn loadLekoLuaAsset(l: *Lua, name: []const u8) ziglua.Error!?LekoAsset {
     if (std.mem.eql(u8, name, "empty")) {
         std.log.err("leko asset '{s}' uses reserved name", .{name});
         return null;

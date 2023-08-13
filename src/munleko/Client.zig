@@ -221,7 +221,7 @@ fn draw(self: *Client) !void {
     self.gui.render();
 }
 
-fn onWorldUpdate(self: *Client, world: *World) !void {
+fn onWorldUpdate(self: *Client, world: *World) Allocator.Error!void {
     if (self.session_state) |state| {
         try state.renderer.onWorldUpdate(world);
     }

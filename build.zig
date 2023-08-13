@@ -1,5 +1,4 @@
 const std = @import("std");
-const ziglua = @import("lib/ziglua/build.zig");
 const zgui = @import("lib/zig-gamedev/libs/zgui/build.zig");
 
 const Build = std.Build;
@@ -35,7 +34,10 @@ pub fn build(b: *Build) void {
     // step when running `zig build`).
     b.installArtifact(exe);
 
-    addModules(b, exe);
+    addModules(b, exe, .{
+        .target = target,
+        .optimize = optimize,
+    });
 
     const zgui_pkg = zgui.package(b, target, optimize, .{ .options = .{ .backend = .no_backend } });
     zgui_pkg.link(exe);
@@ -95,9 +97,10 @@ fn createLibModule(b: *Build, comptime name: []const u8, deps: []const ModuleDep
     });
 }
 
-fn addModules(b: *Build, exe: *Build.CompileStep) void {
-    const lua = ziglua.compileAndCreateModule(b, exe, .{ .version = .lua_54 });
-    exe.addModule("ziglua", lua);
+fn addModules(b: *Build, exe: *Build.CompileStep, args: anytype) void {
+    const ziglua = b.dependency("ziglua", args);
+    exe.addModule("ziglua", ziglua.module("ziglua"));
+    exe.linkLibrary(ziglua.artifact("lua"));
 
     exe.linkLibC();
     const oko = createLibModule(b, "oko", &.{});
@@ -111,12 +114,12 @@ fn addModules(b: *Build, exe: *Build.CompileStep) void {
     });
     exe.addModule("window", window);
     const mun = createLibModule(b, "mun", &.{
-        .{ .name = "ziglua", .module = lua },
+        .{ .name = "ziglua", .module = ziglua.module("ziglua") },
     });
     exe.addModule("mun", mun);
 
-    exe.addIncludePath("lib/window/c");
-    exe.addLibraryPath("lib/window/c/");
+    exe.addIncludePath(.{ .path = "lib/window/c" });
+    exe.addLibraryPath(.{ .path = "lib/window/c/" });
     exe.linkSystemLibrary("glfw3");
     if (exe.target.getOsTag() == .windows) {
         exe.step.dependOn(
@@ -128,19 +131,19 @@ fn addModules(b: *Build, exe: *Build.CompileStep) void {
     exe.addModule("nm", nm);
     const gl = createLibModule(b, "gl", &.{});
     exe.addModule("gl", gl);
-    exe.addIncludePath("lib/gl/c");
-    exe.addCSourceFile("lib/gl/c/glad.c", &.{"-std=c99"});
+    exe.addIncludePath(.{ .path = "lib/gl/c" });
+    exe.addCSourceFile(.{ .file = .{ .path = "lib/gl/c/glad.c" }, .flags = &.{"-std=c99"} });
 
     const ls = createLibModule(b, "ls", &.{
         .{ .name = "gl", .module = gl },
     });
     exe.addModule("ls", ls);
 
-    exe.addIncludePath("src/munleko/engine/c");
-    exe.addCSourceFile("src/munleko/engine/c/stb_image.c", &.{"-std=c99"});
-    exe.addIncludePath("src/munleko/client/gui/c");
-    exe.addIncludePath("lib/zig-gamedev/libs/zgui/libs/imgui");
-    exe.addCSourceFile("src/munleko/client/gui/c/imgui_impl_opengl3.cpp", &.{"-fno-sanitize=undefined"});
-    exe.addCSourceFile("src/munleko/client/gui/c/imgui_impl_glfw.cpp", &.{"-fno-sanitize=undefined"});
-    exe.addCSourceFile("src/munleko/client/gui/c/imgui_backend.cpp", &.{"-fno-sanitize=undefined"});
+    exe.addIncludePath(.{ .path = "src/munleko/engine/c" });
+    exe.addCSourceFile(.{ .file = .{ .path = "src/munleko/engine/c/stb_image.c" }, .flags = &.{"-std=c99"} });
+    exe.addIncludePath(.{ .path = "src/munleko/client/gui/c" });
+    exe.addIncludePath(.{ .path = "lib/zig-gamedev/libs/zgui/libs/imgui" });
+    exe.addCSourceFile(.{ .file = .{ .path = "src/munleko/client/gui/c/imgui_impl_opengl3.cpp" }, .flags = &.{"-fno-sanitize=undefined"} });
+    exe.addCSourceFile(.{ .file = .{ .path = "src/munleko/client/gui/c/imgui_impl_glfw.cpp" }, .flags = &.{"-fno-sanitize=undefined"} });
+    exe.addCSourceFile(.{ .file = .{ .path = "src/munleko/client/gui/c/imgui_backend.cpp" }, .flags = &.{"-fno-sanitize=undefined"} });
 }
