@@ -35,7 +35,12 @@ pub const LekoValue = enum(u16) { empty = 0, _ };
 
 pub const ChunkLeko = [chunk_leko_count]LekoValue;
 
+pub const ChunkLekoMeta = struct {
+    generation: u32 = 0,
+};
+
 pub const ChunkLekoStore = util.IjoDataStoreArenaInit(Chunk, ChunkLeko);
+pub const ChunkLekoMetaStore = util.IjoDataStoreDefaultInit(Chunk, ChunkLekoMeta);
 
 pub const LekoEvents = util.Events(union(enum) {
     leko_edit: LekoEditEvent,
@@ -50,6 +55,7 @@ pub const LekoEditEvent = struct {
 pub const LekoData = struct {
     world: *World,
     chunk_leko: ChunkLekoStore,
+    chunk_meta: ChunkLekoMetaStore,
     leko_types: *LekoTypeTable,
     events: LekoEvents,
     events_mutex: Mutex = .{},
@@ -59,6 +65,7 @@ pub const LekoData = struct {
         self.* = .{
             .world = world,
             .chunk_leko = ChunkLekoStore.init(allocator),
+            .chunk_meta = ChunkLekoMetaStore.init(allocator),
             .leko_types = leko_type_table,
             .events = LekoEvents.init(allocator),
         };
@@ -66,11 +73,13 @@ pub const LekoData = struct {
 
     pub fn deinit(self: *LekoData) void {
         self.chunk_leko.deinit();
+        self.chunk_meta.deinit();
         self.events.deinit();
     }
 
     pub fn matchDataCapacity(self: *LekoData) !void {
         try self.chunk_leko.matchCapacity(self.world.chunks.pool);
+        try self.chunk_meta.matchCapacity(self.world.chunks.pool);
     }
 
     pub fn lekoValueAt(self: *LekoData, reference: Reference) LekoValue {
@@ -92,6 +101,8 @@ pub const LekoData = struct {
     }
 
     pub fn editLekoAt(self: *LekoData, reference: Reference, new_value: LekoValue) !void {
+        const meta = self.chunk_meta.getPtr(reference.chunk);
+        meta.generation +%= 1;
         const ptr = &self.chunk_leko.get(reference.chunk).*[reference.address.v];
         const old_value = ptr.*;
         ptr.* = new_value;
@@ -139,6 +150,8 @@ pub const ChunkLoader = struct {
     }
 
     pub fn loadChunk(self: *ChunkLoader, chunk: Chunk) !void {
+        const meta = self.world.leko_data.chunk_meta.getPtr(chunk);
+        meta.generation = 0;
         @setRuntimeSafety(false);
         const perlin = nm.Perlin3{};
         const world = self.world;

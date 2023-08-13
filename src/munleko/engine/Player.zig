@@ -204,8 +204,7 @@ fn updateLekoCursor(self: *Player, world: *World) void {
                 switch (self.leko_edit_mode) {
                     .place => switch (self.leko_place_mode) {
                         .wall => {
-                            // if (checkNeighborsWallPlaceMode(world, forward.abs().maxComponent().axis, raycast.cell)) {
-                            if (checkNeighborsWallPlaceMode(world, (raycast.move orelse break).axis(), raycast.cell)) {
+                            if (raycast.move != null and checkNeighborsWallPlaceMode(world, raycast.move.?.axis(), raycast.cell)) {
                                 self.leko_cursor = raycast.cell;
                                 break;
                             }

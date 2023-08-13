@@ -18,6 +18,8 @@ const stb_image = @cImport(@cInclude("stb_image.h"));
 const leko = @import("leko.zig");
 const LekoTypeTable = leko.LekoTypeTable;
 
+const Dir = std.fs.Dir;
+
 allocator: Allocator,
 
 leko_table: LekoAssetTable = undefined,
@@ -139,9 +141,7 @@ pub fn AssetTable(comptime Asset_: type) type {
     };
 }
 
-pub fn load(self: *Assets, lua: *Lua, data_root_path: []const u8) !void {
-    var data_dir = try std.fs.openDirAbsolute(data_root_path, .{});
-    defer data_dir.close();
+pub fn load(self: *Assets, lua: *Lua, data_dir: Dir) !void {
     var error_count: usize = 0;
     _ = lua.getGlobal("assets") catch {
         std.log.err("missing 'assets' table in global lua state", .{});
