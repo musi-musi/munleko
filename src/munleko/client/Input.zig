@@ -27,7 +27,7 @@ state: InputState = .gameplay,
 previous_mouse_position: Vec2 = Vec2.zero,
 
 pub fn init(client: *Client) Input {
-    var self = Input{
+    const self = Input{
         .client = client,
     };
     return self;

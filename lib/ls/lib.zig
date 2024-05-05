@@ -110,24 +110,24 @@ const GlslPrimitive = gl.GlslPrimitive;
 
 pub const VertInDef = struct {
     location: u32,
-    name: []const u8,
+    name: [:0]const u8,
     attr_type: GlslPrimitive,
 };
 
 pub const FragOutDef = struct {
     location: u32,
-    name: []const u8,
+    name: [:0]const u8,
     attr_type: GlslPrimitive,
 };
 
 pub const UniformDef = struct {
-    name: []const u8,
+    name: [:0]const u8,
     uniform_type: GlslPrimitive,
     array_len: ?usize = null,
 };
 
 pub const SamplerDef = struct {
-    name: []const u8,
+    name: [:0]const u8,
     sampler_type: SamplerType,
 };
 
@@ -143,7 +143,7 @@ pub const SamplerType = enum {
     }
 };
 
-pub fn defVertIn(location: u32, name: []const u8, attr_type: GlslPrimitive) VertInDef {
+pub fn defVertIn(location: u32, name: [:0]const u8, attr_type: GlslPrimitive) VertInDef {
     return .{
         .location = location,
         .name = name,
@@ -151,7 +151,7 @@ pub fn defVertIn(location: u32, name: []const u8, attr_type: GlslPrimitive) Vert
     };
 }
 
-pub fn defFragOut(location: u32, name: []const u8, attr_type: GlslPrimitive) FragOutDef {
+pub fn defFragOut(location: u32, name: [:0]const u8, attr_type: GlslPrimitive) FragOutDef {
     return .{
         .location = location,
         .name = name,
@@ -159,14 +159,14 @@ pub fn defFragOut(location: u32, name: []const u8, attr_type: GlslPrimitive) Fra
     };
 }
 
-pub fn defUniform(name: []const u8, uniform_type: GlslPrimitive) UniformDef {
+pub fn defUniform(name: [:0]const u8, uniform_type: GlslPrimitive) UniformDef {
     return .{
         .name = name,
         .uniform_type = uniform_type,
     };
 }
 
-pub fn defUniformArray(name: []const u8, uniform_type: GlslPrimitive, array_len: usize) UniformDef {
+pub fn defUniformArray(name: [:0]const u8, uniform_type: GlslPrimitive, array_len: usize) UniformDef {
     return .{
         .name = name,
         .uniform_type = uniform_type,
@@ -174,7 +174,7 @@ pub fn defUniformArray(name: []const u8, uniform_type: GlslPrimitive, array_len:
     };
 }
 
-pub fn defSampler(name: []const u8, sampler_type: SamplerType) SamplerDef {
+pub fn defSampler(name: [:0]const u8, sampler_type: SamplerType) SamplerDef {
     return .{
         .name = name,
         .sampler_type = sampler_type,

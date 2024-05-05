@@ -14,7 +14,7 @@ const List = std.ArrayListUnmanaged;
 
 const Thread = std.Thread;
 const Mutex = Thread.Mutex;
-const Atomic = std.atomic.Atomic;
+const Atomic = std.atomic.Value;
 const AtomicFlag = util.AtomicFlag;
 const ResetEvent = Thread.ResetEvent;
 
@@ -254,7 +254,7 @@ pub const ObserverState = enum(u8) {
 };
 
 const ObserverStatus = struct {
-    state: Atomic(ObserverState) = .{ .value = .deleted },
+    state: Atomic(ObserverState) = .{ .raw = .deleted },
     is_dirty: AtomicFlag = .{},
 };
 
@@ -395,7 +395,7 @@ pub const Observers = struct {
         try self.chunk_events.matchCapacity(self.pool);
 
         const status = self.statuses.getPtr(observer);
-        status.state.store(.creating, .Monotonic);
+        status.state.store(.creating, .monotonic);
         status.is_dirty.set(true);
         const chunk_maps = self.chunk_maps.get(observer);
         chunk_maps.*.loading.clearRetainingCapacity();
@@ -409,7 +409,7 @@ pub const Observers = struct {
 
     pub fn delete(self: *Observers, observer: Observer) void {
         const status = self.statuses.getPtr(observer);
-        status.state.store(.deleting, .Monotonic);
+        status.state.store(.deleting, .monotonic);
         status.is_dirty.set(true);
         self.world.dirty_event.set();
     }
@@ -557,7 +557,7 @@ pub const Manager = struct {
             const observer = observers.atIndex(i);
             i += 1;
             const status = observers.statuses.getPtr(observer);
-            const state = status.state.load(.Monotonic);
+            const state = status.state.load(.monotonic);
             const zone = observers.zones.getPtr(observer);
             if (state == .active) {
                 const events = observers.chunk_events.get(observer);
@@ -577,7 +577,7 @@ pub const Manager = struct {
                         .observer = observer,
                         .range = observerZoneRange(center_position, zone.load_radius),
                     });
-                    status.state.store(.active, .Monotonic);
+                    status.state.store(.active, .monotonic);
                 },
                 .active => {
                     const position = zone.getPosition();
@@ -605,7 +605,7 @@ pub const Manager = struct {
                         .observer = observer,
                         .range = observerZoneRange(zone.center_chunk_position, zone.load_radius),
                     });
-                    status.state.store(.deleted, .Monotonic);
+                    status.state.store(.deleted, .monotonic);
                 },
                 .deleted => {
                     observers.pool.delete(observer);

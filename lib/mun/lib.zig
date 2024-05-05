@@ -8,7 +8,7 @@ const Integer = ziglua.Integer;
 /// return an error if value doesnt have at least `dimensions` array values,
 /// or any value cannot be converted to `Scalar`
 pub fn toVector(lua: *Lua, comptime Scalar: type, comptime dimensions: comptime_int, index: i32) ![dimensions]Scalar {
-    const is_float = comptime std.meta.trait.isFloat(Scalar);
+    const is_float = @typeInfo(Scalar) == .Float;
     var vector: [dimensions]Scalar = undefined;
     for (&vector, 0..) |*v, i| {
         _ = lua.getIndex(index, @as(Integer, @intCast(i + 1)));

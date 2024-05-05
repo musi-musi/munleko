@@ -46,7 +46,7 @@ pub fn create(allocator: Allocator, arguments: Arguments) !*Engine {
     errdefer allocator.free(saves_root_path);
 
     if (std.fs.makeDirAbsolute(saves_root_path)) {} else |err| {
-        if (err != std.os.MakeDirError.PathAlreadyExists) {
+        if (err != std.posix.MakeDirError.PathAlreadyExists) {
             return err;
         }
     }
@@ -66,7 +66,7 @@ pub fn destroy(self: *Engine) void {
 
 pub fn load(self: *Engine) !void {
     try self.mun.requireModule("main");
-    try self.assets.load(&self.mun.lua, self.data_dir.dir);
+    try self.assets.load(self.mun.lua, self.data_dir.dir);
 }
 
 pub fn createSession(self: *Engine) !*Session {

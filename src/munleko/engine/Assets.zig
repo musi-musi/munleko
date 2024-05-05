@@ -127,7 +127,7 @@ pub fn AssetTable(comptime Asset_: type) type {
                     lua.pop(1);
                     continue;
                 }
-                const name = try lua.toBytes(-2);
+                const name = try lua.toString(-2);
                 if (try loader(lua, name)) |asset| {
                     try self.addAsset(name, asset);
                     // std.log.info("loaded {s} asset '{s}'", .{table_name, name});
@@ -213,7 +213,7 @@ fn loadLekoLuaAsset(l: *Lua, name: []const u8) ziglua.Error!?LekoAsset {
     l.pop(1);
     switch (l.getField(-1, "texture")) {
         .nil => asset.texture_name = name,
-        .string => asset.texture_name = try l.toBytes(-1),
+        .string => asset.texture_name = try l.toString(-1),
         else => |t| {
             std.log.err("leko asset {s} 'texture' field must be string, not {s}", .{ name, @tagName(t) });
             l.pop(1);

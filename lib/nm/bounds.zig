@@ -94,7 +94,7 @@ pub fn Range(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             }
             return true;
         }
-        pub usingnamespace if (std.meta.trait.isIntegral(Scalar)) struct {
+        pub usingnamespace if (@typeInfo(Scalar) == .Int) struct {
             pub fn iterate(self: Self) Iterator {
                 return Iterator.init(self);
             }

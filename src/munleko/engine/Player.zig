@@ -256,8 +256,8 @@ fn moveXZ(self: *Player, world: *World, move: Vec2) void {
                 // zig fmt: off
                 if (
                     move_step == null
-                    or std.math.fabs(move_step.?.v[0]) > std.math.fabs(move_actual.v[0])
-                    or std.math.fabs(move_step.?.v[1]) > std.math.fabs(move_actual.v[1])
+                    or @abs(move_step.?.v[0]) > @abs(move_actual.v[0])
+                    or @abs(move_step.?.v[1]) > @abs(move_actual.v[1])
                 ) {
                 // zig fmt: on
                     self.eye_height_offset += self.hull.center.get(.y) - step_hull.center.get(.y);
@@ -287,7 +287,7 @@ fn moveLekoBoundsXZ(physics: *Physics, bounds: *Bounds3, move: Vec2) ?Vec2 {
 fn moveStepOffset(self: *Player, dt: f32) void {
     var offset = self.eye_height_offset;
     if (offset != 0) {
-        const offset_delta = self.settings.move_speed * dt * @max(1, std.math.fabs(offset));
+        const offset_delta = self.settings.move_speed * dt * @max(1, @abs(offset));
         if (offset > 0) {
             offset -= offset_delta;
             if (offset < 0) {
@@ -303,7 +303,7 @@ fn moveStepOffset(self: *Player, dt: f32) void {
     }
 }
 fn getMoveXZ(self: Player) Vec2 {
-    const face_angle = std.math.degreesToRadians(f32, self.look_angles.v[0]);
+    const face_angle = std.math.degreesToRadians(self.look_angles.v[0]);
     const sin = @sin(-face_angle);
     const cos = @cos(-face_angle);
     const face_forward = vec2(.{ -sin, cos });

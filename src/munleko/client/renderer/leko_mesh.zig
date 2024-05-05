@@ -378,7 +378,7 @@ pub const LekoMeshSystem = struct {
         while (i < 256) : (i += 1) {
             var neighbors = @as(u8, @intCast(i));
             for ([4]u3{ 0, 1, 3, 2 }) |vert| {
-                var vert_neighbors = neighbors & 0b111;
+                const vert_neighbors = neighbors & 0b111;
                 neighbors = std.math.rotr(u8, neighbors, 2);
                 const ao: u8 = switch (vert_neighbors) {
                     0b000 => 0,

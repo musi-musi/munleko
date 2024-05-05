@@ -71,7 +71,7 @@ pub fn EventsUnmanaged(comptime channels_def: type) type {
             }
             break :blk @Type(.{
                 .Struct = .{
-                    .layout = .Auto,
+                    .layout = .auto,
                     .fields = &channels_fields,
                     .decls = &.{},
                     .is_tuple = false,

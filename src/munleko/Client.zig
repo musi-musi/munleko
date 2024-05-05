@@ -33,8 +33,8 @@ pub const Gui = @import("client/Gui.zig");
 pub const Input = @import("client/Input.zig");
 
 pub const main_decls = struct {
-    pub const std_options = struct {
-        pub const log_level = std.log.Level.info;
+    pub const std_options = std.Options{
+        .log_level = std.log.Level.info,
     };
 
     pub fn main() !void {

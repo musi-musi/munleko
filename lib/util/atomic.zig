@@ -4,14 +4,14 @@ pub const AtomicFlag = struct {
     value: bool = false,
 
     pub fn init(value: bool) AtomicFlag {
-        return .{ .value = value };
+        return .{ .raw = value };
     }
 
     pub fn set(self: *AtomicFlag, value: bool) void {
-        @atomicStore(bool, &self.value, value, .Monotonic);
+        @atomicStore(bool, &self.value, value, .monotonic);
     }
 
     pub fn get(self: *const AtomicFlag) bool {
-        return @atomicLoad(bool, &self.value, .Monotonic);
+        return @atomicLoad(bool, &self.value, .monotonic);
     }
 };

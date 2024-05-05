@@ -67,6 +67,7 @@ pub fn init(allocator: Allocator, window: *Window) !Gui {
 
 pub fn deinit(self: *Gui) void {
     _ = self;
+    imgui_backend_deinit();
     zgui.deinit();
 }
 
@@ -146,7 +147,7 @@ pub fn showRadial(self: *Gui, radial: Radial, wedges: []RadialWedge, mouse_posit
     const draw_list = zgui.getForegroundDrawList();
     const relative_mouse_position = mouse_position.sub(position);
     const in_deadzone = relative_mouse_position.mag() < radial.radius_deadzone;
-    var mouse_theta = std.math.atan2(f32, relative_mouse_position.v[1], relative_mouse_position.v[0]);
+    const mouse_theta = std.math.atan2(relative_mouse_position.v[1], relative_mouse_position.v[0]);
     const mouse_wedge_index_signed: i32 = @intFromFloat((@floor((mouse_theta / delta_theta) + 0.5)));
     const mouse_wedge_index: usize = @intCast(@mod(mouse_wedge_index_signed, @as(i32, @intCast(wedges.len))));
     const radius_center = (radial.radius_outer + radial.radius_inner) / 2;

@@ -1,10 +1,10 @@
 const std = @import("std");
-const zgui = @import("lib/zig-gamedev/libs/zgui/build.zig");
+// const zgui = @import("lib/zig-gamedev/libs/zgui/build.zig");
 
 const Build = std.Build;
 const Step = Build.Step;
 const Module = Build.Module;
-const ModuleDependency = Build.ModuleDependency;
+const ModuleDependency = Module.Import;
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
@@ -39,8 +39,16 @@ pub fn build(b: *Build) void {
         .optimize = optimize,
     });
 
-    const zgui_pkg = zgui.package(b, target, optimize, .{ .options = .{ .backend = .no_backend } });
-    zgui_pkg.link(exe);
+    // const zgui_pkg = zgui.package(b, target, optimize, .{ .options = .{ .backend = .no_backend } });
+    // zgui_pkg.link(exe);
+
+    const zgui = b.dependency("zgui", .{
+        .shared = false,
+        .with_implot = false,
+        .backend = .no_backend,
+    });
+    exe.root_module.addImport("zgui", zgui.module("root"));
+    exe.linkLibrary(zgui.artifact("imgui"));
 
     // This *creates* a RunStep in the build graph, to be executed when another
     // step is evaluated that depends on it. The next line below will establish
@@ -90,54 +98,59 @@ pub fn sequence(steps: []const *Step) void {
     }
 }
 
-fn createLibModule(b: *Build, comptime name: []const u8, deps: []const ModuleDependency) *Module {
+fn createLibModule(b: *Build, _: *Build.Step.Compile, comptime name: []const u8, deps: []const ModuleDependency) *Module {
     return b.createModule(.{
-        .source_file = .{ .path = "lib/" ++ name ++ "/lib.zig" },
-        .dependencies = deps,
+        .root_source_file = .{ .path = "lib/" ++ name ++ "/lib.zig" },
+        .imports = deps,
+        // .target = exe.rootModuleTarget(),
     });
 }
 
-fn addModules(b: *Build, exe: *Build.CompileStep, args: anytype) void {
+fn addModules(b: *Build, exe: *Build.Step.Compile, args: anytype) void {
     const ziglua = b.dependency("ziglua", args);
-    exe.addModule("ziglua", ziglua.module("ziglua"));
-    exe.linkLibrary(ziglua.artifact("lua"));
+    exe.root_module.addImport("ziglua", ziglua.module("ziglua"));
+    // exe.linkLibrary(ziglua.artifact("lua"));
 
     exe.linkLibC();
-    const oko = createLibModule(b, "oko", &.{});
-    exe.addModule("oko", oko);
-    const util = createLibModule(b, "util", &.{
-        .{ .name = "oko", .module = oko },
+    const oko = createLibModule(b, exe, "oko", &.{});
+    exe.root_module.addImport("oko", oko);
+    const util = createLibModule(b, exe, "util", &.{
+        // .{ .name = "oko", .module = oko },
     });
-    exe.addModule("util", util);
-    const window = createLibModule(b, "window", &.{
-        .{ .name = "util", .module = util },
-    });
-    exe.addModule("window", window);
-    const mun = createLibModule(b, "mun", &.{
+    exe.root_module.addImport("util", util);
+    const mun = createLibModule(b, exe, "mun", &.{
         .{ .name = "ziglua", .module = ziglua.module("ziglua") },
     });
-    exe.addModule("mun", mun);
+    exe.root_module.addImport("mun", mun);
 
-    exe.addIncludePath(.{ .path = "lib/window/c" });
-    exe.addLibraryPath(.{ .path = "lib/window/c/" });
-    exe.linkSystemLibrary("glfw3");
-    if (exe.target.getOsTag() == .windows) {
-        exe.step.dependOn(
-            &b.addInstallBinFile(.{ .path = "lib/window/c/glfw3.dll" }, "glfw3.dll").step,
-        );
+    const window = b.createModule(.{
+        .root_source_file = .{ .path = "lib/window/lib.zig" },
+        .imports = &.{
+            .{ .name = "util", .module = util },
+        },
+        .target = args.target,
+        .optimize = args.optimize,
+        .link_libc = true,
+    });
+    window.addLibraryPath(.{ .path = "lib/window/c" });
+    window.addIncludePath(.{ .path = "lib/window/c" });
+    window.linkSystemLibrary("glfw3", .{ .needed = true });
+    if (args.target.result.os.tag == .windows) {
+        b.installBinFile("lib/window/c/glfw3.dll", "./glfw3.dll");
     }
+    exe.root_module.addImport("window", window);
 
-    const nm = createLibModule(b, "nm", &.{});
-    exe.addModule("nm", nm);
-    const gl = createLibModule(b, "gl", &.{});
-    exe.addModule("gl", gl);
-    exe.addIncludePath(.{ .path = "lib/gl/c" });
-    exe.addCSourceFile(.{ .file = .{ .path = "lib/gl/c/glad.c" }, .flags = &.{"-std=c99"} });
+    const nm = createLibModule(b, exe, "nm", &.{});
+    exe.root_module.addImport("nm", nm);
+    const gl = createLibModule(b, exe, "gl", &.{});
+    gl.addIncludePath(.{ .path = "lib/gl/c" });
+    gl.addCSourceFile(.{ .file = .{ .path = "lib/gl/c/glad.c" }, .flags = &.{"-std=c99"} });
+    exe.root_module.addImport("gl", gl);
 
-    const ls = createLibModule(b, "ls", &.{
+    const ls = createLibModule(b, exe, "ls", &.{
         .{ .name = "gl", .module = gl },
     });
-    exe.addModule("ls", ls);
+    exe.root_module.addImport("ls", ls);
 
     exe.addIncludePath(.{ .path = "src/munleko/engine/c" });
     exe.addCSourceFile(.{ .file = .{ .path = "src/munleko/engine/c/stb_image.c" }, .flags = &.{"-std=c99"} });
@@ -146,4 +159,5 @@ fn addModules(b: *Build, exe: *Build.CompileStep, args: anytype) void {
     exe.addCSourceFile(.{ .file = .{ .path = "src/munleko/client/gui/c/imgui_impl_opengl3.cpp" }, .flags = &.{"-fno-sanitize=undefined"} });
     exe.addCSourceFile(.{ .file = .{ .path = "src/munleko/client/gui/c/imgui_impl_glfw.cpp" }, .flags = &.{"-fno-sanitize=undefined"} });
     exe.addCSourceFile(.{ .file = .{ .path = "src/munleko/client/gui/c/imgui_backend.cpp" }, .flags = &.{"-fno-sanitize=undefined"} });
+    exe.addIncludePath(.{ .path = "lib/window/c" });
 }

@@ -8,7 +8,7 @@ voxel game engine in zig and lua
 # clonin n buildin
 use zig master, have gpu drivers that can handle opengl 3.3
 
-confirmed with zig version 0.11.0
+confirmed with zig version 0.13.0-dev.46+3648d7df1
 
 munleko uses submodules for dependency management, make sure to use `--recursive` when cloning
 

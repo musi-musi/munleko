@@ -18,7 +18,7 @@ pub const FpsCounter = struct {
 
     pub fn frame(self: *FpsCounter) ?f32 {
         const read_delay_ns = @as(u64, @intFromFloat(self.read_delay * std.time.ns_per_s));
-        var time = self.timer.read();
+        const time = self.timer.read();
         if (time > read_delay_ns) {
             self.timer.reset();
             const fps = @as(f32, @floatFromInt(self.frame_count)) / self.read_delay;

@@ -143,7 +143,7 @@ pub const Camera = struct {
         pub fn toMatrix(self: Projection) Mat4 {
             return switch (self) {
                 .perspective => |p| nm.transform.createPerspective(
-                    std.math.degreesToRadians(f32, p.fov),
+                    std.math.degreesToRadians(p.fov),
                     p.aspect_ratio orelse 1,
                     p.near_plane,
                     p.far_plane,
@@ -162,7 +162,7 @@ pub const Camera = struct {
         pub fn toFrustum(self: Projection) Frustum {
             switch (self) {
                 .perspective => |p| {
-                    const fov_v = std.math.degreesToRadians(f32, p.fov) / 2;
+                    const fov_v = std.math.degreesToRadians(p.fov) / 2;
                     const fov_h = std.math.atan(std.math.tan(fov_v) * (p.aspect_ratio orelse 1));
                     const sin_v = std.math.sin(fov_v);
                     const cos_v = std.math.cos(fov_v);

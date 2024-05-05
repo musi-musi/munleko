@@ -11,24 +11,24 @@ var history_end: usize = 0;
 
 var history_head: ?*AllocHistory = null;
 
-var is_running: std.atomic.Atomic(bool) = .{ .value = false };
+var is_running: std.atomic.Atomic(bool) = .{ .raw = false };
 var tick_thread: std.Thread = undefined;
 
 pub fn start(comptime tick_time: comptime_float) !void {
     const S = struct {
         fn thread_main() void {
-            while (is_running.load(.Monotonic)) {
+            while (is_running.load(.monotonic)) {
                 tick();
                 std.time.sleep(comptime @as(u64, @intFromFloat(tick_time * std.time.ns_per_s)));
             }
         }
     };
-    is_running.store(true, .Monotonic);
+    is_running.store(true, .monotonic);
     tick_thread = try std.Thread.spawn(.{}, S.thread_main, .{});
 }
 
 pub fn stop() void {
-    is_running.store(false, .Monotonic);
+    is_running.store(false, .monotonic);
     tick_thread.join();
 }
 
