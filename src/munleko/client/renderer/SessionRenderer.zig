@@ -107,13 +107,24 @@ pub fn draw(self: *SessionRenderer) void {
     if (player.leko_cursor) |leko_cursor| {
         const selection_box_color: [3]f32 = switch (player.leko_edit_mode) {
             .place => switch (player.leko_place_mode) {
-                .normal => [3]f32{ 1, 1, 1 },
-                .wall => [3]f32{ 0.8, 0.8, 1 },
+                .wall => [3]f32{ 0.4, 0.4, 1.0 },
+                else => [3]f32{ 1, 1, 1 },
+            },
+            .remove => [3]f32{ 0.8, 0.2, 0.2 },
+        };
+        const selection_box_size: [3]f32 = switch (player.leko_edit_mode) {
+            .place => switch (player.leko_place_mode) {
+                .box => [3]f32{ 2, 2, 2 },
+                else => [3]f32{ 1, 1, 1 },
             },
             .remove => [3]f32{ 1, 1, 1 },
         };
         self.selection_box.setColor(selection_box_color);
         self.selection_box.setCamera(self.scene.camera);
-        self.selection_box.draw(leko_cursor.cast(f32).v, .{ 1, 1, 1 });
+        self.selection_box.draw(leko_cursor.cast(f32).v, selection_box_size);
+        // if (player.corner_cursor) |corner_cursor| {
+        //     self.selection_box.draw(leko_cursor.cast(f32).v, [3]f32{ 1, 1, 1 });
+        //     self.selection_box.draw(corner_cursor.cast(f32).v, [3]f32{ 0.5, 0.5, 0.5 });
+        // }
     }
 }
