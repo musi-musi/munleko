@@ -185,8 +185,11 @@ pub const GridRaycastIterator = struct {
     direction: Vec3,
     /// the last cell we hit
     cell: Vec3i,
+    subcell: Vec3i,
+    corner: Vec3i = Vec3i.zero,
     /// the total distance the raycast has travelled from `origin`
     distance: f32 = 0,
+    subdistance: f32 = 0,
     /// the direction the raycast moved to get to the current cell from the previous cell
     /// null until next is called for the first time
     /// negate this direction to get the normal of the face we just hit
@@ -195,9 +198,13 @@ pub const GridRaycastIterator = struct {
     // that determines what the next move is
     t_max: Vec3,
     t_delta: Vec3,
+    sub_t_max: Vec3,
 
     pub fn init(origin: Vec3, direction: Vec3) GridRaycastIterator {
         const dir = direction.norm() orelse Vec3.zero;
+        const sub_origin = origin.mulScalar(2);
+
+        // calculate t_delta
         const dx2 = dir.v[0] * dir.v[0];
         const dy2 = dir.v[1] * dir.v[1];
         const dz2 = dir.v[2] * dir.v[2];
@@ -205,6 +212,22 @@ pub const GridRaycastIterator = struct {
         if (dx2 != 0) t_delta.v[0] = std.math.sqrt(1 + (dy2 + dz2) / dx2);
         if (dy2 != 0) t_delta.v[1] = std.math.sqrt(1 + (dx2 + dz2) / dy2);
         if (dz2 != 0) t_delta.v[2] = std.math.sqrt(1 + (dx2 + dy2) / dz2);
+
+        // calculate t_max
+        const t_max = calc_t_max(origin, dir, t_delta);
+        const sub_t_max = calc_t_max(sub_origin, dir, t_delta);
+        return GridRaycastIterator{
+            .origin = origin,
+            .cell = origin.floor().cast(i32),
+            .subcell = sub_origin.floor().cast(i32),
+            .direction = dir,
+            .t_max = t_max,
+            .t_delta = t_delta,
+            .sub_t_max = sub_t_max,
+        };
+    }
+
+    fn calc_t_max(origin: Vec3, dir: Vec3, t_delta: Vec3) Vec3 {
         const origin_floor = origin.floor();
         var t_max = Vec3.init(.{
             (if (dir.v[0] > 0) (origin_floor.v[0] + 1 - origin.v[0]) else origin.v[0] - origin_floor.v[0]) * t_delta.v[0],
@@ -214,37 +237,44 @@ pub const GridRaycastIterator = struct {
         if (dir.v[0] == 0) t_max.v[0] = std.math.inf(f32);
         if (dir.v[1] == 0) t_max.v[1] = std.math.inf(f32);
         if (dir.v[2] == 0) t_max.v[2] = std.math.inf(f32);
-        return GridRaycastIterator{
-            .origin = origin,
-            .cell = origin_floor.cast(i32),
-            .direction = dir,
-            .t_max = t_max,
-            .t_delta = t_delta,
-        };
+        return t_max;
     }
 
     pub fn next(self: *GridRaycastIterator) void {
-        const min = self.t_max.minComponent();
-        const axis = min.axis;
+        const axis = self.t_max.minComponent().axis;
         self.t_max.ptrMut(axis).* += self.t_delta.get(axis);
         if (self.direction.get(axis) < 0) {
             self.cell.ptrMut(axis).* -= 1;
-            self.updateDistance(axis, .negative);
+            self.distance = self.updateDistance(axis, .negative, self.cell, self.origin);
             switch (axis) {
                 inline else => |a| self.move = comptime Cardinal3.init(a, .negative),
             }
         } else {
             self.cell.ptrMut(axis).* += 1;
-            self.updateDistance(axis, .positive);
+            self.distance = self.updateDistance(axis, .positive, self.cell, self.origin);
             switch (axis) {
                 inline else => |a| self.move = comptime Cardinal3.init(a, .positive),
             }
         }
+
+        while (self.subdistance / 2 < self.distance) {
+            const sub_axis = self.sub_t_max.minComponent().axis;
+            self.sub_t_max.ptrMut(sub_axis).* += self.t_delta.get(sub_axis);
+            if (self.direction.get(sub_axis) < 0) {
+                self.subcell.ptrMut(sub_axis).* -= 1;
+                self.subdistance = self.updateDistance(sub_axis, .negative, self.subcell, self.origin.mulScalar(2));
+            } else {
+                self.subcell.ptrMut(sub_axis).* += 1;
+                self.subdistance = self.updateDistance(sub_axis, .positive, self.subcell, self.origin.mulScalar(2));
+            }
+        }
+
+        self.corner = self.cell.mulScalar(2).sub(self.subcell).addScalar(1);
     }
 
-    fn updateDistance(self: *GridRaycastIterator, axis: nm.Axis3, comptime sign: nm.Sign) void {
-        var distance = @as(f32, @floatFromInt(self.cell.get(axis))) - self.origin.get(axis);
+    fn updateDistance(self: *GridRaycastIterator, axis: nm.Axis3, comptime sign: nm.Sign, cell: Vec3i, origin: Vec3) f32 {
+        var distance = cell.cast(f32).get(axis) - origin.get(axis);
         distance += (1 - sign.scalar(f32)) / 2;
-        self.distance = distance / self.direction.get(axis);
+        return distance / self.direction.get(axis);
     }
 };

@@ -39,6 +39,7 @@ eye_height: f32 = 1.5,
 eye_height_offset: f32 = 0,
 
 leko_cursor: ?Vec3i = null,
+// corner_cursor: ?Vec3 = null,
 /// the leko type to place when placing
 leko_equip: ?LekoType = null,
 leko_edit_mode: LekoEditMode = .remove,
@@ -50,6 +51,7 @@ look_angles: Vec2 = Vec2.zero,
 observer: Observer,
 input: Input = .{},
 settings: Settings = .{},
+patterns: Patterns = .{},
 
 leko_equip_radial: [leko_equip_radial_len]?LekoType = [1]?LekoType{null} ** leko_equip_radial_len,
 
@@ -71,6 +73,19 @@ pub const Settings = struct {
     edit_cooldown_duration: f32 = 0.2,
 };
 
+pub const Patterns = struct {
+    box: [8]Vec3i = .{
+        vec3i(.{ 0, 0, 0 }),
+        vec3i(.{ 0, 0, 1 }),
+        vec3i(.{ 0, 1, 0 }),
+        vec3i(.{ 0, 1, 1 }),
+        vec3i(.{ 1, 0, 0 }),
+        vec3i(.{ 1, 0, 1 }),
+        vec3i(.{ 1, 1, 0 }),
+        vec3i(.{ 1, 1, 1 }),
+    },
+};
+
 pub const MoveMode = enum {
     normal,
     noclip,
@@ -84,6 +99,7 @@ pub const LekoEditMode = enum {
 pub const LekoPlaceMode = enum {
     normal,
     wall,
+    box,
 };
 
 pub fn init(world: *World, position: Vec3) !Player {
@@ -116,10 +132,19 @@ pub fn tick(self: *Player, session: *Session) !void {
             self.leko_edit_cooldown = self.editCooldownTicksFromDuration(session);
             switch (self.leko_edit_mode) {
                 .remove => _ = try session.world.leko_data.editLekoAtPosition(cursor, .empty),
-                .place => _ = {
-                    if (self.leko_equip) |leko_type| {
-                        _ = try session.world.leko_data.editLekoAtPosition(cursor, leko_type.value);
-                    }
+                .place => switch (self.leko_place_mode) {
+                    .box => {
+                        if (self.leko_equip) |leko_type| {
+                            inline for (self.patterns.box) |offset| {
+                                _ = try session.world.leko_data.editLekoAtPosition(cursor.add(offset), leko_type.value);
+                            }
+                        }
+                    },
+                    else => {
+                        if (self.leko_equip) |leko_type| {
+                            _ = try session.world.leko_data.editLekoAtPosition(cursor, leko_type.value);
+                        }
+                    },
                 },
             }
         }
@@ -194,9 +219,23 @@ fn updateLekoCursor(self: *Player, world: *World) void {
                             }
                             break;
                         },
-                        .wall => {
+                        .box => {
+                            if (raycast.move) |move| {
+                                const offset = switch (move) {
+                                    inline else => |m| Vec3i.unitSigned(m),
+                                };
+                                var cursor_target = raycast.cell.sub(offset).sub(raycast.corner);
+                                inline for (self.patterns.box) |pattern_offset| {
+                                    if (world.leko_data.lekoValueAtPosition(cursor_target.add(pattern_offset)) != .empty) {
+                                        return;
+                                    }
+                                }
+                                self.leko_cursor = cursor_target;
+                                // self.corner_cursor = raycast.subcell.cast(f32).divScalar(2);
+                            }
                             break;
                         },
+                        else => {},
                     },
                 }
                 break;
