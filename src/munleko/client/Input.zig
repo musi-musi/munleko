@@ -74,7 +74,7 @@ pub fn update(self: *Input) void {
         switch (self.state) {
             .gameplay => {
                 if (w.buttonPressed(.g)) {
-                    p.settings.move_mode = util.cycleEnum(p.settings.move_mode);
+                    p.move_mode = util.cycleEnum(p.move_mode);
                 }
                 if (w.buttonPressed(.x)) {
                     p.leko_edit_mode = util.cycleEnum(p.leko_edit_mode);

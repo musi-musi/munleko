@@ -25,18 +25,23 @@ const Axis3 = nm.Axis3;
 const Player = @This();
 
 world: *World,
+observer: Observer,
+
+// Physical states //
 
 position: Vec3,
-
 hull: Bounds3 = .{
     .center = undefined,
     .radius = vec3(.{ 1.5 / 2.0, 3.5 / 2.0, 1.5 / 2.0 }),
 },
 is_grounded: bool = false,
-velocity_y: f32 = 0,
-
+velocity: Vec3 = Vec3.zero,
 eye_height: f32 = 1.5,
 eye_height_offset: f32 = 0,
+look_angles: Vec2 = Vec2.zero,
+move_mode: MoveMode = .normal,
+
+// Leko states //
 
 leko_cursor: ?Vec3i = null,
 // corner_cursor: ?Vec3 = null,
@@ -47,8 +52,6 @@ leko_place_mode: LekoPlaceMode = .normal,
 
 leko_edit_cooldown: i32 = 0,
 
-look_angles: Vec2 = Vec2.zero,
-observer: Observer,
 input: Input = .{},
 settings: Settings = .{},
 patterns: Patterns = .{},
@@ -65,10 +68,19 @@ pub const Input = struct {
 };
 
 pub const Settings = struct {
-    move_speed: f32 = 15,
+    stall_speed: f32 = 1.5,
+    ground_speed: f32 = 10,
+    air_speed: f32 = 2,
+    ground_accel: f32 = 80,
+    air_accel: f32 = 80,
+    ground_friction: f32 = 6,
+    air_friction: f32 = 0.1,
+
+    // between 0 and 1, ideally. unless you want to have fun ofc (it will cause error)
+    noclip_smoothness: f32 = 0.4,
+    eye_move_speed: f32 = 15,
     jump_height: f32 = 2.25,
     noclip_move_speed: f32 = 32,
-    move_mode: MoveMode = .normal,
     interact_range: f32 = 10,
     edit_cooldown_duration: f32 = 0.2,
 };
@@ -120,11 +132,13 @@ pub fn deinit(self: Player) void {
 pub fn tick(self: *Player, session: *Session) !void {
     defer self.input.trigger_jump = false;
     defer self.input.trigger_primary = false;
-    switch (self.settings.move_mode) {
-        .normal => self.moveNormal(session),
-        .noclip => self.moveNoclip(session),
+    const dt = 1 / session.tick_timer.rate;
+    switch (self.move_mode) {
+        .normal => self.moveNormal(session.world, dt),
+        .noclip => self.moveNoclip(session.world, dt),
     }
-    self.position = self.hull.center;
+    // self.position = self.hull.center;
+    self.hull.center = self.position;
     self.world.observers.setPosition(self.observer, self.position.cast(i32));
     self.updateLekoCursor(session.world);
     if (self.leko_cursor) |cursor| {
@@ -160,39 +174,70 @@ fn editCooldownTicksFromDuration(self: Player, session: *Session) i32 {
     return @max(1, tick_count);
 }
 
-fn moveNoclip(self: *Player, session: *Session) void {
-    const dt = 1 / session.tick_timer.rate;
-    const move_xz = self.getMoveXZ();
-    self.hull.center.v[0] += move_xz.v[0] * dt * self.settings.noclip_move_speed;
-    self.hull.center.v[1] += self.input.move.v[1] * dt * self.settings.noclip_move_speed;
-    self.hull.center.v[2] += move_xz.v[1] * dt * self.settings.noclip_move_speed;
-    self.position = self.hull.center;
-    self.velocity_y = 0;
-    self.is_grounded = false;
+fn applyFriction(self: *Player, friction: f32, dt: f32) void {
+    const move_vel = vec2(.{ self.velocity.get(.x), self.velocity.get(.z) });
+    if (!move_vel.eql(Vec2.zero)) {
+        const mag = move_vel.mag();
+        const factor = @max(0, mag - @max(mag, self.settings.stall_speed) * friction * dt) / mag;
+        self.velocity.v[0] *= factor;
+        self.velocity.v[2] *= factor;
+    }
 }
 
-fn moveNormal(self: *Player, session: *Session) void {
-    const world = session.world;
-    const dt = 1 / session.tick_timer.rate;
-    self.velocity_y -= world.physics.settings.gravity * dt;
-    if (world.physics.moveLekoBoundsAxis(&self.hull, self.velocity_y * dt, .y)) |_| {
-        defer self.velocity_y = 0;
-        if (self.velocity_y < 0) {
+fn moveForced(self: *Player, dt: f32) void {
+    self.position = self.position.add(self.velocity.mulScalar(dt));
+}
+fn moveAndSlide(self: *Player, world: *World, dt: f32) void {
+    if (world.physics.moveLekoBoundsAxis(&self.hull, self.velocity.get(.y) * dt, .y)) |_| {
+        defer self.velocity.v[1] = 0;
+        if (self.velocity.get(.y) < 0) {
             self.is_grounded = true;
         }
     } else {
         self.is_grounded = false;
     }
-    if (self.is_grounded and self.input.trigger_jump) {
-        self.velocity_y = world.physics.jumpSpeedFromHeight(self.settings.jump_height);
-    }
-    const move_xz = self.getMoveXZ().mulScalar(dt * self.settings.move_speed);
-    self.moveXZ(world, move_xz);
+    const current_pos = self.position;
+    self.moveXZ(world, vec2(.{ self.velocity.get(.x), self.velocity.get(.z) }).mulScalar(dt));
     self.moveStepOffset(dt);
+    self.position = self.hull.center;
+    const diff = self.position.sub(current_pos).divScalar(dt);
+    self.velocity.v[0] = diff.get(.x);
+    self.velocity.v[2] = diff.get(.z);
     // self.position = self.hull.center;
     // self.position.v[0] += move_xz.v[0] * dt * self.settings.move_speed;
     // self.position.v[1] += self.input.move.v[1] * dt * self.settings.move_speed;
     // self.position.v[2] += move_xz.v[1] * dt * self.settings.move_speed;
+}
+fn moveNoclip(self: *Player, _: *World, dt: f32) void {
+    const move_xz = self.getMoveXZ();
+    const move_dir = vec3(.{ move_xz.get(.x), self.input.move.get(.y), move_xz.get(.y) });
+    const target_vel = move_dir.mulScalar(self.settings.noclip_move_speed);
+    const t = std.math.pow(f32, self.settings.noclip_smoothness, dt * 60);
+    self.velocity = self.velocity.mulScalar(1 - t).add(target_vel.mulScalar(t));
+
+    self.moveForced(dt);
+    self.is_grounded = false;
+}
+
+fn moveNormal(self: *Player, world: *World, dt: f32) void {
+    const speed = if (self.is_grounded) self.settings.ground_speed else self.settings.air_speed;
+    const accel = if (self.is_grounded) self.settings.ground_accel else self.settings.air_accel;
+    const friction = if (self.is_grounded) self.settings.ground_friction else self.settings.air_friction;
+    self.applyFriction(friction, dt);
+
+    const wish_dir = self.getMoveXZ();
+    const curr_dir = vec2(.{ self.velocity.get(.x), self.velocity.get(.z) });
+    // is there a clamp function
+    const real_dir = wish_dir.mulScalar(@min(@max(0, speed - curr_dir.dot(wish_dir)), accel * dt));
+
+    self.velocity.v[0] += real_dir.get(.x);
+    self.velocity.v[1] -= world.physics.settings.gravity * dt;
+    self.velocity.v[2] += real_dir.get(.y);
+    self.moveAndSlide(world, dt);
+    if (self.is_grounded and self.input.trigger_jump) {
+        self.velocity.v[1] = world.physics.jumpSpeedFromHeight(self.settings.jump_height);
+        self.is_grounded = false;
+    }
 }
 
 fn updateLekoCursor(self: *Player, world: *World) void {
@@ -326,7 +371,7 @@ fn moveLekoBoundsXZ(physics: *Physics, bounds: *Bounds3, move: Vec2) ?Vec2 {
 fn moveStepOffset(self: *Player, dt: f32) void {
     var offset = self.eye_height_offset;
     if (offset != 0) {
-        const offset_delta = self.settings.move_speed * dt * @max(1, @abs(offset));
+        const offset_delta = self.settings.eye_move_speed * dt * @max(1, @abs(offset));
         if (offset > 0) {
             offset -= offset_delta;
             if (offset < 0) {
