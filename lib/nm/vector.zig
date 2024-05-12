@@ -420,6 +420,32 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             return res;
         }
 
+        pub fn eqlAny(a: Self, b: Self) bool {
+            inline for (indices) |i| {
+                if (a.v[i] == b.v[i]) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        pub fn min(a: Self, b: Self) Self {
+            var res: Self = undefined;
+            inline for (indices) |i| {
+                res.v[i] = @min(a.v[i], b.v[i]);
+            }
+            return res;
+        }
+        pub fn max(a: Self, b: Self) Self {
+            var res: Self = undefined;
+            inline for (indices) |i| {
+                res.v[i] = @max(a.v[i], b.v[i]);
+            }
+            return res;
+        }
+        pub fn aabbSize(a: Self, b: Self) Self {
+            return a.max(b).sub(a.min(b));
+        }
+
         pub fn format(self: Self, comptime fmt: []const u8, options: std.fmt.FormatOptions, w: anytype) !void {
             try w.writeAll("(");
             inline for (indices) |i| {

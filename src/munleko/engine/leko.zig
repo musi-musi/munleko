@@ -100,6 +100,16 @@ pub const LekoData = struct {
         return null;
     }
 
+    pub fn lekoValueAtPositionIsEmpty(self: *LekoData, position: Vec3i) bool {
+        const value = self.lekoValueAtPosition(position);
+        return value != null and value == .empty;
+    }
+
+    pub fn lekoValueAtPositionIsSolid(self: *LekoData, position: Vec3i) bool {
+        const value = self.lekoValueAtPosition(position);
+        return value != null and value != .empty;
+    }
+
     pub fn editLekoAt(self: *LekoData, reference: Reference, new_value: LekoValue) !void {
         const meta = self.chunk_meta.getPtr(reference.chunk);
         meta.generation +%= 1;
