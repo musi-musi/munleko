@@ -44,6 +44,8 @@ move_mode: MoveMode = .normal,
 // Leko states //
 
 leko_cursor: ?Vec3i = null,
+leko_anchor: ?Vec3i = null,
+
 // corner_cursor: ?Vec3 = null,
 /// the leko type to place when placing
 leko_equip: ?LekoType = null,
@@ -63,7 +65,8 @@ pub const leko_equip_radial_len = 8;
 pub const Input = struct {
     move: Vec3 = Vec3.zero,
     trigger_jump: bool = false,
-    trigger_primary: bool = false,
+    on_primary_pressed: bool = false,
+    on_primary_released: bool = false,
     primary: bool = false,
 };
 
@@ -112,6 +115,7 @@ pub const LekoPlaceMode = enum {
     normal,
     wall,
     box,
+    drag,
 };
 
 pub fn init(world: *World, position: Vec3) !Player {
@@ -131,7 +135,8 @@ pub fn deinit(self: Player) void {
 
 pub fn tick(self: *Player, session: *Session) !void {
     defer self.input.trigger_jump = false;
-    defer self.input.trigger_primary = false;
+    defer self.input.on_primary_pressed = false;
+    defer self.input.on_primary_released = false;
     const dt = 1 / session.tick_timer.rate;
     switch (self.move_mode) {
         .normal => self.moveNormal(session.world, dt),
@@ -154,6 +159,7 @@ pub fn tick(self: *Player, session: *Session) !void {
                             }
                         }
                     },
+                    .drag => {},
                     else => {
                         if (self.leko_equip) |leko_type| {
                             _ = try session.world.leko_data.editLekoAtPosition(cursor, leko_type.value);
@@ -162,6 +168,29 @@ pub fn tick(self: *Player, session: *Session) !void {
                 },
             }
         }
+        if (self.input.on_primary_released) {
+            if (self.leko_edit_mode == .place and self.leko_place_mode == .drag) {
+                if (self.leko_anchor) |anchor| {
+                    const dist = cursor.aabbSize(anchor).cast(usize).addScalar(1);
+                    if (self.leko_equip) |leko_type| {
+                        for (0..dist.get(.x)) |x| {
+                            for (0..dist.get(.y)) |y| {
+                                for (0..dist.get(.z)) |z| {
+                                    const offset = vec3i(.{ @intCast(x), @intCast(y), @intCast(z) });
+                                    const target = cursor.min(anchor).add(offset);
+                                    if (session.world.leko_data.lekoValueAtPosition(target) == .empty) {
+                                        _ = try session.world.leko_data.editLekoAtPosition(target, leko_type.value);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (!self.input.primary) {
+        self.leko_anchor = null;
     }
     if (self.leko_edit_cooldown > 0) {
         self.leko_edit_cooldown -= 1;
@@ -247,60 +276,113 @@ fn updateLekoCursor(self: *Player, world: *World) void {
 
     var raycast = Physics.GridRaycastIterator.init(self.eyePosition(), forward);
     self.leko_cursor = null;
-    while (raycast.distance < self.settings.interact_range) : (raycast.next()) {
-        if (world.leko_data.lekoValueAtPosition(raycast.cell)) |leko_value| {
-            if (leko_value != .empty) {
-                switch (self.leko_edit_mode) {
-                    .remove => {
-                        self.leko_cursor = raycast.cell;
-                    },
-                    .place => switch (self.leko_place_mode) {
-                        .normal => {
-                            if (raycast.move) |move| {
-                                const offset = switch (move) {
-                                    inline else => |m| Vec3i.unitSigned(m),
-                                };
-                                self.leko_cursor = raycast.cell.sub(offset);
-                            }
-                            break;
-                        },
-                        .box => {
-                            if (raycast.move) |move| {
-                                const offset = switch (move) {
-                                    inline else => |m| Vec3i.unitSigned(m),
-                                };
-                                var cursor_target = raycast.cell.sub(offset).sub(raycast.corner);
-                                inline for (self.patterns.box) |pattern_offset| {
-                                    if (world.leko_data.lekoValueAtPosition(cursor_target.add(pattern_offset)) != .empty) {
-                                        return;
-                                    }
-                                }
-                                self.leko_cursor = cursor_target;
-                                // self.corner_cursor = raycast.subcell.cast(f32).divScalar(2);
-                            }
-                            break;
-                        },
-                        else => {},
-                    },
-                }
-                break;
-            } else {
-                switch (self.leko_edit_mode) {
-                    .place => switch (self.leko_place_mode) {
-                        .wall => {
-                            if (raycast.move != null and checkNeighborsWallPlaceMode(world, raycast.move.?.axis(), raycast.cell)) {
-                                self.leko_cursor = raycast.cell;
-                                break;
-                            }
-                        },
-                        else => {},
-                    },
-                    else => {},
+
+    const limit = self.settings.interact_range;
+    switch (self.leko_edit_mode) {
+        .remove => {
+            while (raycast.distance < limit) : (raycast.next()) {
+                if (world.leko_data.lekoValueAtPositionIsSolid(raycast.cell)) {
+                    self.leko_cursor = raycast.cell;
+                    break;
                 }
             }
-        } else {
-            break;
-        }
+        },
+        .place => switch (self.leko_place_mode) {
+            .normal => {
+                while (raycast.distance < limit) : (raycast.next()) {
+                    if (world.leko_data.lekoValueAtPositionIsSolid(raycast.cell)) {
+                        if (raycast.move) |move| {
+                            const offset = switch (move) {
+                                inline else => |m| Vec3i.unitSigned(m),
+                            };
+                            self.leko_cursor = raycast.cell.sub(offset);
+                        }
+                        break;
+                    }
+                }
+            },
+            .wall => {
+                while (raycast.distance < limit) : (raycast.next()) {
+                    if (raycast.move != null and checkNeighborsWallPlaceMode(world, raycast.move.?.axis(), raycast.cell)) {
+                        self.leko_cursor = raycast.cell;
+                        break;
+                    }
+                }
+            },
+            .box => {
+                while (raycast.distance < limit) : (raycast.next()) {
+                    if (world.leko_data.lekoValueAtPositionIsSolid(raycast.cell)) {
+                        if (raycast.move) |move| {
+                            const offset = switch (move) {
+                                inline else => |m| Vec3i.unitSigned(m),
+                            };
+                            var cursor_target = raycast.cell.sub(offset).sub(raycast.corner);
+                            inline for (self.patterns.box) |pattern_offset| {
+                                if (world.leko_data.lekoValueAtPosition(cursor_target.add(pattern_offset)) != .empty) {
+                                    return;
+                                }
+                            }
+                            self.leko_cursor = cursor_target;
+                            // self.corner_cursor = raycast.subcell.cast(f32).divScalar(2);
+                        }
+                        break;
+                    }
+                }
+            },
+            .drag => {
+                var air_caught: ?Vec3i = null;
+                var solid_dist: ?f32 = null;
+                while (raycast.distance < limit) : (raycast.next()) {
+                    if (world.leko_data.lekoValueAtPositionIsSolid(raycast.cell)) {
+                        if (raycast.move) |move| {
+                            const offset = switch (move) {
+                                inline else => |m| Vec3i.unitSigned(m),
+                            };
+                            const offset_cell = raycast.cell.sub(offset);
+                            if (self.input.on_primary_pressed) {
+                                self.leko_anchor = offset_cell;
+                                self.leko_cursor = offset_cell;
+                                return;
+                            }
+                            if (self.leko_anchor == null) {
+                                self.leko_cursor = offset_cell;
+                                return;
+                            }
+
+                            if (self.leko_anchor) |anchor| {
+                                if (anchor.eqlAny(offset_cell)) {
+                                    self.leko_cursor = offset_cell;
+                                    return;
+                                }
+                            }
+                        }
+                        if (solid_dist == null) {
+                            solid_dist = raycast.distance;
+                        }
+                    }
+
+                    if (raycast.distance < 0.5) {
+                        continue;
+                    }
+                    if (solid_dist) |dist| {
+                        if (raycast.distance > dist + 1) {
+                            air_caught = null;
+                            break;
+                        }
+                    }
+                    if (air_caught == null) {
+                        if (raycast.move != null and raycast.distance < self.settings.interact_range) {
+                            if (self.leko_anchor) |anchor| {
+                                if (raycast.cell.eqlAny(anchor)) {
+                                    air_caught = raycast.cell;
+                                }
+                            }
+                        }
+                    }
+                }
+                self.leko_cursor = air_caught;
+            },
+        },
     }
 }
 

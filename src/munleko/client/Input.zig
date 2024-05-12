@@ -83,7 +83,10 @@ pub fn update(self: *Input) void {
                     p.leko_place_mode = util.cycleEnum(p.leko_place_mode);
                 }
                 if (w.buttonPressed(.mouse_1)) {
-                    p.input.trigger_primary = true;
+                    p.input.on_primary_pressed = true;
+                }
+                if (w.buttonReleased(.mouse_1)) {
+                    p.input.on_primary_released = true;
                 }
                 p.input.primary = w.buttonHeld(.mouse_1);
                 const mouse_delta = mouse_position.sub(self.previous_mouse_position).mulScalar(0.1);
