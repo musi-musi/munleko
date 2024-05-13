@@ -33,6 +33,7 @@ const WorldModel = @This();
 
 const Vec3 = nm.Vec3;
 const vec3 = nm.vec3;
+const Vec3i = nm.Vec3i;
 
 pub const chunk_model_bounds_radius = std.math.sqrt(3) * World.chunk_width;
 
@@ -87,6 +88,7 @@ pub const ChunkModelStatus = struct {
     state: ChunkModelState = .deleted,
     generation: u32 = 0,
     chunk_generation: u32 = 0,
+    chunk_position: Vec3i = undefined,
     task_flags: ChunkModelTaskFlags = ChunkModelTaskFlags.initEmpty(),
     is_busy: bool = false,
 };
@@ -142,15 +144,19 @@ const ChunkModels = struct {
     fn createAndAddChunkModel(self: *ChunkModels, chunk: Chunk) !ChunkModel {
         const chunk_model = try self.pool.create();
         try self.statuses.matchCapacity(self.pool);
-        const status = self.statuses.getPtr(chunk_model);
-        status.mutex.lock();
-        status.mutex.unlock();
-        status.chunk = chunk;
-        const chunk_status = self.world_model.world.chunks.statuses.getPtr(chunk);
-        status.state = .pending;
-        status.chunk_generation = chunk_status.generation;
-        status.task_flags = ChunkModelTaskFlags.initEmpty();
-        status.is_busy = false;
+        {
+            const status = self.statuses.getPtr(chunk_model);
+            status.mutex.lock();
+            defer status.mutex.unlock();
+            status.chunk = chunk;
+            const chunk_status = self.world_model.world.chunks.statuses.getPtr(chunk);
+            status.state = .pending;
+            status.chunk_generation = chunk_status.generation;
+            status.task_flags = ChunkModelTaskFlags.initEmpty();
+            status.is_busy = false;
+            const chunk_position = self.world_model.world.graph.positions.get(chunk);
+            status.chunk_position = chunk_position;
+        }
         self.map_mutex.lock();
         defer self.map_mutex.unlock();
         try self.map.put(self.allocator, chunk, chunk_model);
@@ -184,16 +190,13 @@ pub const Manager = struct {
     job_queue_mutex: Mutex = .{},
     job_queue_condition: std.Thread.Condition = .{},
 
-    const ChunkModelJobQueue = util.HeapUnmanaged(ChunkModelQueueItem, (struct {
-        fn before(a: ChunkModelQueueItem, b: ChunkModelQueueItem) bool {
-            return a.priority < b.priority;
-        }
-    }).before);
+    const ChunkModelJobQueue = util.PriorityQueueUnmanaged(ChunkModelQueueItem);
 
     const ChunkModelQueueItem = struct {
         chunk_model: ChunkModel,
         generation: u32,
-        priority: i32,
+        chunk_position: Vec3i,
+        // priority: i32,
     };
 
     pub const ChunkModelJob = struct {
@@ -289,6 +292,7 @@ pub const Manager = struct {
             }
             try self.setTaskFlags(chunk_model, 0, &.{ .leko_mesh_generate_middle, .leko_mesh_generate_border });
         }
+        self.reprioritizeJobs(observer_position);
     }
 
     fn generateThreadMain(self: *Manager) !void {
@@ -309,8 +313,18 @@ pub const Manager = struct {
     fn flushJobQueue(self: *Manager) void {
         self.job_queue_mutex.lock();
         defer self.job_queue_mutex.unlock();
-        self.job_queue.items.clearRetainingCapacity();
+        self.job_queue.nodes.clearRetainingCapacity();
         self.job_queue_condition.broadcast();
+    }
+
+    fn reprioritizeJobs(self: *Manager, view_center: Vec3i) void {
+        self.job_queue_mutex.lock();
+        defer self.job_queue_mutex.unlock();
+        self.job_queue.reprioritize(view_center, (struct {
+            fn metric(center: Vec3i, node: ChunkModelJobQueue.Node) i32 {
+                return node.item.chunk_position.sub(center).mag2();
+            }
+        }).metric);
     }
 
     fn setTaskFlags(self: *Manager, chunk_model: ChunkModel, priority: i32, comptime flag_set: []const ChunkModelTask) !void {
@@ -325,9 +339,9 @@ pub const Manager = struct {
         if (old_flags.count() == 0) {
             try self.job_queue.push(self.allocator, .{
                 .chunk_model = chunk_model,
+                .chunk_position = status.chunk_position,
                 .generation = status.generation,
-                .priority = priority,
-            });
+            }, priority);
             self.job_queue_condition.signal();
         }
     }
@@ -346,8 +360,8 @@ pub const Manager = struct {
 
     fn getNextAvailableJob(self: *Manager) ?ChunkModelJob {
         var i: usize = 0;
-        while (i < self.job_queue.items.items.len) {
-            const item = self.job_queue.items.items[i];
+        while (i < self.job_queue.nodes.items.len) {
+            const item = self.job_queue.nodes.items[i].item;
             const chunk_model = item.chunk_model;
             const status = self.world_model.chunk_models.statuses.getPtr(chunk_model);
             status.mutex.lock();

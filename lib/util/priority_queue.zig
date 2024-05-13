@@ -17,9 +17,11 @@ pub fn JobQueueUnmanaged(comptime T: type) type {
 
         const Self = @This();
 
+        pub const Priority = Queue.Priority;
+
         /// push a new item to the queue
         /// if any threads are blocking on a call to `pop`, one will be woken up to recieve the item
-        pub fn push(self: *Self, allocator: Allocator, item: T, priority: i32) Allocator.Error!void {
+        pub fn push(self: *Self, allocator: Allocator, item: T, priority: Priority) Allocator.Error!void {
             self.mutex.lock();
             defer self.mutex.unlock();
             try self.queue.push(allocator, item, priority);
@@ -47,6 +49,12 @@ pub fn JobQueueUnmanaged(comptime T: type) type {
             self.queue.nodes.clearAndFree(allocator);
             self.cond.broadcast();
         }
+
+        pub fn reprioritize(self: *Self, context: anytype, comptime metric: fn (@TypeOf(context), Queue.Node) Priority) void {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            self.queue.reprioritize(context, metric);
+        }
     };
 }
 
@@ -55,19 +63,25 @@ pub fn PriorityQueueUnmanaged(comptime T: type) type {
         nodes: Nodes = .{},
 
         pub const Node = struct {
-            priority: i32,
+            priority: Priority,
             item: T,
         };
 
         pub const Nodes = std.ArrayListUnmanaged(Node);
 
+        pub const Priority = i32;
+
         const Self = @This();
+
+        pub fn deinit(self: *Self, allocator: Allocator) void {
+            self.nodes.clearAndFree(allocator);
+        }
 
         fn swap(self: *Self, a: usize, b: usize) void {
             std.mem.swap(Node, &self.nodes.items[a], &self.nodes.items[b]);
         }
 
-        fn priority(self: Self, i: usize) i32 {
+        fn priority(self: Self, i: usize) Priority {
             return self.nodes.items[i].priority;
         }
 
@@ -109,7 +123,7 @@ pub fn PriorityQueueUnmanaged(comptime T: type) type {
             }
         }
 
-        pub fn push(self: *Self, allocator: Allocator, item: T, p: i32) Allocator.Error!void {
+        pub fn push(self: *Self, allocator: Allocator, item: T, p: Priority) Allocator.Error!void {
             const len = self.nodes.items.len;
             try self.nodes.append(allocator, .{
                 .priority = p,
@@ -133,6 +147,35 @@ pub fn PriorityQueueUnmanaged(comptime T: type) type {
                 }
             } else {
                 return null;
+            }
+        }
+
+        pub fn popAtIndex(self: *Self, i: usize) ?T {
+            const len = self.nodes.items.len;
+            if (i >= len) {
+                return null;
+            }
+            const item = self.nodes.items[i].item;
+            if (i == len - 1) {
+                self.nodes.items.len -= 1;
+                return item;
+            }
+            self.swap(i, len - 1);
+            self.nodes.items.len -= 1;
+            self.down(i);
+            return item;
+        }
+
+        pub fn reprioritize(self: *Self, context: anytype, comptime metric: fn (@TypeOf(context), Node) Priority) void {
+            const old = self.nodes.items;
+            self.nodes.items.len = 0;
+            for (old, 0..) |node, len| {
+                const new_priority = metric(context, node);
+                self.nodes.appendAssumeCapacity(.{
+                    .priority = new_priority,
+                    .item = node.item,
+                });
+                self.up(len);
             }
         }
     };
