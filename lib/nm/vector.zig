@@ -420,6 +420,7 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             return res;
         }
 
+        /// component-wise check for any equal values
         pub fn eqlAny(a: Self, b: Self) bool {
             inline for (indices) |i| {
                 if (a.v[i] == b.v[i]) {
@@ -428,6 +429,8 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             }
             return false;
         }
+
+        /// component-wise @min
         pub fn min(a: Self, b: Self) Self {
             var res: Self = undefined;
             inline for (indices) |i| {
@@ -435,6 +438,8 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             }
             return res;
         }
+
+        /// component-wise @max
         pub fn max(a: Self, b: Self) Self {
             var res: Self = undefined;
             inline for (indices) |i| {
@@ -442,6 +447,8 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
             }
             return res;
         }
+
+        /// difference between max() of two vectors and min() of those same vectors
         pub fn aabbSize(a: Self, b: Self) Self {
             return a.max(b).sub(a.min(b));
         }
@@ -465,6 +472,14 @@ pub fn Vector(comptime Scalar_: type, comptime dimensions_: comptime_int) type {
         pub fn scalarProject(self: Self, target: Self) Scalar {
             comptime nm.assertFloat(Scalar);
             return self.dot(target) / target.mag();
+        }
+
+        pub fn clampScalar(self: Self, a: Scalar, b: Scalar) Self {
+            var res: Self = undefined;
+            inline for (indices) |i| {
+                res.v[i] = std.math.clamp(self.v[i], a, b);
+            }
+            return res;
         }
     };
 }
