@@ -85,6 +85,7 @@ pub const Settings = struct {
     jump_height: f32 = 2.25,
     noclip_move_speed: f32 = 32,
     interact_range: f32 = 10,
+    drag_range: i32 = 15,
     edit_cooldown_duration: f32 = 0.2,
 };
 
@@ -281,7 +282,7 @@ fn updateLekoCursor(self: *Player, world: *World) void {
     switch (self.leko_edit_mode) {
         .remove => {
             while (raycast.distance < limit) : (raycast.next()) {
-                if (world.leko_data.lekoValueAtPositionIsSolid(raycast.cell)) {
+                if (world.leko_data.lekoValueAtPosition(raycast.cell) != .empty) {
                     self.leko_cursor = raycast.cell;
                     break;
                 }
@@ -290,14 +291,14 @@ fn updateLekoCursor(self: *Player, world: *World) void {
         .place => switch (self.leko_place_mode) {
             .normal => {
                 while (raycast.distance < limit) : (raycast.next()) {
-                    if (world.leko_data.lekoValueAtPositionIsSolid(raycast.cell)) {
-                        if (raycast.move) |move| {
-                            const offset = switch (move) {
-                                inline else => |m| Vec3i.unitSigned(m),
-                            };
+                    if (raycast.move) |move| {
+                        const offset = switch (move) {
+                            inline else => |m| Vec3i.unitSigned(m),
+                        };
+                        if (world.leko_data.lekoValueAtPosition(raycast.cell) != .empty) {
                             self.leko_cursor = raycast.cell.sub(offset);
+                            break;
                         }
-                        break;
                     }
                 }
             },
@@ -311,8 +312,8 @@ fn updateLekoCursor(self: *Player, world: *World) void {
             },
             .box => {
                 while (raycast.distance < limit) : (raycast.next()) {
-                    if (world.leko_data.lekoValueAtPositionIsSolid(raycast.cell)) {
-                        if (raycast.move) |move| {
+                    if (raycast.move) |move| {
+                        if (world.leko_data.lekoValueAtPosition(raycast.cell) != .empty) {
                             const offset = switch (move) {
                                 inline else => |m| Vec3i.unitSigned(m),
                             };
@@ -323,64 +324,41 @@ fn updateLekoCursor(self: *Player, world: *World) void {
                                 }
                             }
                             self.leko_cursor = cursor_target;
-                            // self.corner_cursor = raycast.subcell.cast(f32).divScalar(2);
+                            break;
                         }
-                        break;
                     }
                 }
             },
             .drag => {
-                var air_caught: ?Vec3i = null;
-                var solid_dist: ?f32 = null;
                 while (raycast.distance < limit) : (raycast.next()) {
-                    if (world.leko_data.lekoValueAtPositionIsSolid(raycast.cell)) {
-                        if (raycast.move) |move| {
-                            const offset = switch (move) {
-                                inline else => |m| Vec3i.unitSigned(m),
-                            };
-                            const offset_cell = raycast.cell.sub(offset);
+                    if (raycast.move) |move| {
+                        const offset = switch (move) {
+                            inline else => |m| Vec3i.unitSigned(m),
+                        };
+                        const offset_cell = raycast.cell.sub(offset);
+                        if (world.leko_data.lekoValueAtPosition(raycast.cell) != .empty) {
                             if (self.input.on_primary_pressed) {
                                 self.leko_anchor = offset_cell;
-                                self.leko_cursor = offset_cell;
-                                return;
-                            }
-                            if (self.leko_anchor == null) {
-                                self.leko_cursor = offset_cell;
-                                return;
                             }
 
                             if (self.leko_anchor) |anchor| {
-                                if (anchor.eqlAny(offset_cell)) {
-                                    self.leko_cursor = offset_cell;
-                                    return;
+                                if (offset_cell.eqlAny(anchor)) {
+                                    const clamped_offset = offset_cell.sub(anchor).clampScalar(-self.settings.drag_range, self.settings.drag_range);
+                                    self.leko_cursor = anchor.add(clamped_offset);
                                 }
+                                break;
                             }
-                        }
-                        if (solid_dist == null) {
-                            solid_dist = raycast.distance;
-                        }
-                    }
 
-                    if (raycast.distance < 0.5) {
-                        continue;
-                    }
-                    if (solid_dist) |dist| {
-                        if (raycast.distance > dist + 1) {
-                            air_caught = null;
+                            self.leko_cursor = offset_cell;
                             break;
-                        }
-                    }
-                    if (air_caught == null) {
-                        if (raycast.move != null and raycast.distance < self.settings.interact_range) {
-                            if (self.leko_anchor) |anchor| {
-                                if (raycast.cell.eqlAny(anchor)) {
-                                    air_caught = raycast.cell;
-                                }
+                        } else if (self.leko_anchor) |anchor| {
+                            if (raycast.cell.eqlAny(anchor)) {
+                                const clamped_offset = raycast.cell.sub(anchor).clampScalar(-self.settings.drag_range, self.settings.drag_range);
+                                self.leko_cursor = anchor.add(clamped_offset);
                             }
                         }
                     }
                 }
-                self.leko_cursor = air_caught;
             },
         },
     }
